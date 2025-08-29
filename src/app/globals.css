@@ -1,0 +1,86 @@
+@import 'tailwindcss/base';
+@import 'tailwindcss/components';
+@import 'tailwindcss/utilities';
+
+@layer base {
+  :root {
+    --background: 220 17% 7%;
+    --foreground: 220 17% 95%;
+    --card: 220 17% 10%;
+    --card-foreground: 220 17% 95%;
+    --popover: 220 17% 10%;
+    --popover-foreground: 220 17% 95%;
+    --primary: 37 91% 55%;
+    --primary-foreground: 220 17% 7%;
+    --secondary: 220 17% 15%;
+    --secondary-foreground: 220 17% 85%;
+    --muted: 220 17% 15%;
+    --muted-foreground: 220 17% 60%;
+    --accent: 220 17% 15%;
+    --accent-foreground: 220 17% 85%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 220 17% 95%;
+    --border: 220 17% 20%;
+    --input: 220 17% 20%;
+    --ring: 37 91% 55%;
+    --radius: 0.5rem;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+@layer components {
+  .btn-primary {
+    @apply inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:opacity-50 disabled:pointer-events-none ring-offset-background bg-primary text-primary-foreground hover:bg-primary/90 h-10 py-2 px-4;
+  }
+  
+  .btn-secondary {
+    @apply inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:opacity-50 disabled:pointer-events-none ring-offset-background bg-secondary text-secondary-foreground hover:bg-secondary/80 h-10 py-2 px-4;
+  }
+  
+  .card {
+    @apply rounded-lg border bg-card text-card-foreground shadow-sm;
+  }
+  
+  .input {
+    @apply flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50;
+  }
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  @apply bg-muted;
+}
+
+::-webkit-scrollbar-thumb {
+  @apply bg-border rounded-full;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  @apply bg-muted-foreground;
+}
+
+/* Loading animation */
+.animate-pulse {
+  animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: .5;
+  }
+}
