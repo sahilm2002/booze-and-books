@@ -1,0 +1,1 @@
+DROP FUNCTION IF EXISTS get_avatar_url(TEXT);

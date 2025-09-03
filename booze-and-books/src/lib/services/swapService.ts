@@ -4,6 +4,7 @@ import type {
 	SwapRequestInput, 
 	SwapRequestUpdate, 
 	SwapRequestWithBook,
+	SwapCompletion,
 	SwapStatus 
 } from '../types/swap.js';
 
@@ -37,7 +38,7 @@ export class SwapService {
 				requester_id: requesterId,
 				owner_id: book.owner_id,
 				message: input.message,
-				status: 'PENDING'
+				status: SwapStatus.PENDING
 			})
 			.select()
 			.single();
@@ -136,16 +137,23 @@ export class SwapService {
 		}
 
 		// Validate permissions
-		if (status === 'CANCELLED' && request.requester_id !== userId) {
+		if (status === SwapStatus.CANCELLED && request.requester_id !== userId) {
 			throw new Error('Only the requester can cancel a swap request');
 		}
 
-		if ((status === 'ACCEPTED' || status === 'DECLINED') && request.owner_id !== userId) {
+		if ((status === SwapStatus.ACCEPTED || status === SwapStatus.DECLINED) && request.owner_id !== userId) {
 			throw new Error('Only the book owner can accept or decline a swap request');
 		}
 
-		if (request.status !== 'PENDING') {
-			throw new Error('Only pending requests can be updated');
+		if (status === SwapStatus.COMPLETED && request.requester_id !== userId && request.owner_id !== userId) {
+			throw new Error('Only swap participants can mark a swap as completed');
+		}
+
+		// Validate status transitions
+		if (status === SwapStatus.COMPLETED && request.status !== SwapStatus.ACCEPTED) {
+			throw new Error('Only accepted requests can be completed');
+		} else if (status !== SwapStatus.COMPLETED && request.status !== SwapStatus.PENDING) {
+			throw new Error('Only pending requests can be accepted, declined, or cancelled');
 		}
 
 		// Update the status
@@ -210,13 +218,13 @@ export class SwapService {
 				.from('swap_requests')
 				.select('id', { count: 'exact', head: true })
 				.eq('owner_id', userId)
-				.eq('status', 'PENDING'),
+				.eq('status', SwapStatus.PENDING),
 			
 			supabase
 				.from('swap_requests')
 				.select('id', { count: 'exact', head: true })
 				.eq('requester_id', userId)
-				.eq('status', 'PENDING')
+				.eq('status', SwapStatus.PENDING)
 		]);
 
 		if (incomingResult.error) {
@@ -235,16 +243,193 @@ export class SwapService {
 
 	// Cancel swap request (requester only)
 	static async cancelSwapRequest(requestId: string, userId: string): Promise<SwapRequest> {
-		return this.updateSwapRequestStatus(requestId, 'CANCELLED', userId);
+		return this.updateSwapRequestStatus(requestId, SwapStatus.CANCELLED, userId);
 	}
 
 	// Accept swap request (owner only)
 	static async acceptSwapRequest(requestId: string, userId: string): Promise<SwapRequest> {
-		return this.updateSwapRequestStatus(requestId, 'ACCEPTED', userId);
+		return this.updateSwapRequestStatus(requestId, SwapStatus.ACCEPTED, userId);
 	}
 
 	// Decline swap request (owner only)
 	static async declineSwapRequest(requestId: string, userId: string): Promise<SwapRequest> {
-		return this.updateSwapRequestStatus(requestId, 'DECLINED', userId);
+		return this.updateSwapRequestStatus(requestId, SwapStatus.DECLINED, userId);
+	}
+
+	// Mark swap as completed with rating and feedback
+	static async markSwapAsCompleted(
+		requestId: string, 
+		userId: string,
+		completion: SwapCompletion
+	): Promise<SwapRequest> {
+		// First verify the request can be completed
+		const { data: request, error: fetchError } = await supabase
+			.from('swap_requests')
+			.select('*')
+			.eq('id', requestId)
+			.single();
+
+		if (fetchError) {
+			throw new Error(`Swap request not found: ${fetchError.message}`);
+		}
+
+		if (request.status !== SwapStatus.ACCEPTED) {
+			throw new Error('Only accepted requests can be completed');
+		}
+
+		if (request.requester_id !== userId && request.owner_id !== userId) {
+			throw new Error('Only swap participants can mark a swap as completed');
+		}
+
+		// Determine if user is requester or owner and set appropriate rating
+		const updateData: any = {
+			status: SwapStatus.COMPLETED,
+			completion_date: new Date().toISOString()
+		};
+
+		if (request.requester_id === userId) {
+			updateData.requester_rating = completion.rating;
+			updateData.requester_feedback = completion.feedback;
+		} else {
+			updateData.owner_rating = completion.rating;
+			updateData.owner_feedback = completion.feedback;
+		}
+
+		const { data, error } = await supabase
+			.from('swap_requests')
+			.update(updateData)
+			.eq('id', requestId)
+			.select()
+			.single();
+
+		if (error) {
+			throw new Error(`Failed to complete swap: ${error.message}`);
+		}
+
+		return data;
+	}
+
+	// Get completed swaps for a user
+	static async getCompletedSwaps(userId: string): Promise<SwapRequestWithBook[]> {
+		const { data, error } = await supabase
+			.from('swap_requests')
+			.select(`
+				*,
+				book:books (
+					id,
+					title,
+					authors,
+					thumbnail_url,
+					condition
+				),
+				requester_profile:profiles!swap_requests_requester_id_profiles_fkey (
+					username,
+					full_name,
+					avatar_url
+				),
+				owner_profile:profiles!swap_requests_owner_id_profiles_fkey (
+					username,
+					full_name,
+					avatar_url
+				)
+			`)
+			.eq('status', SwapStatus.COMPLETED)
+			.or(`requester_id.eq.${userId},owner_id.eq.${userId}`)
+			.order('completion_date', { ascending: false });
+
+		if (error) {
+			throw new Error(`Failed to fetch completed swaps: ${error.message}`);
+		}
+
+		return data || [];
+	}
+
+	// Get swap statistics for a user
+	static async getSwapStatistics(userId: string): Promise<{
+		total_completed: number;
+		average_rating: number;
+		completion_rate: number;
+		total_swaps: number;
+	}> {
+		try {
+			const { data, error } = await supabase.rpc('get_user_completion_stats', {
+				user_id: userId
+			});
+
+			if (error) {
+				throw new Error(`Failed to fetch swap statistics: ${error.message}`);
+			}
+
+			if (!data || data.length === 0) {
+				return {
+					total_completed: 0,
+					average_rating: 0,
+					completion_rate: 0,
+					total_swaps: 0
+				};
+			}
+
+			return {
+				total_completed: data[0].total_completed || 0,
+				average_rating: parseFloat(data[0].average_rating || '0'),
+				completion_rate: parseFloat(data[0].completion_rate || '0'),
+				total_swaps: data[0].total_swaps || 0
+			};
+		} catch (error) {
+			console.error('Error fetching swap statistics:', error);
+			return {
+				total_completed: 0,
+				average_rating: 0,
+				completion_rate: 0,
+				total_swaps: 0
+			};
+		}
+	}
+
+	// Get user's rating from other users' perspective
+	static async getUserRating(userId: string): Promise<{
+		average_rating: number;
+		total_ratings: number;
+		ratings_breakdown: { [key: number]: number };
+	}> {
+		const { data, error } = await supabase
+			.from('swap_requests')
+			.select('requester_rating, owner_rating, requester_id, owner_id')
+			.eq('status', SwapStatus.COMPLETED)
+			.or(`requester_id.eq.${userId},owner_id.eq.${userId}`)
+			.or('requester_rating.not.is.null,owner_rating.not.is.null');
+
+		if (error) {
+			throw new Error(`Failed to fetch user ratings: ${error.message}`);
+		}
+
+		const ratings: number[] = [];
+		const breakdown = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
+
+		data?.forEach(swap => {
+			// Get the rating given TO this user (not BY this user)
+			if (swap.requester_id === userId && swap.owner_rating !== null) {
+				ratings.push(swap.owner_rating);
+				breakdown[swap.owner_rating as keyof typeof breakdown]++;
+			} else if (swap.owner_id === userId && swap.requester_rating !== null) {
+				ratings.push(swap.requester_rating);
+				breakdown[swap.requester_rating as keyof typeof breakdown]++;
+			}
+		});
+
+		return {
+			average_rating: ratings.length > 0 ? ratings.reduce((a, b) => a + b, 0) / ratings.length : 0,
+			total_ratings: ratings.length,
+			ratings_breakdown: breakdown
+		};
+	}
+
+	// Complete swap request (both parties can use this)
+	static async completeSwapRequest(
+		requestId: string, 
+		userId: string,
+		completion: SwapCompletion
+	): Promise<SwapRequest> {
+		return this.markSwapAsCompleted(requestId, userId, completion);
 	}
 }
