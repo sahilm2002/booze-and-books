@@ -27,7 +27,7 @@ export class BookService {
 			.from('books')
 			.select(`
 				*,
-				profile:profiles!books_owner_id_profiles_fkey (
+				profiles!owner_id (
 					username,
 					full_name,
 					avatar_url
@@ -55,7 +55,7 @@ export class BookService {
 			.from('books')
 			.select(`
 				*,
-				profile:profiles!books_owner_id_profiles_fkey (
+				profiles!owner_id (
 					username,
 					full_name,
 					avatar_url
@@ -133,7 +133,7 @@ export class BookService {
 			.from('books')
 			.select(`
 				*,
-				profile:profiles!books_owner_id_profiles_fkey (
+				profiles!owner_id (
 					username,
 					full_name,
 					avatar_url
@@ -278,7 +278,7 @@ export class BookService {
 			.from('books')
 			.select(`
 				*,
-				profile:profiles!books_owner_id_profiles_fkey (
+				profiles!owner_id (
 					username,
 					full_name,
 					avatar_url
@@ -327,7 +327,7 @@ export class BookService {
 			.from('books')
 			.select(`
 				*,
-				profile:profiles!books_owner_id_profiles_fkey (
+				profiles!owner_id (
 					username,
 					full_name,
 					avatar_url
@@ -364,7 +364,7 @@ export class BookService {
 			.from('books')
 			.select(`
 				*,
-				profile:profiles!books_owner_id_profiles_fkey (
+				profiles!owner_id (
 					username,
 					full_name,
 					avatar_url

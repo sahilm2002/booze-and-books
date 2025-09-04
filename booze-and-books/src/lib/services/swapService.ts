@@ -1,11 +1,11 @@
 import { supabase } from '$lib/supabase';
-import type { 
-	SwapRequest, 
-	SwapRequestInput, 
-	SwapRequestUpdate, 
-	SwapRequestWithBook,
-	SwapCompletion,
-	SwapStatus 
+import { 
+	SwapStatus,
+	type SwapRequest, 
+	type SwapRequestInput, 
+	type SwapRequestUpdate, 
+	type SwapRequestWithBook,
+	type SwapCompletion
 } from '../types/swap.js';
 
 export class SwapService {

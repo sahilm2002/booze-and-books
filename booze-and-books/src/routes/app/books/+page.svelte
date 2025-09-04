@@ -2,8 +2,8 @@
 	import { page } from '$app/stores';
 	import { goto } from '$app/navigation';
 	import { onMount } from 'svelte';
-	import BookCard from '$components/books/BookCard.svelte';
-	import BookEditForm from '$components/books/BookEditForm.svelte';
+	import BookCard from '../../../components/books/BookCard.svelte';
+	import BookEditForm from '../../../components/books/BookEditForm.svelte';
 	import { bookStore, books, booksLoading, booksError } from '$lib/stores/books';
 	import type { Book } from '$lib/types/book';
 	import type { PageData } from './$types';
@@ -65,6 +65,13 @@
 		searchTerm = '';
 		selectedGenre = '';
 		selectedCondition = '';
+	}
+
+	function handleViewDetails(event: CustomEvent<{ book: Book }>) {
+		const { book } = event.detail;
+		// Navigate to a book details page or show a modal with details
+		// For now, let's navigate to a book details route
+		goto(`/app/books/${book.id}`);
 	}
 </script>
 
@@ -238,6 +245,7 @@
 					{book}
 					on:edit={handleEditBook}
 					on:delete={handleDeleteBook}
+					on:view-details={handleViewDetails}
 				/>
 			{/each}
 		</div>

@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import BookCard from '$lib/components/books/BookCard.svelte';
+	import BookCard from '../../../components/books/BookCard.svelte';
 	import type { PageData } from './$types';
 	import type { BookWithOwner } from '$lib/types/book';
 
@@ -13,7 +13,7 @@
 	let showSuccessMessage = '';
 
 	// Get unique genres and conditions for filters
-	$: uniqueGenres = [...new Set(data.availableBooks.map(book => book.genre).filter(Boolean))].sort();
+	$: uniqueGenres = [...new Set(data.availableBooks.map(book => book.genre).filter(Boolean))].sort() as string[];
 	$: uniqueConditions = [...new Set(data.availableBooks.map(book => book.condition))].sort();
 
 	// Filter books based on search and filters

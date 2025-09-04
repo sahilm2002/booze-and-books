@@ -2,7 +2,7 @@
 	import { page } from '$app/stores';
 	import { pendingIncomingCount } from '$lib/stores/swaps';
 	
-	const navItems = [
+	$: navItems = [
 		{
 			name: 'Dashboard',
 			href: '/app',
@@ -27,7 +27,7 @@
 			name: 'Swap Requests',
 			href: '/app/swaps',
 			icon: 'exchange',
-			badgeCount: pendingIncomingCount
+			badgeCount: $pendingIncomingCount
 		},
 		{
 			name: 'Settings',
@@ -57,7 +57,7 @@
 				<li>
 					{#if item.disabled}
 						<div class="flex items-center px-3 py-2 text-sm text-gray-400 rounded-md cursor-not-allowed">
-							<svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+							<svg class="w-5 h-5 mr-3" width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
 								{@html icons[item.icon]}
 							</svg>
 							{item.name}
@@ -75,13 +75,13 @@
 									: 'text-gray-700 hover:bg-gray-50 hover:text-gray-900'
 							}"
 						>
-							<svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+							<svg class="w-5 h-5 mr-3" width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
 								{@html icons[item.icon]}
 							</svg>
 							{item.name}
-							{#if item.badgeCount && $item.badgeCount > 0}
+							{#if item.badgeCount && item.badgeCount > 0}
 								<span class="ml-auto inline-flex items-center justify-center px-2 py-1 text-xs font-bold leading-none text-white bg-red-600 rounded-full">
-									{$item.badgeCount}
+									{item.badgeCount}
 								</span>
 							{/if}
 						</a>
@@ -91,3 +91,15 @@
 		</ul>
 	</div>
 </nav>
+
+<style>
+	/* Ensure SVG icons are properly sized */
+	svg {
+		width: 1.25rem !important;
+		height: 1.25rem !important;
+		min-width: 1.25rem !important;
+		min-height: 1.25rem !important;
+		max-width: 1.25rem !important;
+		max-height: 1.25rem !important;
+	}
+</style>

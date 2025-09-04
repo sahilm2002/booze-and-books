@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { auth } from '$lib/stores/auth';
 	import { profile } from '$lib/stores/profile';
-	import ProfileCard from '$components/profile/ProfileCard.svelte';
+	import ProfileCard from '../../components/profile/ProfileCard.svelte';
 	import { ProfileService } from '$lib/services/profileService';
 	import type { PageData } from './$types';
 
@@ -49,8 +49,13 @@
 					
 					<div class="stat-card">
 						<h3>Average Rating</h3>
-						<p class="stat-number">{data.swapStatistics.average_rating.toFixed(1)}</p>
-						<p class="stat-label">★ From other users</p>
+						{#if data.swapStatistics.average_rating > 0}
+							<p class="stat-number">{data.swapStatistics.average_rating.toFixed(1)}</p>
+							<p class="stat-label">★ From other users</p>
+						{:else}
+							<p class="stat-number">--</p>
+							<p class="stat-label">No ratings yet</p>
+						{/if}
 					</div>
 				</section>
 

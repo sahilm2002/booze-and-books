@@ -1,5 +1,5 @@
 <script lang="ts">
-	import BookAddForm from '$components/books/BookAddForm.svelte';
+	import BookAddForm from '../../../../components/books/BookAddForm.svelte';
 </script>
 
 <svelte:head>

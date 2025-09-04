@@ -47,7 +47,7 @@ export interface BookUpdate {
 }
 
 export interface BookWithOwner extends Book {
-	profile: {
+	profiles: {
 		username: string | null;
 		full_name: string | null;
 		avatar_url: string | null;

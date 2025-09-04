@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import SwapRequestCard from '$lib/components/swaps/SwapRequestCard.svelte';
+	import SwapRequestCard from '../../../components/swaps/SwapRequestCard.svelte';
 	import { swapStore, incomingSwapRequests, outgoingSwapRequests, swapRequestsLoading, swapRequestsError } from '$lib/stores/swaps';
 	import type { PageData } from './$types';
 

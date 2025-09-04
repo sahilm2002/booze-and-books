@@ -97,3 +97,11 @@ function createAuthStore() {
 }
 
 export const auth = createAuthStore();
+
+// Create a derived store for just the user
+export const user = writable<User | null>(null);
+
+// Update user store when auth changes
+auth.subscribe(state => {
+	user.set(state.user);
+});

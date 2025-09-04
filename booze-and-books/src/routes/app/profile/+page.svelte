@@ -1,7 +1,7 @@
 <script lang="ts">
-	import ProfileCard from '$components/profile/ProfileCard.svelte';
-	import ProfileEditForm from '$components/profile/ProfileEditForm.svelte';
-	import UserRating from '$components/profile/UserRating.svelte';
+	import ProfileCard from '../../../components/profile/ProfileCard.svelte';
+	import ProfileEditForm from '../../../components/profile/ProfileEditForm.svelte';
+	import UserRating from '../../../components/profile/UserRating.svelte';
 	import { profile } from '$lib/stores/profile';
 	import { userRating, swapStatistics } from '$lib/stores/swaps';
 

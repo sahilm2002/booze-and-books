@@ -15,7 +15,7 @@ export const load: PageServerLoad = async ({ params, locals: { supabase, getSess
 
 	try {
 		// Get book details with owner information
-		const book = await BookServiceServer.getBookById(supabase, bookId);
+		const book = await BookServiceServer.getBook(supabase, bookId);
 
 		if (!book) {
 			throw error(404, 'Book not found');

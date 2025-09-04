@@ -1,11 +1,11 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { SwapStatus } from '../types/swap.js';
 import type { 
 	SwapRequest, 
 	SwapRequestInput, 
 	SwapRequestUpdate, 
 	SwapRequestWithBook,
-	SwapCompletion,
-	SwapStatus 
+	SwapCompletion
 } from '../types/swap.js';
 
 export class SwapServiceServer {

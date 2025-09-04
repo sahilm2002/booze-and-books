@@ -1,8 +1,8 @@
 <script lang="ts">
 	import { page } from '$app/stores';
 	import { goto } from '$app/navigation';
-	import BookDetailView from '$components/books/BookDetailView.svelte';
-	import SwapRequestDialog from '$components/swaps/SwapRequestDialog.svelte';
+	import BookDetailView from '../../../../components/books/BookDetailView.svelte';
+	import SwapRequestDialog from '../../../../components/swaps/SwapRequestDialog.svelte';
 	import { swapStore } from '$lib/stores/swaps.js';
 	import type { PageData } from './$types.js';
 

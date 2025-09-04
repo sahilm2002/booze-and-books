@@ -299,12 +299,16 @@ class BookStore {
 
 export const bookStore = BookStore.getInstance();
 
-// Auto-load books when user changes
-user.subscribe((currentUser) => {
-	if (currentUser) {
-		bookStore.loadUserBooks(currentUser.id, true);
-		bookStore.loadBookStats(currentUser.id);
-	} else {
-		bookStore.clearBooks();
-	}
-});
+// Auto-load books when user changes (only in browser to avoid SSR issues)
+import { browser } from '$app/environment';
+
+if (browser) {
+	user.subscribe((currentUser) => {
+		if (currentUser) {
+			bookStore.loadUserBooks(currentUser.id, true);
+			bookStore.loadBookStats(currentUser.id);
+		} else {
+			bookStore.clearBooks();
+		}
+	});
+}

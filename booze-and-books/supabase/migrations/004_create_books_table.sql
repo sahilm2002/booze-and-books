@@ -18,7 +18,11 @@ CREATE TABLE IF NOT EXISTS books (
   CONSTRAINT unique_user_google_book UNIQUE (owner_id, google_volume_id)
 );
 
--- Add foreign key constraint to profiles table
+-- Remove conflicting FK to auth.users
+ALTER TABLE books DROP CONSTRAINT IF EXISTS books_owner_id_fkey;
+
+-- Ensure FK references profiles.id only
+ALTER TABLE books DROP CONSTRAINT IF EXISTS books_owner_id_profiles_fkey;
 ALTER TABLE books
   ADD CONSTRAINT books_owner_id_profiles_fkey
   FOREIGN KEY (owner_id) REFERENCES profiles(id) ON DELETE CASCADE;
@@ -31,20 +35,29 @@ CREATE POLICY "Books are viewable by everyone"
 ON books FOR SELECT 
 USING (true);
 
--- Policy: Users can only insert their own books
+-- Policy: Users can insert own books
 CREATE POLICY "Users can insert own books" 
 ON books FOR INSERT 
 WITH CHECK (auth.uid() = owner_id);
 
--- Policy: Users can only update their own books
+-- Policy: Users can update own books
 CREATE POLICY "Users can update own books" 
 ON books FOR UPDATE 
 USING (auth.uid() = owner_id);
 
--- Policy: Users can only delete their own books
+-- Policy: Users can delete own books
 CREATE POLICY "Users can delete own books" 
 ON books FOR DELETE 
 USING (auth.uid() = owner_id);
+
+-- Create or replace function to update updated_at column
+CREATE OR REPLACE FUNCTION update_updated_at_column()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.updated_at = now();
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
 
 -- Create trigger for books table to update updated_at timestamp
 CREATE TRIGGER update_books_updated_at 

@@ -4,8 +4,8 @@
 	import { profile, profileStore } from '$lib/stores/profile';
 	import { ProfileService } from '$lib/services/profileService';
 	import { realtimeService } from '$lib/services/realtimeService';
-	import NotificationBell from '$lib/components/notifications/NotificationBell.svelte';
-	import RealtimeStatus from '$lib/components/common/RealtimeStatus.svelte';
+	import NotificationBell from '../components/notifications/NotificationBell.svelte';
+	import RealtimeStatus from '../components/common/RealtimeStatus.svelte';
 	import type { PageData } from './$types';
 	export let data: PageData;
 

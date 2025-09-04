@@ -1,9 +1,9 @@
 <script lang="ts">
-	import DashboardNav from '$components/dashboard/DashboardNav.svelte';
-	import { user } from '$lib/stores/auth';
+	import DashboardNav from '../../components/dashboard/DashboardNav.svelte';
+	import { auth } from '$lib/stores/auth';
 </script>
 
-{#if $user}
+{#if $auth.user}
 	<div class="min-h-screen bg-gray-50 flex">
 		<div class="w-64 bg-white shadow-sm">
 			<DashboardNav />

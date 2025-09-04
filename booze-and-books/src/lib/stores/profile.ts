@@ -1,5 +1,5 @@
 import { writable, derived, get } from 'svelte/store';
-import { user } from '$lib/stores/auth';
+import { auth } from '$lib/stores/auth';
 import { ProfileService } from '$lib/services/profileService';
 import type { Profile, ProfileUpdate } from '$lib/types/profile';
 
@@ -7,12 +7,12 @@ export const profile = writable<Profile | null>(null);
 export const profileLoading = writable<boolean>(false);
 export const profileError = writable<string | null>(null);
 
-export const profileWithUser = derived([profile, user], ([$profile, $user]) => {
-	if (!$profile || !$user) return null;
+export const profileWithUser = derived([profile, auth], ([$profile, $auth]) => {
+	if (!$profile || !$auth.user) return null;
 	
 	return {
 		...$profile,
-		email: $user.email || ''
+		email: $auth.user.email || ''
 	};
 });
 
@@ -27,7 +27,7 @@ class ProfileStore {
 	}
 
 	async loadProfile(userId?: string) {
-		const currentUser = get(user);
+		const { user: currentUser } = get(auth);
 
 		const targetUserId = userId || currentUser?.id;
 		if (!targetUserId) {
@@ -60,7 +60,7 @@ class ProfileStore {
 	}
 
 	async updateProfile(updates: ProfileUpdate): Promise<boolean> {
-		const currentUser = get(user);
+		const { user: currentUser } = get(auth);
 
 		if (!currentUser?.id) {
 			profileError.set('User not authenticated');
@@ -84,7 +84,7 @@ class ProfileStore {
 	}
 
 	async uploadAvatar(file: File): Promise<string | null> {
-		const currentUser = get(user);
+		const { user: currentUser } = get(auth);
 
 		if (!currentUser?.id) {
 			profileError.set('User not authenticated');
@@ -139,7 +139,7 @@ class ProfileStore {
 
 export const profileStore = ProfileStore.getInstance();
 
-user.subscribe((currentUser) => {
+auth.subscribe(({ user: currentUser }) => {
 	if (currentUser) {
 		profileStore.loadProfile(currentUser.id);
 	} else {

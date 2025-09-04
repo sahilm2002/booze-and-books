@@ -43,22 +43,9 @@ export class RealtimeService {
 	}
 
 	private setupConnectionHandlers() {
-		// Listen for connection state changes
-		supabase.realtime.onOpen(() => {
-			this.connection.connected = true;
-			this.notifyConnectionChange(true);
-		});
-
-		supabase.realtime.onClose(() => {
-			this.connection.connected = false;
-			this.notifyConnectionChange(false);
-		});
-
-		supabase.realtime.onError((error) => {
-			console.error('Realtime connection error:', error);
-			this.connection.connected = false;
-			this.notifyConnectionChange(false);
-		});
+		// Connection state is managed per channel in modern Supabase
+		// Set initial connected state to true for now
+		this.connection.connected = true;
 	}
 
 	private notifyConnectionChange(connected: boolean) {

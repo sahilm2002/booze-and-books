@@ -1,11 +1,14 @@
 -- Create notifications table and system for swap requests
 
+-- Ensure pgcrypto extension for gen_random_uuid()
+CREATE EXTENSION IF NOT EXISTS pgcrypto;
+
 -- Create enum for notification types
 CREATE TYPE notification_type AS ENUM ('SWAP_REQUEST', 'SWAP_ACCEPTED', 'SWAP_DECLINED');
 
 -- Create notifications table
 CREATE TABLE notifications (
-    id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
     user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
     type notification_type NOT NULL,
     title TEXT NOT NULL,
@@ -33,7 +36,13 @@ CREATE POLICY "Users can view their own notifications" ON notifications
 
 -- Users can only update their own notifications (to mark as read)
 CREATE POLICY "Users can update their own notifications" ON notifications
-    FOR UPDATE USING (auth.uid() = user_id);
+    FOR UPDATE USING (auth.uid() = user_id)
+    WITH CHECK (auth.uid() = user_id);
+
+-- Revoke generic UPDATE from anon/authenticated
+REVOKE UPDATE ON notifications FROM anon, authenticated;
+-- Grant UPDATE(is_read) to authenticated
+GRANT UPDATE(is_read) ON notifications TO authenticated;
 
 -- Users can delete their own notifications
 CREATE POLICY "Users can delete their own notifications" ON notifications
@@ -46,60 +55,58 @@ CREATE POLICY "Only system can insert notifications" ON notifications
 -- Function to create swap request notifications
 CREATE OR REPLACE FUNCTION create_swap_request_notification()
 RETURNS TRIGGER AS $$
+DECLARE
 BEGIN
+    -- Pin search_path to trusted schemas
+    PERFORM set_config('search_path', 'pg_catalog,public', true);
     -- Create notification for new swap request
     IF TG_OP = 'INSERT' THEN
-        INSERT INTO notifications (user_id, type, title, message, data)
+        INSERT INTO public.notifications (user_id, type, title, message, data)
         SELECT 
             NEW.owner_id,
             'SWAP_REQUEST',
             'New Swap Request',
-            'Someone wants to swap for your book "' || books.title || '"',
+            'Someone wants to swap for your book "' || public.books.title || '"',
             jsonb_build_object(
                 'swap_request_id', NEW.id,
                 'book_id', NEW.book_id,
                 'requester_id', NEW.requester_id
             )
-        FROM books WHERE books.id = NEW.book_id;
-        
+        FROM public.books WHERE public.books.id = NEW.book_id;
         RETURN NEW;
     END IF;
-
     -- Create notifications for status updates
     IF TG_OP = 'UPDATE' AND OLD.status != NEW.status THEN
         -- Notify requester when request is accepted/declined
         IF NEW.status = 'ACCEPTED' THEN
-            INSERT INTO notifications (user_id, type, title, message, data)
+            INSERT INTO public.notifications (user_id, type, title, message, data)
             SELECT 
                 NEW.requester_id,
                 'SWAP_ACCEPTED',
                 'Swap Request Accepted',
-                'Your swap request for "' || books.title || '" has been accepted!',
+                'Your swap request for "' || public.books.title || '" has been accepted!',
                 jsonb_build_object(
                     'swap_request_id', NEW.id,
                     'book_id', NEW.book_id,
                     'owner_id', NEW.owner_id
                 )
-            FROM books WHERE books.id = NEW.book_id;
-        
+            FROM public.books WHERE public.books.id = NEW.book_id;
         ELSIF NEW.status = 'DECLINED' THEN
-            INSERT INTO notifications (user_id, type, title, message, data)
+            INSERT INTO public.notifications (user_id, type, title, message, data)
             SELECT 
                 NEW.requester_id,
                 'SWAP_DECLINED',
                 'Swap Request Declined',
-                'Your swap request for "' || books.title || '" has been declined.',
+                'Your swap request for "' || public.books.title || '" has been declined.',
                 jsonb_build_object(
                     'swap_request_id', NEW.id,
                     'book_id', NEW.book_id,
                     'owner_id', NEW.owner_id
                 )
-            FROM books WHERE books.id = NEW.book_id;
+            FROM public.books WHERE public.books.id = NEW.book_id;
         END IF;
-        
         RETURN NEW;
     END IF;
-    
     RETURN NEW;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;

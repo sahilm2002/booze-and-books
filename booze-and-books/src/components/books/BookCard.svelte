@@ -137,10 +137,10 @@
 				{/if}
 
 				<!-- Owner Info (if showing) -->
-				{#if showOwner && bookWithOwner.profile}
+				{#if showOwner && bookWithOwner.profiles}
 					<p class="text-sm text-gray-500 mt-2">
 						<span class="font-medium">Owner:</span> 
-						{bookWithOwner.profile.full_name || bookWithOwner.profile.username || 'Anonymous'}
+						{bookWithOwner.profiles.full_name || bookWithOwner.profiles.username || 'Anonymous'}
 					</p>
 				{/if}
 

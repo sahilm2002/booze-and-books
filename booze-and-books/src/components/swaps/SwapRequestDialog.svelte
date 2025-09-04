@@ -38,7 +38,7 @@
 			const result = await swapStore.createSwapRequest(input);
 			if (result) {
 				dispatch('success', {
-					message: `Swap request sent to ${book.profile.username || book.profile.full_name || 'book owner'}!`
+					message: `Swap request sent to ${book.profile?.full_name ?? book.profile?.username ?? 'book owner'}!`
 				});
 				handleClose();
 			}
@@ -121,7 +121,7 @@
 						<h3 class="font-medium text-gray-900">{book.title}</h3>
 						<p class="text-sm text-gray-600">by {book.authors.join(', ')}</p>
 						<div class="mt-2 flex items-center text-xs text-gray-500">
-							<span>Owner: {book.profile.username || book.profile.full_name || 'Unknown'}</span>
+							<span>Owner: {book.profile?.full_name ?? book.profile?.username ?? 'Unknown'}</span>
 							<span class="mx-2">•</span>
 							<span class="px-2 py-1 bg-blue-100 text-blue-800 rounded-full">
 								{book.condition}
