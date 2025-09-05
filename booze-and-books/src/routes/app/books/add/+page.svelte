@@ -6,14 +6,55 @@
 	<title>Add Book - Booze & Books</title>
 </svelte:head>
 
-<div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-	<!-- Main Content -->
-	<div class="mb-8">
-		<h1 class="text-3xl font-bold text-gray-900">Add New Book</h1>
-		<p class="mt-2 text-gray-600">
-			Search Google Books for automatic details or enter book information manually.
-		</p>
+<div class="container">
+	<!-- Page Header -->
+	<div class="page-header">
+		<div class="header-content">
+			<h1 class="page-title">Add New Book</h1>
+			<p class="page-subtitle">
+				Search Google Books for automatic details or enter book information manually.
+			</p>
+		</div>
 	</div>
 
 	<BookAddForm />
 </div>
+
+<style>
+	.container {
+		max-width: 900px;
+		margin: 0 auto;
+		padding: 2rem;
+	}
+
+	@media (max-width: 640px) {
+		.container {
+			padding: 1rem;
+		}
+	}
+
+	.page-header {
+		margin-bottom: 2rem;
+		text-align: center;
+	}
+
+	.header-content {
+		max-width: 600px;
+		margin: 0 auto;
+	}
+
+	.page-title {
+		color: #2d3748;
+		font-size: 2rem;
+		font-weight: 700;
+		margin-bottom: 0.75rem;
+		line-height: 1.2;
+	}
+
+	.page-subtitle {
+		color: #718096;
+		font-size: 1.1rem;
+		line-height: 1.5;
+		margin: 0;
+	}
+</style>

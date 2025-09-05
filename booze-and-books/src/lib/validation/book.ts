@@ -44,10 +44,6 @@ export const bookInputSchema = z.object({
 		.optional()
 		.nullable()),
 	
-	thumbnail_url: z.preprocess(blankToNull, z.string()
-		.url('Invalid thumbnail URL')
-		.optional()
-		.nullable()),
 	
 	google_volume_id: z.preprocess(blankToNull, z.string()
 		.trim()
@@ -93,10 +89,6 @@ export const bookUpdateSchema = z.object({
 		.optional()
 		.nullable()),
 	
-	thumbnail_url: z.preprocess(blankToNull, z.string()
-		.url('Invalid thumbnail URL')
-		.optional()
-		.nullable()),
 	
 	is_available: z.boolean()
 		.optional()

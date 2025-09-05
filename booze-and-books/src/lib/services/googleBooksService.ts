@@ -129,7 +129,6 @@ export class GoogleBooksService {
 			authors: volumeInfo.authors || ['Unknown Author'],
 			isbn,
 			description: volumeInfo.description || null,
-			thumbnail_url: thumbnailUrl,
 			google_volume_id: googleBook.id,
 			genre
 		};

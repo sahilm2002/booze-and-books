@@ -23,7 +23,6 @@
 		condition: 'GOOD' as BookCondition,
 		genre: '',
 		description: '',
-		thumbnail_url: '',
 		google_volume_id: ''
 	};
 
@@ -77,7 +76,6 @@
 			authors: extracted.authors,
 			isbn: extracted.isbn,
 			description: extracted.description,
-			thumbnail_url: extracted.thumbnail_url,
 			google_volume_id: extracted.google_volume_id,
 			genre: extracted.genre || formData.genre
 		};
@@ -115,7 +113,6 @@
 				condition: 'GOOD' as BookCondition,
 				genre: '',
 				description: '',
-				thumbnail_url: '',
 				google_volume_id: ''
 			};
 			searchValue = '';
@@ -123,61 +120,52 @@
 	}
 </script>
 
-<div class="bg-white shadow rounded-lg overflow-hidden">
-	<div class="px-6 py-4 border-b border-gray-200">
-		<div class="flex items-center justify-between">
-			<h3 class="text-lg font-medium text-gray-900">Add New Book</h3>
-			<button
-				type="button"
-				on:click={toggleManualEntry}
-				class="text-sm text-blue-600 hover:text-blue-800 focus:outline-none"
-			>
-				{isManualEntry ? 'Search Google Books' : 'Enter manually'}
+<div class="form-container">
+	<div class="form-header">
+		<div class="form-header-content">
+			<h3 class="form-title">Book Details</h3>
+			<button type="button" on:click={toggleManualEntry} class="toggle-btn">
+				{isManualEntry ? '🔍 Search Google Books' : '✏️ Enter Manually'}
 			</button>
 		</div>
 	</div>
 
-	<form on:submit|preventDefault={handleSubmit} class="p-6 space-y-6">
+	<form on:submit|preventDefault={handleSubmit} class="form-content">
 		{#if !isManualEntry}
-			<div>
-				<label for="book-search" class="block text-sm font-medium text-gray-700 mb-2">
-					Search for a book
-				</label>
+			<div class="field-group full-width">
+				<label class="field-label">Search Google Books</label>
 				<GoogleBookSearch
 					bind:value={searchValue}
 					on:select={handleGoogleBookSelect}
 					placeholder="Search by title, author, or ISBN..."
 				/>
-				<p class="mt-1 text-xs text-gray-500">
-					Search Google Books to automatically fill in book details, or switch to manual entry.
-				</p>
 			</div>
 		{/if}
 
-		<div class="grid grid-cols-1 gap-6 sm:grid-cols-2">
-			<div class="sm:col-span-2">
-				<label for="title" class="block text-sm font-medium text-gray-700">Title *</label>
+		<div class="form-grid">
+			<div class="field-group full-width">
+				<label for="title" class="field-label">Title *</label>
 				<input
 					type="text"
 					id="title"
 					bind:value={formData.title}
-					class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+					class="form-input"
 					placeholder="Enter book title"
 					required
 				/>
 				{#if errors.title}
-					<p class="mt-1 text-sm text-red-600">{errors.title}</p>
+					<p class="field-error">{errors.title}</p>
 				{/if}
 			</div>
 
-			<div class="sm:col-span-2">
-				<label class="block text-sm font-medium text-gray-700 mb-2">Authors *</label>
+			<div class="field-group full-width">
+				<label class="field-label">Authors *</label>
 				{#each formData.authors as author, index}
-					<div class="flex gap-2 mb-2">
+					<div class="author-input-group">
 						<input
 							type="text"
 							bind:value={formData.authors[index]}
-							class="flex-1 px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+							class="form-input"
 							placeholder="Enter author name"
 							required
 						/>
@@ -185,140 +173,442 @@
 							<button
 								type="button"
 								on:click={() => removeAuthorField(index)}
-								class="px-3 py-2 text-red-600 hover:text-red-800 focus:outline-none"
+								class="remove-author-btn"
 							>
-								<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+								<svg class="btn-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 									<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
 								</svg>
 							</button>
 						{/if}
 					</div>
 				{/each}
-				<button
-					type="button"
-					on:click={addAuthorField}
-					class="text-sm text-blue-600 hover:text-blue-800 focus:outline-none"
-				>
+				<button type="button" on:click={addAuthorField} class="add-author-btn">
 					+ Add another author
 				</button>
 				{#if errors.authors}
-					<p class="mt-1 text-sm text-red-600">{errors.authors}</p>
+					<p class="field-error">{errors.authors}</p>
 				{/if}
 			</div>
 
-			<div>
-				<label for="isbn" class="block text-sm font-medium text-gray-700">ISBN</label>
+			<div class="field-group">
+				<label for="isbn" class="field-label">ISBN</label>
 				<input
 					type="text"
 					id="isbn"
 					bind:value={formData.isbn}
-					class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+					class="form-input"
 					placeholder="ISBN-10 or ISBN-13"
 				/>
 				{#if errors.isbn}
-					<p class="mt-1 text-sm text-red-600">{errors.isbn}</p>
+					<p class="field-error">{errors.isbn}</p>
 				{/if}
 			</div>
 
-			<div>
-				<label for="condition" class="block text-sm font-medium text-gray-700">Condition *</label>
-				<select
-					id="condition"
-					bind:value={formData.condition}
-					class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-					required
-				>
+			<div class="field-group">
+				<label for="condition" class="field-label">Condition *</label>
+				<select id="condition" bind:value={formData.condition} class="form-select" required>
 					{#each conditionOptions as option}
 						<option value={option.value}>{option.label}</option>
 					{/each}
 				</select>
 				{#if errors.condition}
-					<p class="mt-1 text-sm text-red-600">{errors.condition}</p>
+					<p class="field-error">{errors.condition}</p>
 				{/if}
 			</div>
 
-			<div class="sm:col-span-2">
-				<label for="genre" class="block text-sm font-medium text-gray-700">Genre</label>
+			<div class="field-group full-width">
+				<label for="genre" class="field-label">Genre</label>
 				<input
 					type="text"
 					id="genre"
 					bind:value={formData.genre}
-					class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+					class="form-input"
 					placeholder="e.g., Fiction, Science Fiction, Biography"
 				/>
 			</div>
 
-			<div class="sm:col-span-2">
-				<label for="thumbnail_url" class="block text-sm font-medium text-gray-700">Cover Image URL</label>
-				<input
-					type="url"
-					id="thumbnail_url"
-					bind:value={formData.thumbnail_url}
-					class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-					placeholder="https://example.com/book-cover.jpg"
-				/>
-				{#if errors.thumbnail_url}
-					<p class="mt-1 text-sm text-red-600">{errors.thumbnail_url}</p>
-				{/if}
-			</div>
 		</div>
 
-		<div>
-			<label for="description" class="block text-sm font-medium text-gray-700">Description</label>
+		<div class="field-group full-width">
+			<label for="description" class="field-label">Description</label>
 			<textarea
 				id="description"
 				rows="4"
 				bind:value={formData.description}
-				class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+				class="form-textarea"
 				placeholder="Add your personal notes or a book description..."
 			></textarea>
 			{#if errors.description}
-				<p class="mt-1 text-sm text-red-600">{errors.description}</p>
+				<p class="field-error">{errors.description}</p>
 			{/if}
-			<p class="mt-1 text-xs text-gray-500">
+			<p class="character-count">
 				{formData.description?.length || 0}/2000 characters
 			</p>
 		</div>
 
 		{#if $booksError}
-			<div class="rounded-md bg-red-50 p-4">
-				<div class="flex">
-					<div class="flex-shrink-0">
-						<svg class="h-5 w-5 text-red-400" fill="currentColor" viewBox="0 0 20 20">
-							<path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"/>
-						</svg>
-					</div>
-					<div class="ml-3">
-						<h3 class="text-sm font-medium text-red-800">Error</h3>
-						<p class="mt-1 text-sm text-red-700">{$booksError}</p>
+			<div class="error-message">
+				<div class="error-content">
+					<svg class="error-icon" fill="currentColor" viewBox="0 0 20 20">
+						<path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"/>
+					</svg>
+					<div class="error-text">
+						<h3 class="error-title">Error</h3>
+						<p class="error-detail">{$booksError}</p>
 					</div>
 				</div>
 			</div>
 		{/if}
 
-		<div class="flex justify-end space-x-3 pt-6 border-t border-gray-200">
-			<button
-				type="button"
-				on:click={handleCancel}
-				class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-				disabled={saving}
-			>
+		<div class="form-actions">
+			<button type="button" on:click={handleCancel} class="btn-cancel" disabled={saving}>
 				Cancel
 			</button>
-			<button
-				type="submit"
-				class="px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-md shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
-				disabled={saving}
-			>
+			<button type="submit" class="btn-submit" disabled={saving}>
 				{#if saving}
-					<div class="flex items-center">
-						<div class="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+					<div class="btn-loading">
+						<div class="loading-spinner"></div>
 						Adding Book...
 					</div>
 				{:else}
+					<svg class="btn-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
+					</svg>
 					Add Book
 				{/if}
 			</button>
 		</div>
 	</form>
 </div>
+
+<style>
+	.form-container {
+		background: white;
+		border: 1px solid #e2e8f0;
+		border-radius: 12px;
+		box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+		overflow: hidden;
+	}
+
+	.form-header {
+		background: linear-gradient(135deg, #f8f9fa 0%, #f1f3f4 100%);
+		border-bottom: 1px solid #e2e8f0;
+		padding: 1.25rem 1.5rem;
+	}
+
+	.form-header-content {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 1rem;
+	}
+
+	@media (max-width: 640px) {
+		.form-header-content {
+			flex-direction: column;
+			align-items: flex-start;
+		}
+	}
+
+	.form-title {
+		color: #2d3748;
+		font-size: 1.25rem;
+		font-weight: 600;
+		margin: 0;
+	}
+
+	.toggle-btn {
+		background: #8B2635;
+		color: #F5F5DC;
+		border: none;
+		padding: 0.5rem 1rem;
+		border-radius: 6px;
+		font-size: 0.9rem;
+		font-weight: 500;
+		cursor: pointer;
+		transition: all 0.2s ease;
+	}
+
+	.toggle-btn:hover {
+		background: #722F37;
+		transform: translateY(-1px);
+	}
+
+	.form-content {
+		padding: 1.5rem;
+		display: flex;
+		flex-direction: column;
+		gap: 1.5rem;
+	}
+
+
+	.form-grid {
+		display: grid;
+		grid-template-columns: 1fr 1fr;
+		gap: 1.5rem;
+	}
+
+	@media (max-width: 640px) {
+		.form-grid {
+			grid-template-columns: 1fr;
+		}
+	}
+
+	.field-group {
+		display: flex;
+		flex-direction: column;
+		gap: 0.5rem;
+	}
+
+	.field-group.full-width {
+		grid-column: 1 / -1;
+	}
+
+	.field-label {
+		color: #374151;
+		font-size: 0.95rem;
+		font-weight: 600;
+		margin: 0;
+	}
+
+	.form-input, .form-select {
+		padding: 0.75rem 1rem;
+		border: 1px solid #d1d5db;
+		border-radius: 8px;
+		background: #f8f9fa;
+		font-size: 0.95rem;
+		color: #374151;
+		transition: all 0.2s ease;
+		width: 100%;
+		box-sizing: border-box;
+	}
+
+	.form-input:focus, .form-select:focus {
+		outline: none;
+		border-color: #8B2635;
+		background: white;
+		box-shadow: 0 0 0 3px rgba(139, 38, 53, 0.1);
+	}
+
+	.form-input:hover, .form-select:hover {
+		background: #f1f3f4;
+	}
+
+	.form-textarea {
+		padding: 0.75rem 1rem;
+		border: 1px solid #d1d5db;
+		border-radius: 8px;
+		background: #f8f9fa;
+		font-size: 0.95rem;
+		color: #374151;
+		transition: all 0.2s ease;
+		width: 100%;
+		box-sizing: border-box;
+		resize: vertical;
+		min-height: 100px;
+		font-family: inherit;
+	}
+
+	.form-textarea:focus {
+		outline: none;
+		border-color: #8B2635;
+		background: white;
+		box-shadow: 0 0 0 3px rgba(139, 38, 53, 0.1);
+	}
+
+	.form-textarea:hover {
+		background: #f1f3f4;
+	}
+
+	.author-input-group {
+		display: flex;
+		gap: 0.75rem;
+		align-items: flex-start;
+		margin-bottom: 0.75rem;
+	}
+
+	.remove-author-btn {
+		background: #fee;
+		color: #dc2626;
+		border: 1px solid #fecaca;
+		padding: 0.75rem;
+		border-radius: 6px;
+		cursor: pointer;
+		transition: all 0.2s ease;
+		flex-shrink: 0;
+	}
+
+	.remove-author-btn:hover {
+		background: #fecaca;
+		border-color: #f87171;
+	}
+
+	.add-author-btn {
+		background: none;
+		color: #8B2635;
+		border: 1px solid #e2e8f0;
+		padding: 0.5rem 0.75rem;
+		border-radius: 6px;
+		font-size: 0.9rem;
+		font-weight: 500;
+		cursor: pointer;
+		transition: all 0.2s ease;
+		margin-top: 0.25rem;
+	}
+
+	.add-author-btn:hover {
+		background: #f8f9fa;
+		border-color: #8B2635;
+	}
+
+	.field-error {
+		color: #dc2626;
+		font-size: 0.85rem;
+		margin: 0;
+	}
+
+	.field-hint {
+		color: #6b7280;
+		font-size: 0.85rem;
+		margin: 0;
+		line-height: 1.4;
+	}
+
+	.character-count {
+		color: #9ca3af;
+		font-size: 0.8rem;
+		text-align: right;
+		margin: 0;
+	}
+
+	.error-message {
+		background: #fef2f2;
+		border: 1px solid #fecaca;
+		border-radius: 8px;
+		padding: 1rem;
+	}
+
+	.error-content {
+		display: flex;
+		align-items: flex-start;
+		gap: 0.75rem;
+	}
+
+	.error-icon {
+		width: 20px;
+		height: 20px;
+		color: #dc2626;
+		flex-shrink: 0;
+		margin-top: 2px;
+	}
+
+	.error-text {
+		flex: 1;
+	}
+
+	.error-title {
+		color: #991b1b;
+		font-size: 0.9rem;
+		font-weight: 600;
+		margin: 0 0 0.25rem 0;
+	}
+
+	.error-detail {
+		color: #b91c1c;
+		font-size: 0.85rem;
+		margin: 0;
+		line-height: 1.4;
+	}
+
+	.form-actions {
+		display: flex;
+		gap: 1rem;
+		justify-content: flex-end;
+		padding-top: 1.5rem;
+		border-top: 1px solid #e2e8f0;
+	}
+
+	@media (max-width: 640px) {
+		.form-actions {
+			flex-direction: column-reverse;
+		}
+	}
+
+	.btn-cancel {
+		background: #f8f9fa;
+		color: #6b7280;
+		border: 1px solid #e2e8f0;
+		padding: 0.75rem 1.5rem;
+		border-radius: 8px;
+		font-size: 0.95rem;
+		font-weight: 500;
+		cursor: pointer;
+		transition: all 0.2s ease;
+	}
+
+	.btn-cancel:hover:not(:disabled) {
+		background: #f1f3f4;
+		border-color: #d1d5db;
+		color: #374151;
+	}
+
+	.btn-cancel:disabled {
+		opacity: 0.5;
+		cursor: not-allowed;
+	}
+
+	.btn-submit {
+		background: linear-gradient(135deg, #8B2635 0%, #722F37 100%);
+		color: #F5F5DC;
+		border: none;
+		padding: 0.75rem 1.5rem;
+		border-radius: 8px;
+		font-size: 0.95rem;
+		font-weight: 600;
+		cursor: pointer;
+		transition: all 0.2s ease;
+		box-shadow: 0 4px 12px rgba(139, 38, 53, 0.3);
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+	}
+
+	.btn-submit:hover:not(:disabled) {
+		background: linear-gradient(135deg, #722F37 0%, #8B2635 100%);
+		transform: translateY(-2px);
+		box-shadow: 0 6px 20px rgba(139, 38, 53, 0.4);
+	}
+
+	.btn-submit:disabled {
+		opacity: 0.7;
+		cursor: not-allowed;
+		transform: none;
+	}
+
+	.btn-icon {
+		width: 18px;
+		height: 18px;
+		flex-shrink: 0;
+	}
+
+	.btn-loading {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+	}
+
+	.loading-spinner {
+		width: 16px;
+		height: 16px;
+		border: 2px solid transparent;
+		border-top: 2px solid currentColor;
+		border-radius: 50%;
+		animation: spin 1s linear infinite;
+	}
+
+	@keyframes spin {
+		to {
+			transform: rotate(360deg);
+		}
+	}
+</style>
