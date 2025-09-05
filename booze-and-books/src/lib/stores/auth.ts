@@ -3,6 +3,7 @@ import type { Session, User } from '@supabase/supabase-js';
 import { supabase } from '$lib/supabase';
 import { goto, invalidateAll } from '$app/navigation';
 import { browser } from '$app/environment';
+import { activityService } from '$lib/services/activityService';
 
 export interface AuthState {
 	session: Session | null;
@@ -49,15 +50,30 @@ function createAuthStore() {
 
 					// Handle sign out
 					if (event === 'SIGNED_OUT') {
+						// Stop activity tracking when user signs out
+						activityService.destroy();
 						await goto('/auth/login', { replaceState: true });
 					}
 					
-					// Handle sign in
+					// Handle sign in - start activity tracking
 					if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+						// Initialize activity tracking for auto-logout
+						activityService.initialize(async () => {
+							console.log('Auto-logout triggered due to inactivity');
+							await auth.signOut();
+						});
 						await invalidateAll();
 					}
 				});
 				unsubscribe = () => subscription.unsubscribe();
+				
+				// If we already have a session, start activity tracking
+				if (session) {
+					activityService.initialize(async () => {
+						console.log('Auto-logout triggered due to inactivity');
+						await auth.signOut();
+					});
+				}
 			}
 		},
 
@@ -87,12 +103,18 @@ function createAuthStore() {
 		},
 
 		/**
-		 * Clean up auth state change listener
+		 * Clean up auth state change listener and activity tracking
 		 */
 		teardown: () => {
 			unsubscribe?.();
 			unsubscribe = null;
-		}
+			activityService.destroy();
+		},
+
+		/**
+		 * Get activity service for debugging/monitoring
+		 */
+		getActivityService: () => activityService
 	};
 }
 

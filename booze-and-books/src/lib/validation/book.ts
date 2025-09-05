@@ -170,8 +170,7 @@ export function isValidIsbn(isbn: string): boolean {
 // Helper function to get condition display name
 export function getConditionDisplayName(condition: BookCondition): string {
 	const displayNames: Record<BookCondition, string> = {
-		[BookCondition.AS_NEW]: 'As New',
-		[BookCondition.FINE]: 'Fine',
+		[BookCondition.LIKE_NEW]: 'Like New',
 		[BookCondition.VERY_GOOD]: 'Very Good',
 		[BookCondition.GOOD]: 'Good',
 		[BookCondition.FAIR]: 'Fair',

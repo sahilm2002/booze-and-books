@@ -81,6 +81,7 @@
 				</div>
 			</div>
 
+			<!-- TODO: Quick Actions Section - Hidden until features are ready
 			<div class="bg-white shadow rounded-lg p-6">
 				<h3 class="text-lg font-medium text-gray-900 mb-4">Quick Actions</h3>
 				<div class="space-y-2">
@@ -100,6 +101,7 @@
 					</button>
 				</div>
 			</div>
+			-->
 		</div>
 	</div>
 </div>

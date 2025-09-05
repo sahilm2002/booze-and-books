@@ -11,7 +11,8 @@
 		{
 			name: 'Profile',
 			href: '/app/profile',
-			icon: 'user'
+			icon: 'user',
+			hideOnPaths: ['/app']
 		},
 		{
 			name: 'My Books',
@@ -28,12 +29,6 @@
 			href: '/app/swaps',
 			icon: 'exchange',
 			badgeCount: $pendingIncomingCount
-		},
-		{
-			name: 'Settings',
-			href: '/app/settings',
-			icon: 'settings',
-			disabled: true
 		}
 	];
 
@@ -49,57 +44,202 @@
 	$: currentPath = $page.url.pathname;
 </script>
 
-<nav class="bg-white shadow-sm border-r border-gray-200 h-full">
-	<div class="p-4">
-		<h2 class="text-lg font-semibold text-gray-900 mb-4">Dashboard</h2>
-		<ul class="space-y-1">
+<nav class="horizontal-nav">
+	<div class="nav-container">
+		<div class="nav-brand">
+			<h1 class="brand-title">📚 Booze & Books</h1>
+		</div>
+		
+		<ul class="nav-items">
 			{#each navItems as item}
-				<li>
-					{#if item.disabled}
-						<div class="flex items-center px-3 py-2 text-sm text-gray-400 rounded-md cursor-not-allowed">
-							<svg class="w-5 h-5 mr-3" width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-								{@html icons[item.icon]}
-							</svg>
-							{item.name}
-							<span class="ml-auto text-xs bg-gray-100 text-gray-500 px-2 py-1 rounded">Soon</span>
-						</div>
-					{:else}
+				{#if !item.hideOnPaths || !item.hideOnPaths.includes(currentPath)}
+					<li class="nav-item">
 						<a
 							href={item.href}
-							class="flex items-center px-3 py-2 text-sm rounded-md transition-colors {
+							class="nav-link {
 								currentPath === item.href || 
 								(item.href === '/app/books' && currentPath.startsWith('/app/books')) ||
 								(item.href === '/app/discover' && currentPath.startsWith('/app/discover')) ||
 								(item.href === '/app/swaps' && currentPath.startsWith('/app/swaps'))
-									? 'bg-blue-50 text-blue-700 border-r-2 border-blue-500'
-									: 'text-gray-700 hover:bg-gray-50 hover:text-gray-900'
+									? 'active'
+									: ''
 							}"
 						>
-							<svg class="w-5 h-5 mr-3" width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+							<svg class="nav-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
 								{@html icons[item.icon]}
 							</svg>
-							{item.name}
+							<span class="nav-text">{item.name}</span>
 							{#if item.badgeCount && item.badgeCount > 0}
-								<span class="ml-auto inline-flex items-center justify-center px-2 py-1 text-xs font-bold leading-none text-white bg-red-600 rounded-full">
+								<span class="nav-badge">
 									{item.badgeCount}
 								</span>
 							{/if}
 						</a>
-					{/if}
-				</li>
+					</li>
+				{/if}
 			{/each}
 		</ul>
 	</div>
 </nav>
 
 <style>
-	/* Ensure SVG icons are properly sized */
-	svg {
+	/* Books & Booze Theme Colors */
+	:root {
+		--primary-burgundy: #8B2635;
+		--secondary-gold: #D4AF37;
+		--accent-cream: #F5F5DC;
+		--warm-brown: #8B4513;
+		--deep-red: #722F37;
+		--light-cream: #FFF8DC;
+	}
+
+	.horizontal-nav {
+		background: linear-gradient(135deg, var(--primary-burgundy) 0%, var(--deep-red) 100%);
+		box-shadow: 0 2px 8px rgba(139, 38, 53, 0.3);
+		position: sticky;
+		top: 0;
+		z-index: 100;
+	}
+
+	.nav-container {
+		max-width: 1200px;
+		margin: 0 auto;
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		padding: 0 2rem;
+		height: 4rem;
+	}
+
+	.nav-brand {
+		display: flex;
+		align-items: center;
+	}
+
+	.brand-title {
+		color: var(--accent-cream);
+		font-size: 1.5rem;
+		font-weight: 700;
+		font-family: 'Georgia', serif;
+		margin: 0;
+		text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.3);
+	}
+
+	.nav-items {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+		list-style: none;
+		margin: 0;
+		padding: 0;
+	}
+
+	.nav-item {
+		position: relative;
+	}
+
+	.nav-link {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+		padding: 0.75rem 1rem;
+		color: var(--light-cream);
+		text-decoration: none;
+		border-radius: 0.5rem;
+		transition: all 0.3s ease;
+		font-weight: 500;
+		position: relative;
+		overflow: hidden;
+	}
+
+	.nav-link:hover {
+		background: rgba(212, 175, 55, 0.2);
+		color: var(--secondary-gold);
+		transform: translateY(-1px);
+	}
+
+	.nav-link.active {
+		background: var(--secondary-gold);
+		color: var(--primary-burgundy);
+		font-weight: 600;
+		box-shadow: 0 2px 8px rgba(212, 175, 55, 0.4);
+	}
+
+	.nav-link.active:hover {
+		background: var(--secondary-gold);
+		color: var(--primary-burgundy);
+		transform: translateY(-1px);
+	}
+
+	.nav-icon {
 		width: 1.25rem !important;
 		height: 1.25rem !important;
 		min-width: 1.25rem !important;
 		min-height: 1.25rem !important;
 		max-width: 1.25rem !important;
 		max-height: 1.25rem !important;
+		flex-shrink: 0;
+	}
+
+	.nav-text {
+		font-size: 0.9rem;
+		white-space: nowrap;
+	}
+
+	.nav-badge {
+		background: #dc2626;
+		color: white;
+		font-size: 0.75rem;
+		font-weight: 700;
+		padding: 0.125rem 0.375rem;
+		border-radius: 9999px;
+		min-width: 1.25rem;
+		height: 1.25rem;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		line-height: 1;
+	}
+
+	/* Responsive Design */
+	@media (max-width: 768px) {
+		.nav-container {
+			padding: 0 1rem;
+		}
+		
+		.nav-items {
+			gap: 0.25rem;
+		}
+		
+		.nav-link {
+			padding: 0.5rem 0.75rem;
+		}
+		
+		.nav-text {
+			display: none;
+		}
+		
+		.brand-title {
+			font-size: 1.25rem;
+		}
+	}
+
+	@media (max-width: 480px) {
+		.nav-container {
+			flex-direction: column;
+			height: auto;
+			padding: 1rem;
+			gap: 1rem;
+		}
+		
+		.nav-text {
+			display: inline;
+		}
+		
+		.nav-items {
+			width: 100%;
+			justify-content: center;
+			flex-wrap: wrap;
+		}
 	}
 </style>

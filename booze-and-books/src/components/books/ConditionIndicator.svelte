@@ -48,16 +48,9 @@
 			stars: 1
 		},
 		// Enum codes
-		'AS_NEW': {
-			label: 'As New',
+		'LIKE_NEW': {
+			label: 'Like New',
 			description: 'Pristine condition, appears unread with no visible wear or markings',
-			color: 'text-emerald-600 bg-emerald-50 border-emerald-200',
-			icon: '✨',
-			stars: 5
-		},
-		'FINE': {
-			label: 'Fine',
-			description: 'Excellent condition with minimal shelf wear',
 			color: 'text-emerald-600 bg-emerald-50 border-emerald-200',
 			icon: '✨',
 			stars: 5

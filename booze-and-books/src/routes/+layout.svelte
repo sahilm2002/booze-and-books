@@ -5,7 +5,6 @@
 	import { ProfileService } from '$lib/services/profileService';
 	import { realtimeService } from '$lib/services/realtimeService';
 	import NotificationBell from '../components/notifications/NotificationBell.svelte';
-	import RealtimeStatus from '../components/common/RealtimeStatus.svelte';
 	import type { PageData } from './$types';
 	export let data: PageData;
 
@@ -81,9 +80,6 @@
 						<span class="user-email">{user.email}</span>
 					</div>
 				</div>
-				<RealtimeStatus />
-				<a href="/app" class="nav-link">Dashboard</a>
-				<a href="/app/profile" class="nav-link">Profile</a>
 				<NotificationBell />
 				<form method="POST" action="/auth/logout" style="display: inline;">
 					<button type="submit" class="logout-btn">Sign Out</button>
@@ -98,6 +94,7 @@
 	</nav>
 	
 	<slot />
+	
 </div>
 
 <style>
@@ -114,12 +111,12 @@
 	}
 
 	.main-nav {
-		background: white;
-		border-bottom: 1px solid #e2e8f0;
+		background: linear-gradient(135deg, #8B2635 0%, #722F37 100%);
+		border-bottom: 1px solid rgba(212, 175, 55, 0.2);
 		padding: 1rem 2rem;
 		display: flex;
 		justify-content: flex-end;
-		box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+		box-shadow: 0 2px 8px rgba(139, 38, 53, 0.3);
 	}
 
 	.nav-user {
@@ -165,16 +162,17 @@
 	}
 
 	.user-name {
-		color: #2d3748;
+		color: #FFF8DC;
 		font-weight: 600;
 		font-size: 0.9rem;
 		line-height: 1.2;
 	}
 
 	.user-email {
-		color: #718096;
+		color: #F5F5DC;
 		font-size: 0.8rem;
 		line-height: 1.2;
+		opacity: 0.9;
 	}
 
 	.nav-auth {
@@ -184,31 +182,34 @@
 	}
 
 	.nav-link {
-		color: #4299e1;
+		color: #F5F5DC;
 		text-decoration: none;
 		font-weight: 500;
 		padding: 0.5rem 1rem;
 		border-radius: 6px;
-		transition: background-color 0.2s;
+		transition: all 0.2s;
 	}
 
 	.nav-link:hover {
-		background-color: #f7fafc;
+		background-color: rgba(212, 175, 55, 0.2);
+		color: #D4AF37;
 	}
 
 	.nav-link.primary {
-		background: #4299e1;
-		color: white;
+		background: linear-gradient(135deg, #D4AF37 0%, #B8941F 100%);
+		color: #8B2635;
+		font-weight: 600;
 	}
 
 	.nav-link.primary:hover {
-		background: #3182ce;
+		background: linear-gradient(135deg, #B8941F 0%, #D4AF37 100%);
+		transform: translateY(-1px);
 	}
 
 	.logout-btn {
 		background: none;
-		border: 1px solid #e2e8f0;
-		color: #718096;
+		border: 1px solid rgba(245, 245, 220, 0.3);
+		color: #F5F5DC;
 		padding: 0.5rem 1rem;
 		border-radius: 6px;
 		cursor: pointer;
@@ -217,8 +218,9 @@
 	}
 
 	.logout-btn:hover {
-		background: #f7fafc;
-		border-color: #cbd5e0;
+		background: rgba(212, 175, 55, 0.1);
+		border-color: rgba(212, 175, 55, 0.5);
+		color: #D4AF37;
 	}
 
 	:global(.container) {
