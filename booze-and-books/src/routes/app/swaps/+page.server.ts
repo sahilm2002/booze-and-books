@@ -17,11 +17,17 @@ export const load: PageServerLoad = async ({ locals }) => {
 		);
 
 		return {
-			incomingRequests: incoming,
-			outgoingRequests: outgoing
+			incomingRequests: incoming || [],
+			outgoingRequests: outgoing || []
 		};
 	} catch (err) {
-		console.error('Error loading swap requests:', err);
-		throw error(500, 'Failed to load swap requests');
+		console.error('Error loading swap requests with full details:', err);
+		
+		// Return empty arrays instead of throwing 500 error
+		console.warn('Database error, returning empty swap requests');
+		return {
+			incomingRequests: [],
+			outgoingRequests: []
+		};
 	}
 };
