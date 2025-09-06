@@ -67,6 +67,13 @@
 				{/if}
 			</div>
 		</div>
+		
+		<div class="bg-gray-50 px-6 py-3">
+			<div class="flex justify-between text-sm text-gray-600">
+				<span>Member since</span>
+				<span>{new Date($profileWithUser.created_at).toLocaleDateString()}</span>
+			</div>
+		</div>
 	</div>
 {:else}
 	<div class="bg-white shadow rounded-lg p-6">

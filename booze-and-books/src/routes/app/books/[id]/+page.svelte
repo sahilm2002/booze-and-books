@@ -1,7 +1,6 @@
 <script lang="ts">
 	import { page } from '$app/stores';
 	import { goto } from '$app/navigation';
-	import { auth } from '$lib/stores/auth';
 	import BookDetailView from '../../../../components/books/BookDetailView.svelte';
 	import SwapRequestDialog from '../../../../components/swaps/SwapRequestDialog.svelte';
 	import { swapStore } from '$lib/stores/swaps.js';
@@ -17,21 +16,12 @@
 
 	function handleSwapSuccess(event: CustomEvent<{ message: string }>) {
 		showSwapDialog = false;
-		
-		if (!$auth.user) {
-			goto('/auth/login?redirectTo=/app/books?success=swap-requested');
-			return;
-		}
-		
+		// Navigate back to books page or show success message
 		goto('/app/books?success=swap-requested');
 	}
 
 	function handleCloseDetail() {
-		if (!$auth.user) {
-			goto('/auth/login?redirectTo=/app/books');
-			return;
-		}
-		
+		// Navigate back to books page
 		goto('/app/books');
 	}
 

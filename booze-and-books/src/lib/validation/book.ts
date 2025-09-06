@@ -28,7 +28,9 @@ export const bookInputSchema = z.object({
 		.optional()
 		.nullable()),
 	
-	condition: z.nativeEnum(BookCondition),
+	condition: z.nativeEnum(BookCondition, {
+		errorMap: () => ({ message: 'Invalid book condition' })
+	}),
 	
 	genre: z.preprocess(blankToNull, z.string()
 		.max(100, 'Genre must be 100 characters or less')
@@ -71,7 +73,9 @@ export const bookUpdateSchema = z.object({
 		.optional()
 		.nullable()),
 	
-	condition: z.nativeEnum(BookCondition).optional(),
+	condition: z.nativeEnum(BookCondition, {
+		errorMap: () => ({ message: 'Invalid book condition' })
+	}).optional(),
 	
 	genre: z.preprocess(blankToNull, z.string()
 		.max(100, 'Genre must be 100 characters or less')
@@ -106,9 +110,9 @@ export function validateBookInput(data: unknown) {
 		};
 	} else {
 		const errors: Record<string, string> = {};
-		result.error.issues.forEach(issue => {
-			const path = issue.path.join('.');
-			errors[path] = issue.message;
+		result.error.errors.forEach(error => {
+			const path = error.path.join('.');
+			errors[path] = error.message;
 		});
 		
 		return { 
@@ -131,9 +135,9 @@ export function validateBookUpdate(data: unknown) {
 		};
 	} else {
 		const errors: Record<string, string> = {};
-		result.error.issues.forEach(issue => {
-			const path = issue.path.join('.');
-			errors[path] = issue.message;
+		result.error.errors.forEach(error => {
+			const path = error.path.join('.');
+			errors[path] = error.message;
 		});
 		
 		return { 
@@ -158,8 +162,7 @@ export function isValidIsbn(isbn: string): boolean {
 // Helper function to get condition display name
 export function getConditionDisplayName(condition: BookCondition): string {
 	const displayNames: Record<BookCondition, string> = {
-		[BookCondition.AS_NEW]: 'As New',
-		[BookCondition.FINE]: 'Fine',
+		[BookCondition.LIKE_NEW]: 'Like New',
 		[BookCondition.VERY_GOOD]: 'Very Good',
 		[BookCondition.GOOD]: 'Good',
 		[BookCondition.FAIR]: 'Fair',

@@ -1,6 +1,5 @@
 import { writable, derived, get } from 'svelte/store';
 import { SwapService } from '../services/swapService.js';
-import { NotificationService } from '../services/notificationService.js';
 import { realtimeService } from '../services/realtimeService.js';
 import { auth } from './auth.js';
 import type { 
@@ -328,94 +327,12 @@ export class SwapStore {
 
 	// Accept a swap request (owner only)
 	async acceptSwapRequest(requestId: string): Promise<SwapRequest | null> {
-		const { user: currentUser } = get(auth);
-		if (!currentUser?.id) {
-			swapRequestsError.set('User not authenticated');
-			return null;
-		}
-
-		try {
-			// Get request details for notifications
-			const swapRequest = await SwapService.getSwapRequestById(requestId);
-			
-			const updatedRequest = await this.updateSwapRequestStatus(requestId, 'ACCEPTED');
-			
-			// Send email notification for approval
-			if (swapRequest && updatedRequest) {
-				// Get user emails for notification
-				const requesterEmail = swapRequest.requester_profile.email;
-				const ownerEmail = swapRequest.owner_profile.email;
-				
-				if (requesterEmail && ownerEmail) {
-					await NotificationService.sendSwapApprovalNotification(
-						requestId,
-						requesterEmail,
-						ownerEmail,
-						swapRequest.book.title
-					);
-				}
-			}
-			
-			return updatedRequest;
-		} catch (error) {
-			const errorMessage = error instanceof Error ? error.message : 'Failed to accept swap request';
-			swapRequestsError.set(errorMessage);
-			console.error('Error accepting swap request:', error);
-			return null;
-		}
+		return this.updateSwapRequestStatus(requestId, 'ACCEPTED');
 	}
 
-	// Make counter offer (owner only)
-	async makeCounterOffer(requestId: string, counterOfferedBookId: string): Promise<SwapRequest | null> {
-		const { user: currentUser } = get(auth);
-		if (!currentUser?.id) {
-			swapRequestsError.set('User not authenticated');
-			return null;
-		}
-
-		swapRequestsError.set(null);
-
-		try {
-			// Get request details for notifications
-			const swapRequest = await SwapService.getSwapRequestById(requestId);
-			
-			const updatedRequest = await SwapService.makeCounterOffer(
-				requestId, 
-				currentUser.id, 
-				counterOfferedBookId
-			);
-			
-			// Reload swap requests to get updated data
-			await this.loadSwapRequests();
-			
-			// Send counter-offer notification
-			if (swapRequest && updatedRequest) {
-				const requesterEmail = swapRequest.requester_profile.email;
-				
-				if (requesterEmail) {
-					// We need to get the counter-offered book title
-					const { data: counterBook } = await import('../supabase.js').then(s => s.supabase)
-						.from('books')
-						.select('title')
-						.eq('id', counterOfferedBookId)
-						.single();
-					
-					await NotificationService.sendCounterOfferNotification(
-						requestId,
-						requesterEmail,
-						swapRequest.book.title,
-						counterBook?.title || 'Unknown Book'
-					);
-				}
-			}
-			
-			return updatedRequest;
-		} catch (error) {
-			const errorMessage = error instanceof Error ? error.message : 'Failed to make counter offer';
-			swapRequestsError.set(errorMessage);
-			console.error('Error making counter offer:', error);
-			return null;
-		}
+	// Decline a swap request (owner only)
+	async declineSwapRequest(requestId: string): Promise<SwapRequest | null> {
+		return this.updateSwapRequestStatus(requestId, 'DECLINED');
 	}
 
 	// Cancel a swap request (requester only)

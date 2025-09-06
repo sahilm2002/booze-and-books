@@ -1,7 +1,6 @@
 <script lang="ts">
 	import { page } from '$app/stores';
 	import { goto } from '$app/navigation';
-	import { auth } from '$lib/stores/auth';
 	import { onMount } from 'svelte';
 	import BookCard from '../../../components/books/BookCard.svelte';
 	import BookEditForm from '../../../components/books/BookEditForm.svelte';
@@ -70,12 +69,8 @@
 
 	function handleViewDetails(event: CustomEvent<{ book: Book }>) {
 		const { book } = event.detail;
-		
-		if (!$auth.user) {
-			goto(`/auth/login?redirectTo=/app/books/${book.id}`);
-			return;
-		}
-		
+		// Navigate to a book details page or show a modal with details
+		// For now, let's navigate to a book details route
 		goto(`/app/books/${book.id}`);
 	}
 </script>
@@ -93,27 +88,14 @@
 				{data.bookCount || $books.length} book{(data.bookCount || $books.length) !== 1 ? 's' : ''} in your collection
 			</p>
 		</div>
-		{#if $books.length > 0}
-			<div class="header-actions">
-				<button type="button" class="btn-add" on:click={async () => {
-					console.log('Add Book clicked - Auth state:', $auth.user ? 'Logged in' : 'Not logged in');
-					
-					if (!$auth.user) {
-						console.log('User not authenticated, redirecting to login');
-						goto('/auth/login?redirectTo=/app/books/add');
-						return;
-					}
-					
-					console.log('User authenticated, navigating to /app/books/add');
-					goto('/app/books/add');
-				}}>
-					<svg class="btn-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
-					</svg>
-					Add Book
-				</button>
-			</div>
-		{/if}
+		<div class="header-actions">
+			<a href="/app/books/add" class="btn-add">
+				<svg class="btn-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
+				</svg>
+				Add Book
+			</a>
+		</div>
 	</div>
 
 	<!-- Filters -->
@@ -205,35 +187,16 @@
 				<h3 class="mt-2 text-sm font-medium text-gray-900">No books yet</h3>
 				<p class="mt-1 text-sm text-gray-500">Get started by adding your first book.</p>
 				<div class="mt-6">
-					<button type="button" class="btn-add" on:click={async () => {
-						console.log('Add Your First Book clicked');
-						console.log('Auth state:', $auth.user ? 'Logged in' : 'Not logged in');
-						console.log('Auth user:', $auth.user);
-						console.log('Window location:', window.location.href);
-						
-						if (!$auth.user) {
-							console.log('User not authenticated, redirecting to login');
-							goto('/auth/login?redirectTo=/app/books/add');
-							return;
-						}
-						
-						console.log('User authenticated, navigating to /app/books/add');
-						
-						// Try direct navigation first
-						try {
-							await goto('/app/books/add');
-							console.log('Navigation completed successfully');
-						} catch (error) {
-							console.error('Navigation failed:', error);
-							// Fallback to window.location for debugging
-							window.location.href = '/app/books/add';
-						}
-					}}>
-						<svg class="btn-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+					<a
+						href="/app/books/add"
+						class="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white transition-all duration-200"
+					style="background: linear-gradient(135deg, #8B2635 0%, #722F37 100%)"
+					>
+						<svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
 						</svg>
 						Add Your First Book
-					</button>
+					</a>
 				</div>
 			{:else}
 				<svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -242,7 +205,12 @@
 				<h3 class="mt-2 text-sm font-medium text-gray-900">No books found</h3>
 				<p class="mt-1 text-sm text-gray-500">Try adjusting your search or filter criteria.</p>
 				<div class="mt-6">
-					<button type="button" on:click={clearFilters} class="btn-clear">
+					<button
+						type="button"
+						on:click={clearFilters}
+						class="inline-flex items-center px-4 py-2 border shadow-sm text-sm font-medium rounded-md hover:shadow-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-opacity-50 transition-all duration-200"
+						style="background-color: #F5F5DC; color: #8B2635; border-color: #8B2635;"
+					>
 						Clear Filters
 					</button>
 				</div>
@@ -332,9 +300,6 @@
 		box-shadow: 0 4px 12px rgba(139, 38, 53, 0.3);
 		transition: all 0.2s ease;
 		border: none;
-		cursor: pointer;
-		z-index: 10;
-		position: relative;
 	}
 
 	.btn-add:hover {

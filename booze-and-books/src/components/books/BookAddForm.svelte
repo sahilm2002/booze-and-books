@@ -1,14 +1,12 @@
 <script lang="ts">
 	import { createEventDispatcher } from 'svelte';
 	import { goto } from '$app/navigation';
-	import { auth } from '$lib/stores/auth';
 	import GoogleBookSearch from './GoogleBookSearch.svelte';
 	import { bookStore, booksError } from '$lib/stores/books';
 	import { validateBookInput } from '$lib/validation/book';
 	import { getConditionOptions } from '$lib/validation/book';
-	import { BookCondition } from '$lib/types/book';
+	import type { BookCondition } from '$lib/types/book';
 	import type { BookInput, GoogleBookResult } from '$lib/types/book';
-
 
 	export let onSave: (() => void) | undefined = undefined;
 	export let onCancel: (() => void) | undefined = undefined;
@@ -22,54 +20,11 @@
 		title: '',
 		authors: [''],
 		isbn: '',
-		condition: BookCondition.GOOD,
+		condition: 'GOOD' as BookCondition,
 		genre: '',
 		description: '',
 		google_volume_id: ''
 	};
-
-	// Predefined genre options
-	const genreOptions = [
-		'Fiction',
-		'Non-Fiction',
-		'Mystery/Thriller',
-		'Science Fiction',
-		'Fantasy',
-		'Romance',
-		'Historical Fiction',
-		'Biography',
-		'Self-Help',
-		'Business',
-		'Health & Wellness',
-		'Cooking',
-		'Travel',
-		'Art & Design',
-		'Science & Nature',
-		'Philosophy',
-		'Religion & Spirituality',
-		'Poetry',
-		'Drama',
-		'Children\'s Books',
-		'Young Adult',
-		'Horror',
-		'Comedy/Humor',
-		'Sports',
-		'Politics',
-		'History'
-	];
-
-	let selectedGenres: string[] = [];
-
-	// Update formData.genre when selectedGenres changes
-	$: formData.genre = selectedGenres.join(', ');
-
-	function toggleGenre(genre: string) {
-		if (selectedGenres.includes(genre)) {
-			selectedGenres = selectedGenres.filter(g => g !== genre);
-		} else {
-			selectedGenres = [...selectedGenres, genre];
-		}
-	}
 
 	let saving = false;
 	let errors: Record<string, string> = {};
@@ -102,10 +57,6 @@
 				if (onSave) {
 					onSave();
 				} else {
-					if (!$auth.user) {
-						goto('/auth/login?redirectTo=/app/books');
-						return;
-					}
 					goto('/app/books');
 				}
 			}
@@ -115,7 +66,6 @@
 			saving = false;
 		}
 	}
-
 
 	function handleGoogleBookSelect(event: CustomEvent<{ book: GoogleBookResult; extracted: any }>) {
 		const { extracted } = event.detail;
@@ -129,12 +79,6 @@
 			google_volume_id: extracted.google_volume_id,
 			genre: extracted.genre || formData.genre
 		};
-
-		// Parse and set genres for multi-select
-		if (extracted.genre) {
-			const extractedGenres = extracted.genre.split(',').map((g: string) => g.trim());
-			selectedGenres = extractedGenres.filter((g: string) => genreOptions.includes(g));
-		}
 		
 		isManualEntry = false;
 	}
@@ -154,10 +98,6 @@
 		if (onCancel) {
 			onCancel();
 		} else {
-			if (!$auth.user) {
-				goto('/auth/login?redirectTo=/app/books');
-				return;
-			}
 			goto('/app/books');
 		}
 	}
@@ -170,7 +110,7 @@
 				title: '',
 				authors: [''],
 				isbn: '',
-				condition: BookCondition.GOOD,
+				condition: 'GOOD' as BookCondition,
 				genre: '',
 				description: '',
 				google_volume_id: ''
@@ -277,40 +217,14 @@
 			</div>
 
 			<div class="field-group full-width">
-				<label class="field-label">Genres</label>
-				<div class="genre-selector">
-					<div class="selected-genres">
-						{#if selectedGenres.length === 0}
-							<span class="no-genres">No genres selected</span>
-						{:else}
-							{#each selectedGenres as genre}
-								<span class="selected-genre">
-									{genre}
-									<button
-										type="button"
-										class="remove-genre"
-										on:click={() => toggleGenre(genre)}
-										aria-label="Remove {genre}"
-									>
-										×
-									</button>
-								</span>
-							{/each}
-						{/if}
-					</div>
-					<div class="genre-options">
-						{#each genreOptions as genre}
-							<button
-								type="button"
-								class="genre-option"
-								class:selected={selectedGenres.includes(genre)}
-								on:click={() => toggleGenre(genre)}
-							>
-								{genre}
-							</button>
-						{/each}
-					</div>
-				</div>
+				<label for="genre" class="field-label">Genre</label>
+				<input
+					type="text"
+					id="genre"
+					bind:value={formData.genre}
+					class="form-input"
+					placeholder="e.g., Fiction, Science Fiction, Biography"
+				/>
 			</div>
 
 		</div>
@@ -565,96 +479,6 @@
 		font-size: 0.8rem;
 		text-align: right;
 		margin: 0;
-	}
-
-	/* Genre Selector */
-	.genre-selector {
-		background: #f8f9fa;
-		border: 1px solid #d1d5db;
-		border-radius: 8px;
-		padding: 1rem;
-	}
-
-	.selected-genres {
-		margin-bottom: 1rem;
-		min-height: 2.5rem;
-		display: flex;
-		flex-wrap: wrap;
-		gap: 0.5rem;
-		align-items: center;
-	}
-
-	.no-genres {
-		color: #9ca3af;
-		font-style: italic;
-		font-size: 0.9rem;
-	}
-
-	.selected-genre {
-		display: inline-flex;
-		align-items: center;
-		background: #8B2635;
-		color: #F5F5DC;
-		padding: 0.375rem 0.75rem;
-		border-radius: 20px;
-		font-size: 0.85rem;
-		font-weight: 500;
-		gap: 0.5rem;
-	}
-
-	.remove-genre {
-		background: none;
-		border: none;
-		color: #F5F5DC;
-		font-size: 1.25rem;
-		line-height: 1;
-		cursor: pointer;
-		padding: 0;
-		width: 16px;
-		height: 16px;
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		border-radius: 50%;
-		transition: all 0.2s ease;
-	}
-
-	.remove-genre:hover {
-		background: rgba(245, 245, 220, 0.2);
-	}
-
-	.genre-options {
-		display: grid;
-		grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-		gap: 0.5rem;
-		max-height: 200px;
-		overflow-y: auto;
-		border-top: 1px solid #e2e8f0;
-		padding-top: 1rem;
-	}
-
-	.genre-option {
-		padding: 0.5rem 0.75rem;
-		border: 1px solid #d1d5db;
-		border-radius: 6px;
-		background: white;
-		color: #374151;
-		font-size: 0.85rem;
-		cursor: pointer;
-		transition: all 0.2s ease;
-		text-align: left;
-	}
-
-	.genre-option:hover {
-		border-color: #8B2635;
-		background: #f8f9fa;
-	}
-
-	.genre-option.selected {
-		background: #8B2635;
-		border-color: #8B2635;
-		color: #F5F5DC;
-		font-weight: 500;
 	}
 
 	.error-message {
