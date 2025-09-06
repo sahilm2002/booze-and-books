@@ -65,21 +65,23 @@
 	<nav class="main-nav">
 		{#if user}
 			<div class="nav-user">
-				<div class="user-profile">
-					<div class="user-avatar">
-						{#if avatarUrl}
-							<img src={avatarUrl} alt="Profile" class="avatar-img" />
-						{:else}
-							<div class="avatar-placeholder">{initials}</div>
-						{/if}
+				<a href="/app" class="user-profile-link" title="Go to Dashboard">
+					<div class="user-profile">
+						<div class="user-avatar">
+							{#if avatarUrl}
+								<img src={avatarUrl} alt="Profile" class="avatar-img" />
+							{:else}
+								<div class="avatar-placeholder">{initials}</div>
+							{/if}
+						</div>
+						<div class="user-info">
+							<span class="user-name">
+								{$profile?.full_name || $profile?.username || user.email}
+							</span>
+							<span class="user-email">{user.email}</span>
+						</div>
 					</div>
-					<div class="user-info">
-						<span class="user-name">
-							{$profile?.full_name || $profile?.username || user.email}
-						</span>
-						<span class="user-email">{user.email}</span>
-					</div>
-				</div>
+				</a>
 				<NotificationBell />
 				<form method="POST" action="/auth/logout" style="display: inline;">
 					<button type="submit" class="logout-btn">Sign Out</button>
@@ -125,11 +127,25 @@
 		gap: 1rem;
 	}
 
+	.user-profile-link {
+		text-decoration: none;
+		color: inherit;
+		border-radius: 8px;
+		transition: all 0.2s ease;
+		margin-right: 1rem;
+		cursor: pointer;
+	}
+
+	.user-profile-link:hover {
+		background-color: rgba(255, 255, 255, 0.1);
+		transform: translateY(-1px);
+	}
+
 	.user-profile {
 		display: flex;
 		align-items: center;
 		gap: 0.75rem;
-		margin-right: 1rem;
+		padding: 0.5rem;
 	}
 
 	.user-avatar {
