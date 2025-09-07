@@ -50,15 +50,12 @@
 		if (!$user?.id || isOwner) return;
 		
 		checkingExistingRequest = true;
-		console.log('🔍 Checking for existing swap request for book:', book.id);
 		try {
-			const { data, error } = await SwapService.getSwapRequestsForUser($user.id);
-			console.log('📊 SwapService result:', { data, error });
-			if (!error && data?.outgoing) {
+			const data = await SwapService.getSwapRequestsForUser($user.id);
+			if (data?.outgoing) {
 				const existing = data.outgoing.find(req => 
 					req.book?.id === book.id && req.status === 'PENDING'
 				);
-				console.log('🔎 Found existing request:', existing);
 				existingSwapRequest = existing || null;
 			}
 		} catch (error) {
@@ -116,7 +113,7 @@
 		if (!existingSwapRequest || !$user?.id) return;
 
 		try {
-			await SwapService.updateSwapRequestStatus(existingSwapRequest.id, 'CANCELLED');
+			await SwapService.updateSwapRequestStatus(existingSwapRequest.id, 'CANCELLED', $user.id);
 			existingSwapRequest = null;
 			
 			dispatch('notification', {
@@ -297,9 +294,6 @@
 				{#if existingSwapRequest}
 					<button on:click={handleCancelRequest} class="btn-cancel">
 						Cancel Request
-					</button>
-					<button on:click={handleSwapRequest} class="btn-update">
-						Update Request
 					</button>
 				{:else if checkingExistingRequest}
 					<button class="btn-swap" disabled>
@@ -650,22 +644,6 @@
 		color: white;
 	}
 
-	.btn-update {
-		background: #fef5e7;
-		color: #d69e2e;
-		border: 1px solid #f6e05e;
-		padding: 0.5rem 1rem;
-		border-radius: 6px;
-		font-size: 0.85rem;
-		font-weight: 500;
-		cursor: pointer;
-		transition: all 0.2s;
-	}
-
-	.btn-update:hover {
-		background: #ed8936;
-		color: white;
-	}
 
 	.btn-spinner {
 		width: 16px;
