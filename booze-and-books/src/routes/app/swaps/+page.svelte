@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
+	import { page } from '$app/stores';
 	import SwapRequestCard from '../../../components/swaps/SwapRequestCard.svelte';
 	import { swapStore, incomingSwapRequests, outgoingSwapRequests, swapRequestsLoading, swapRequestsError } from '$lib/stores/swaps';
 	import type { PageData } from './$types';
@@ -13,6 +14,14 @@
 	onMount(async () => {
 		// Set page title
 		document.title = 'Swap Requests - Booze & Books';
+		
+		// Check for tab parameter in URL
+		const tabParam = $page.url.searchParams.get('tab');
+		if (tabParam === 'outgoing') {
+			activeTab = 'outgoing';
+		} else if (tabParam === 'incoming') {
+			activeTab = 'incoming';
+		}
 		
 		// Fetch swap requests from client-side service
 		await swapStore.refresh();
