@@ -1,5 +1,6 @@
 export enum BookCondition {
-	LIKE_NEW = 'LIKE_NEW',
+	AS_NEW = 'AS_NEW',
+	FINE = 'FINE',
 	VERY_GOOD = 'VERY_GOOD',
 	GOOD = 'GOOD',
 	FAIR = 'FAIR',

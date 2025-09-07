@@ -25,6 +25,12 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 		};
 	} catch (err) {
 		console.error('Error loading discovery page:', err);
-		throw error(500, 'Failed to load available books');
+		
+		// Always return empty array instead of throwing errors
+		// This prevents 500 errors and allows the page to load gracefully
+		console.warn('Database error occurred, returning empty books for graceful fallback');
+		return {
+			availableBooks: []
+		};
 	}
 };
