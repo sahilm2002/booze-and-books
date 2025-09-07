@@ -28,21 +28,29 @@ Imagine having access to a vast library of books owned by fellow readers in your
 - Browse available books and request swaps with other users
 - Offer one of your books in exchange for theirs
 - Include personal messages to connect with fellow readers
+- **Smart Validation**: System prevents requesting your own books or unavailable titles
 
 #### **Counter-Offer Magic**
 - **Didn't like the offered book?** As a book owner, you can make counter-offers
 - **Flexible Negotiations**: Suggest a different book from the requester's collection
 - **Multiple Options**: Keep negotiating until both parties find the perfect match
 
+#### **Enhanced Notifications**
+- **Visual Book Covers**: See book cover images in all swap notifications
+- **Rich Details**: View book title, authors, and condition directly in notifications
+- **Smart Navigation**: Click notifications to jump to the right swap requests tab
+- **Real-Time Updates**: Instant notifications for all swap status changes
+
 #### **Seamless Communication**
 - **Contact Information Sharing**: When both parties agree to a swap, contact details are automatically shared
 - **Email Notifications**: Stay updated on swap requests, approvals, and counter-offers
-- **In-App Notifications**: Real-time updates on all your swap activities
+- **In-App Notifications**: Real-time updates with book covers and detailed information
 
 #### **Complete the Exchange**
 - **Rate Your Experience**: After swapping books, rate your exchange partner
 - **Build Reputation**: Earn trust in the community through successful swaps
 - **Leave Feedback**: Help others by sharing your swap experience
+- **Cancel Anytime**: Either party can cancel pending requests with proper notifications
 
 ### 📊 **Track Your Journey**
 - **Swap Statistics**: See how many successful swaps you've completed
@@ -72,8 +80,8 @@ Our system automatically filters out books that are already in pending swaps, en
 ### **📱 Modern Interface**
 Clean, intuitive design that works beautifully on desktop, tablet, and mobile devices.
 
-### **🔔 Stay Connected**
-Never miss an opportunity with real-time notifications for new swap requests, approvals, and counter-offers.
+### **🔔 Enhanced Notifications**
+Never miss an opportunity with rich, visual notifications featuring book covers, detailed information, and smart navigation to the right content.
 
 ## 🎯 Perfect For...
 
@@ -117,6 +125,30 @@ We take your privacy seriously:
 - Follow through on approved swaps
 - Rate your experiences fairly to help the community
 - Report any inappropriate behavior
+
+## 🛠️ Technical Features & Improvements
+
+### **Recent Enhancements (v1.2)**
+- **Enhanced Notification System**: Visual book covers in notifications with comprehensive book details
+- **Smart Data Consistency**: Database triggers ensure accurate book ownership relationships
+- **Improved Type Safety**: Full TypeScript implementation with proper interfaces
+- **Modern UI/UX**: Consistent design language throughout the application
+- **Robust Swap Management**: Comprehensive validation and error handling
+- **Intelligent Navigation**: Context-aware routing based on notification types
+
+### **Tech Stack**
+- **Frontend**: SvelteKit with TypeScript
+- **Backend**: Supabase (PostgreSQL + PostgREST)
+- **Authentication**: Supabase Auth with Row Level Security
+- **Real-time**: Supabase Realtime for live notifications
+- **External APIs**: Google Books API for book metadata
+- **Styling**: Custom CSS with modern design principles
+
+### **Database Architecture**
+- **Row Level Security (RLS)**: Comprehensive security policies for data protection
+- **Automated Triggers**: Database-level validation and notification creation
+- **Optimized Queries**: Efficient data fetching with proper indexing
+- **Data Integrity**: Foreign key constraints and validation functions
 
 ## 📞 Support & Feedback
 
