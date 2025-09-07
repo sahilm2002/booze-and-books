@@ -50,12 +50,16 @@
 		if (!$user?.id || isOwner) return;
 		
 		checkingExistingRequest = true;
+		console.log('🔍 Checking for existing swap request for book:', book.id);
 		try {
 			const { data, error } = await SwapService.getSwapRequestsForUser($user.id);
+			console.log('📊 SwapService result:', { data, error });
 			if (!error && data?.outgoing) {
-				existingSwapRequest = data.outgoing.find(req => 
+				const existing = data.outgoing.find(req => 
 					req.book?.id === book.id && req.status === 'PENDING'
-				) || null;
+				);
+				console.log('🔎 Found existing request:', existing);
+				existingSwapRequest = existing || null;
 			}
 		} catch (error) {
 			console.error('Error checking existing swap request:', error);
@@ -155,6 +159,9 @@
 				type: 'success',
 				message: `Swap request sent! You offered "${offeredBook.title}" for "${book.title}"`
 			});
+
+			// Refresh existing request status after successful creation
+			await checkForExistingRequest();
 
 			dispatch('swapRequested', {
 				requestedBook: book,
