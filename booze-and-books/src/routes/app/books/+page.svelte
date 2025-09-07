@@ -267,8 +267,8 @@
 
 <!-- Edit Book Modal -->
 {#if showEditModal && editingBook}
-	<div class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50" on:click={handleEditCancel} role="dialog" aria-modal="true">
-		<div class="relative top-20 mx-auto p-5 border w-11/12 md:w-3/4 lg:w-1/2 shadow-lg rounded-md bg-white" on:click|stopPropagation>
+	<div class="modal-overlay" on:click={handleEditCancel} role="dialog" aria-modal="true">
+		<div class="modal-container" on:click|stopPropagation>
 			<BookEditForm 
 				book={editingBook}
 				onSave={handleEditSave}
@@ -492,6 +492,57 @@
 		:global(.lg\:px-8) {
 			padding-left: 2rem;
 			padding-right: 2rem;
+		}
+	}
+
+	/* Modal Styles */
+	.modal-overlay {
+		position: fixed;
+		top: 0;
+		left: 0;
+		right: 0;
+		bottom: 0;
+		background: rgba(0, 0, 0, 0.5);
+		backdrop-filter: blur(2px);
+		z-index: 9999;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		padding: 1rem;
+		overflow-y: auto;
+	}
+
+	.modal-container {
+		background: white;
+		border-radius: 12px;
+		box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+		max-width: 90%;
+		width: 600px;
+		max-height: 90vh;
+		overflow-y: auto;
+		animation: modal-appear 0.2s ease-out;
+	}
+
+	@keyframes modal-appear {
+		from {
+			opacity: 0;
+			transform: scale(0.95) translateY(-10px);
+		}
+		to {
+			opacity: 1;
+			transform: scale(1) translateY(0);
+		}
+	}
+
+	@media (max-width: 768px) {
+		.modal-container {
+			max-width: 95%;
+			width: auto;
+			margin: 0.5rem;
+		}
+
+		.modal-overlay {
+			padding: 0.5rem;
 		}
 	}
 </style>
