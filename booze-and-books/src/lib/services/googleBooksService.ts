@@ -140,8 +140,12 @@ export class GoogleBooksService {
 	static formatSearchResults(results: GoogleBookResult[]) {
 		return results.map(book => {
 			const extracted = this.extractBookData(book);
+			const thumbnailUrl = book.volumeInfo.imageLinks?.thumbnail || 
+							   book.volumeInfo.imageLinks?.smallThumbnail || null;
+			
 			return {
 				...extracted,
+				thumbnail_url: thumbnailUrl,
 				displayText: `${extracted.title} by ${extracted.authors.join(', ')}`,
 				googleBookId: book.id
 			};
