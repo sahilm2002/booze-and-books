@@ -1,7 +1,7 @@
 export enum SwapStatus {
 	PENDING = 'PENDING',
 	ACCEPTED = 'ACCEPTED',
-	DECLINED = 'DECLINED',
+	COUNTER_OFFER = 'COUNTER_OFFER',
 	CANCELLED = 'CANCELLED',
 	COMPLETED = 'COMPLETED'
 }
@@ -13,6 +13,8 @@ export interface SwapRequest {
 	owner_id: string;
 	status: SwapStatus;
 	message: string | null;
+	offered_book_id: string | null;
+	counter_offered_book_id: string | null;
 	created_at: string;
 	updated_at: string;
 	completion_date: string | null;
@@ -25,11 +27,13 @@ export interface SwapRequest {
 export interface SwapRequestInput {
 	book_id: string;
 	message?: string | null;
+	offered_book_id?: string | null;
 }
 
 export interface SwapRequestUpdate {
 	status: SwapStatus;
 	completion_date?: string | null;
+	counter_offered_book_id?: string | null;
 }
 
 export interface SwapCompletion {
@@ -45,15 +49,31 @@ export interface SwapRequestWithBook extends SwapRequest {
 		thumbnail_url: string | null;
 		condition: string;
 	};
+	offered_book?: {
+		id: string;
+		title: string;
+		authors: string[];
+		thumbnail_url: string | null;
+		condition: string;
+	} | null;
+	counter_offered_book?: {
+		id: string;
+		title: string;
+		authors: string[];
+		thumbnail_url: string | null;
+		condition: string;
+	} | null;
 	requester_profile: {
 		username: string | null;
 		full_name: string | null;
 		avatar_url: string | null;
+		email?: string | null; // Only available when status is ACCEPTED
 	};
 	owner_profile: {
 		username: string | null;
 		full_name: string | null;
 		avatar_url: string | null;
+		email?: string | null; // Only available when status is ACCEPTED
 	};
 }
 
