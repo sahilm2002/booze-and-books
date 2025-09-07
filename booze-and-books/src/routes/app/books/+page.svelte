@@ -6,6 +6,7 @@
 	import BookCard from '../../../components/books/BookCard.svelte';
 	import BookEditForm from '../../../components/books/BookEditForm.svelte';
 	import { bookStore, books, booksLoading, booksError } from '$lib/stores/books';
+	import { getConditionDisplayName } from '$lib/validation/book';
 	import type { Book } from '$lib/types/book';
 	import type { PageData } from './$types';
 
@@ -147,7 +148,7 @@
 					<select bind:value={selectedCondition} class="filter-select">
 						<option value="">All Conditions</option>
 						{#each conditions as condition}
-							<option value={condition}>{condition.replace('_', ' ')}</option>
+							<option value={condition}>{getConditionDisplayName(condition)}</option>
 						{/each}
 					</select>
 				</div>
