@@ -70,13 +70,40 @@ export class SwapService {
 			}
 		}
 
-		// Debug: Check authentication
-		const { data: { user }, error: authError } = await supabase.auth.getUser();
-		console.log('🔐 Auth Debug - User:', user?.id, 'Email:', user?.email);
-		console.log('🔐 Auth Error:', authError);
-		console.log('🔐 Requester ID:', requesterId);
+		// Check if there's already a pending request for this book by this user
+		const { data: existingRequest, error: checkError } = await supabase
+			.from('swap_requests')
+			.select('id, status, offered_book_id')
+			.eq('book_id', input.book_id)
+			.eq('requester_id', requesterId)
+			.eq('status', SwapStatus.PENDING)
+			.single();
 
-		// Debug: Show what we're about to insert
+		if (checkError && checkError.code !== 'PGRST116') { // PGRST116 = no rows returned
+			throw new Error(`Failed to check existing requests: ${checkError.message}`);
+		}
+
+		// If there's already a pending request, update it instead of creating a new one
+		if (existingRequest) {
+			const { data, error } = await supabase
+				.from('swap_requests')
+				.update({
+					message: input.message,
+					offered_book_id: input.offered_book_id,
+					updated_at: new Date().toISOString()
+				})
+				.eq('id', existingRequest.id)
+				.select()
+				.single();
+
+			if (error) {
+				throw new Error(`Failed to update swap request: ${error.message}`);
+			}
+
+			return data;
+		}
+
+		// No existing request, create a new one
 		const insertData = {
 			book_id: input.book_id,
 			requester_id: requesterId,
@@ -85,7 +112,6 @@ export class SwapService {
 			offered_book_id: input.offered_book_id,
 			status: SwapStatus.PENDING
 		};
-		console.log('📝 Insert Data:', JSON.stringify(insertData, null, 2));
 
 		// Create the swap request
 		const { data, error } = await supabase
@@ -93,9 +119,6 @@ export class SwapService {
 			.insert(insertData)
 			.select()
 			.single();
-
-		console.log('✅ Insert Result - Data:', data);
-		console.log('❌ Insert Result - Error:', error);
 
 		if (error) {
 			throw new Error(`Failed to create swap request: ${error.message}`);
