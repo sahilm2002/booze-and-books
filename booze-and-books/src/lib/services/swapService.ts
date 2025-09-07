@@ -127,13 +127,13 @@ export class SwapService {
 		return data;
 	}
 
-	// Get swap requests for a user (both incoming and outgoing)
+	// Get swap requests for a user (both incoming and outgoing) - simplified version
 	static async getSwapRequestsForUser(userId: string): Promise<{
 		incoming: SwapRequestWithBook[];
 		outgoing: SwapRequestWithBook[];
 	}> {
 		// Get incoming requests (user is the book owner)
-		const { data: incomingRaw, error: incomingError } = await supabase
+		const { data: incoming, error: incomingError } = await supabase
 			.from('swap_requests')
 			.select(`
 				*,
@@ -150,9 +150,6 @@ export class SwapService {
 					authors,
 					thumbnail_url,
 					condition
-				),
-				requester_profile:profiles!swap_requests_requester_id_fkey (
-					${this.getProfileSelectQuery(false)}
 				)
 			`)
 			.eq('owner_id', userId)
@@ -162,34 +159,8 @@ export class SwapService {
 			throw new Error(`Failed to fetch incoming requests: ${incomingError.message}`);
 		}
 
-		// For ACCEPTED requests, fetch email information separately
-		const acceptedIncoming = incomingRaw?.filter(req => req.status === SwapStatus.ACCEPTED) || [];
-		const incomingWithEmails = await Promise.all(
-			(incomingRaw || []).map(async (req) => {
-				if (req.status === SwapStatus.ACCEPTED) {
-					// Fetch requester email
-					const { data: requesterUser } = await supabase
-						.from('users')
-						.select('email')
-						.eq('id', req.requester_id)
-						.single();
-
-					return {
-						...req,
-						requester_profile: {
-							...req.requester_profile,
-							email: requesterUser?.email || null
-						}
-					};
-				}
-				return req;
-			})
-		);
-
-		const incoming = incomingWithEmails;
-
 		// Get outgoing requests (user is the requester)
-		const { data: outgoingRaw, error: outgoingError } = await supabase
+		const { data: outgoing, error: outgoingError } = await supabase
 			.from('swap_requests')
 			.select(`
 				*,
@@ -206,16 +177,6 @@ export class SwapService {
 					authors,
 					thumbnail_url,
 					condition
-				),
-				counter_offered_book:books!swap_requests_counter_offered_book_id_fkey (
-					id,
-					title,
-					authors,
-					thumbnail_url,
-					condition
-				),
-				owner_profile:profiles!swap_requests_owner_id_fkey (
-					${this.getProfileSelectQuery(false)}
 				)
 			`)
 			.eq('requester_id', userId)
@@ -225,42 +186,9 @@ export class SwapService {
 			throw new Error(`Failed to fetch outgoing requests: ${outgoingError.message}`);
 		}
 
-		// For ACCEPTED requests, fetch owner email information
-		const outgoingWithEmails = await Promise.all(
-			(outgoingRaw || []).map(async (req) => {
-				if (req.status === SwapStatus.ACCEPTED) {
-					// Fetch owner email
-					const { data: ownerUser } = await supabase
-						.from('users')
-						.select('email')
-						.eq('id', req.owner_id)
-						.single();
-
-					return {
-						...req,
-						owner_profile: {
-							...req.owner_profile,
-							email: ownerUser?.email || null
-						}
-					};
-				}
-				return req;
-			})
-		);
-
-		const outgoing = outgoingWithEmails;
-
 		return {
-			incoming: (incoming || []).map(req => ({
-				...req,
-				requester_profile: req.requester_profile,
-				owner_profile: { username: null, full_name: null, avatar_url: null }
-			})) as SwapRequestWithBook[],
-			outgoing: (outgoing || []).map(req => ({
-				...req,
-				requester_profile: { username: null, full_name: null, avatar_url: null },
-				owner_profile: req.owner_profile
-			})) as SwapRequestWithBook[]
+			incoming: (incoming || []) as SwapRequestWithBook[],
+			outgoing: (outgoing || []) as SwapRequestWithBook[]
 		};
 	}
 
