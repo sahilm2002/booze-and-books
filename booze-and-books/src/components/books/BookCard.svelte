@@ -38,6 +38,31 @@
 	let isToggling = false;
 	let showBookSelectionModal = false;
 	let isCreatingSwapRequest = false;
+	let existingSwapRequest: any = null;
+	let checkingExistingRequest = false;
+
+	// Check for existing swap request when user changes
+	$: if ($user?.id && enableSwapRequests && !isOwner) {
+		checkForExistingRequest();
+	}
+
+	async function checkForExistingRequest() {
+		if (!$user?.id || isOwner) return;
+		
+		checkingExistingRequest = true;
+		try {
+			const { data, error } = await SwapService.getSwapRequestsForUser($user.id);
+			if (!error && data?.outgoing) {
+				existingSwapRequest = data.outgoing.find(req => 
+					req.book?.id === book.id && req.status === 'PENDING'
+				) || null;
+			}
+		} catch (error) {
+			console.error('Error checking existing swap request:', error);
+		} finally {
+			checkingExistingRequest = false;
+		}
+	}
 
 	function handleEdit() {
 		if (isOwner) {
@@ -78,8 +103,28 @@
 	}
 
 	function handleSwapRequest() {
-		if (canRequestSwap) {
+		if (canRequestSwap && !existingSwapRequest) {
 			showBookSelectionModal = true;
+		}
+	}
+
+	async function handleCancelRequest() {
+		if (!existingSwapRequest || !$user?.id) return;
+
+		try {
+			await SwapService.updateSwapRequestStatus(existingSwapRequest.id, 'CANCELLED');
+			existingSwapRequest = null;
+			
+			dispatch('notification', {
+				type: 'success',
+				message: `Swap request cancelled for "${book.title}"`
+			});
+		} catch (error) {
+			console.error('Failed to cancel swap request:', error);
+			dispatch('notification', {
+				type: 'error',
+				message: error instanceof Error ? error.message : 'Failed to cancel swap request'
+			});
 		}
 	}
 
@@ -220,6 +265,21 @@
 		</div>
 	{/if}
 
+	<!-- Existing Swap Request Status -->
+	{#if existingSwapRequest && !isOwner}
+		<div class="swap-request-status">
+			<div class="status-info">
+				<span class="status-label">Swap Request:</span>
+				<span class="status-badge pending">Pending</span>
+			</div>
+			{#if existingSwapRequest.offered_book}
+				<div class="offered-book-info">
+					You offered: <strong>{existingSwapRequest.offered_book.title}</strong>
+				</div>
+			{/if}
+		</div>
+	{/if}
+
 	<!-- Actions -->
 	{#if showActions}
 		<div class="actions-section">
@@ -227,14 +287,28 @@
 				<button on:click={handleEdit} class="btn-edit">Edit</button>
 				<button on:click={handleDelete} class="btn-delete">Delete</button>
 			{:else if canRequestSwap}
-				<button on:click={handleSwapRequest} class="btn-swap" disabled={isCreatingSwapRequest}>
-					{#if isCreatingSwapRequest}
+				{#if existingSwapRequest}
+					<button on:click={handleCancelRequest} class="btn-cancel">
+						Cancel Request
+					</button>
+					<button on:click={handleSwapRequest} class="btn-update">
+						Update Request
+					</button>
+				{:else if checkingExistingRequest}
+					<button class="btn-swap" disabled>
 						<div class="btn-spinner"></div>
-						Creating Request...
-					{:else}
-						Request Swap
-					{/if}
-				</button>
+						Checking...
+					</button>
+				{:else}
+					<button on:click={handleSwapRequest} class="btn-swap" disabled={isCreatingSwapRequest}>
+						{#if isCreatingSwapRequest}
+							<div class="btn-spinner"></div>
+							Creating Request...
+						{:else}
+							Request Swap
+						{/if}
+					</button>
+				{/if}
 			{/if}
 		</div>
 	{/if}
@@ -442,6 +516,48 @@
 		transform: translateX(20px);
 	}
 
+	.swap-request-status {
+		background: #e6fffa;
+		border: 1px solid #81e6d9;
+		border-radius: 8px;
+		padding: 0.75rem;
+		margin-bottom: 1rem;
+	}
+
+	.status-info {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		margin-bottom: 0.5rem;
+	}
+
+	.status-label {
+		color: #2d3748;
+		font-size: 0.9rem;
+		font-weight: 500;
+	}
+
+	.status-badge {
+		padding: 0.25rem 0.75rem;
+		border-radius: 12px;
+		font-size: 0.75rem;
+		font-weight: 600;
+		text-transform: uppercase;
+		letter-spacing: 0.05em;
+	}
+
+	.status-badge.pending {
+		background: #fef5e7;
+		color: #d69e2e;
+		border: 1px solid #f6e05e;
+	}
+
+	.offered-book-info {
+		color: #4a5568;
+		font-size: 0.85rem;
+		line-height: 1.4;
+	}
+
 	.actions-section {
 		display: flex;
 		gap: 0.5rem;
@@ -508,6 +624,40 @@
 		color: #a0aec0;
 		cursor: not-allowed;
 		border-color: #e2e8f0;
+	}
+
+	.btn-cancel {
+		background: #fed7d7;
+		color: #c53030;
+		border: 1px solid #feb2b2;
+		padding: 0.5rem 1rem;
+		border-radius: 6px;
+		font-size: 0.85rem;
+		font-weight: 500;
+		cursor: pointer;
+		transition: all 0.2s;
+	}
+
+	.btn-cancel:hover {
+		background: #fc8181;
+		color: white;
+	}
+
+	.btn-update {
+		background: #fef5e7;
+		color: #d69e2e;
+		border: 1px solid #f6e05e;
+		padding: 0.5rem 1rem;
+		border-radius: 6px;
+		font-size: 0.85rem;
+		font-weight: 500;
+		cursor: pointer;
+		transition: all 0.2s;
+	}
+
+	.btn-update:hover {
+		background: #ed8936;
+		color: white;
 	}
 
 	.btn-spinner {
