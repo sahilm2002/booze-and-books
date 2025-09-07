@@ -30,7 +30,7 @@ export class SwapService {
 	}
 	// Create a new swap request
 	static async createSwapRequest(input: SwapRequestInput, requesterId: string): Promise<SwapRequest> {
-		// First, get the book details to determine the owner
+		// Validate the book exists and is available (owner_id will be populated by DB trigger)
 		const { data: book, error: bookError } = await supabase
 			.from('books')
 			.select('id, owner_id, is_available')
@@ -104,10 +104,10 @@ export class SwapService {
 		}
 
 		// No existing request, create a new one
+		// Note: owner_id will be automatically populated by database trigger
 		const insertData = {
 			book_id: input.book_id,
 			requester_id: requesterId,
-			owner_id: book.owner_id,
 			message: input.message,
 			offered_book_id: input.offered_book_id,
 			status: SwapStatus.PENDING
