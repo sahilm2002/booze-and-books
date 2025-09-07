@@ -70,19 +70,32 @@ export class SwapService {
 			}
 		}
 
+		// Debug: Check authentication
+		const { data: { user }, error: authError } = await supabase.auth.getUser();
+		console.log('🔐 Auth Debug - User:', user?.id, 'Email:', user?.email);
+		console.log('🔐 Auth Error:', authError);
+		console.log('🔐 Requester ID:', requesterId);
+
+		// Debug: Show what we're about to insert
+		const insertData = {
+			book_id: input.book_id,
+			requester_id: requesterId,
+			owner_id: book.owner_id,
+			message: input.message,
+			offered_book_id: input.offered_book_id,
+			status: SwapStatus.PENDING
+		};
+		console.log('📝 Insert Data:', JSON.stringify(insertData, null, 2));
+
 		// Create the swap request
 		const { data, error } = await supabase
 			.from('swap_requests')
-			.insert({
-				book_id: input.book_id,
-				requester_id: requesterId,
-				owner_id: book.owner_id,
-				message: input.message,
-				offered_book_id: input.offered_book_id,
-				status: SwapStatus.PENDING
-			})
+			.insert(insertData)
 			.select()
 			.single();
+
+		console.log('✅ Insert Result - Data:', data);
+		console.log('❌ Insert Result - Error:', error);
 
 		if (error) {
 			throw new Error(`Failed to create swap request: ${error.message}`);
@@ -101,7 +114,7 @@ export class SwapService {
 			.from('swap_requests')
 			.select(`
 				*,
-				book:books (
+				book:books!swap_requests_book_id_fkey (
 					id,
 					title,
 					authors,
@@ -115,14 +128,7 @@ export class SwapService {
 					thumbnail_url,
 					condition
 				),
-				counter_offered_book:books!swap_requests_counter_offered_book_id_fkey (
-					id,
-					title,
-					authors,
-					thumbnail_url,
-					condition
-				),
-				requester_profile:profiles!swap_requests_requester_id_profiles_fkey (
+				requester_profile:profiles!swap_requests_requester_id_fkey (
 					${this.getProfileSelectQuery(false)}
 				)
 			`)
@@ -164,7 +170,7 @@ export class SwapService {
 			.from('swap_requests')
 			.select(`
 				*,
-				book:books (
+				book:books!swap_requests_book_id_fkey (
 					id,
 					title,
 					authors,
@@ -185,7 +191,7 @@ export class SwapService {
 					thumbnail_url,
 					condition
 				),
-				owner_profile:profiles!swap_requests_owner_id_profiles_fkey (
+				owner_profile:profiles!swap_requests_owner_id_fkey (
 					${this.getProfileSelectQuery(false)}
 				)
 			`)
@@ -314,7 +320,7 @@ export class SwapService {
 			.from('swap_requests')
 			.select(`
 				*,
-				book:books (
+				book:books!swap_requests_book_id_fkey (
 					id,
 					title,
 					authors,
@@ -335,12 +341,12 @@ export class SwapService {
 					thumbnail_url,
 					condition
 				),
-				requester_profile:profiles!swap_requests_requester_id_profiles_fkey (
+				requester_profile:profiles!swap_requests_requester_id_fkey (
 					username,
 					full_name,
 					avatar_url
 				),
-				owner_profile:profiles!swap_requests_owner_id_profiles_fkey (
+				owner_profile:profiles!swap_requests_owner_id_fkey (
 					username,
 					full_name,
 					avatar_url
@@ -522,7 +528,7 @@ export class SwapService {
 			.from('swap_requests')
 			.select(`
 				*,
-				book:books (
+				book:books!swap_requests_book_id_fkey (
 					id,
 					title,
 					authors,
@@ -543,12 +549,12 @@ export class SwapService {
 					thumbnail_url,
 					condition
 				),
-				requester_profile:profiles!swap_requests_requester_id_profiles_fkey (
+				requester_profile:profiles!swap_requests_requester_id_fkey (
 					username,
 					full_name,
 					avatar_url
 				),
-				owner_profile:profiles!swap_requests_owner_id_profiles_fkey (
+				owner_profile:profiles!swap_requests_owner_id_fkey (
 					username,
 					full_name,
 					avatar_url
