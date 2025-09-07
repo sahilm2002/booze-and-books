@@ -73,35 +73,35 @@
 	}
 </script>
 
-<div class="bg-white shadow rounded-lg overflow-hidden">
-	<div class="px-6 py-4 border-b border-gray-200">
-		<h3 class="text-lg font-medium text-gray-900">Edit Book</h3>
-		<p class="mt-1 text-sm text-gray-600">
+<div class="edit-form-container">
+	<div class="form-header">
+		<h3 class="form-title">Edit Book</h3>
+		<p class="form-subtitle">
 			{book.title} by {book.authors.join(', ')}
 		</p>
 	</div>
 
-	<form on:submit|preventDefault={handleSubmit} class="p-6 space-y-6">
+	<form on:submit|preventDefault={handleSubmit} class="form-content">
 		<!-- Read-only book info -->
-		<div class="bg-gray-50 p-4 rounded-md">
-			<h4 class="font-medium text-gray-900 mb-2">Book Information</h4>
-			<div class="text-sm text-gray-600 space-y-1">
-				<p><span class="font-medium">Title:</span> {book.title}</p>
-				<p><span class="font-medium">Authors:</span> {book.authors.join(', ')}</p>
+		<div class="book-info-section">
+			<h4 class="info-title">Book Information</h4>
+			<div class="info-content">
+				<p><span class="info-label">Title:</span> {book.title}</p>
+				<p><span class="info-label">Authors:</span> {book.authors.join(', ')}</p>
 				{#if book.isbn}
-					<p><span class="font-medium">ISBN:</span> {book.isbn}</p>
+					<p><span class="info-label">ISBN:</span> {book.isbn}</p>
 				{/if}
 			</div>
 		</div>
 
 		<!-- Editable fields -->
-		<div class="grid grid-cols-1 gap-6 sm:grid-cols-2">
-			<div>
-				<label for="condition" class="block text-sm font-medium text-gray-700">Condition *</label>
+		<div class="fields-grid">
+			<div class="field-group">
+				<label for="condition" class="field-label">Condition *</label>
 				<select
 					id="condition"
 					bind:value={formData.condition}
-					class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+					class="field-select"
 					required
 				>
 					{#each conditionOptions as option}
@@ -109,81 +109,293 @@
 					{/each}
 				</select>
 				{#if errors.condition}
-					<p class="mt-1 text-sm text-red-600">{errors.condition}</p>
+					<p class="field-error">{errors.condition}</p>
 				{/if}
 			</div>
 
-			<div>
-				<label for="genre" class="block text-sm font-medium text-gray-700">Genre</label>
+			<div class="field-group">
+				<label for="genre" class="field-label">Genre</label>
 				<input
 					type="text"
 					id="genre"
 					bind:value={formData.genre}
-					class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+					class="field-input"
 					placeholder="e.g., Fiction, Science Fiction, Biography"
 				/>
 				{#if errors.genre}
-					<p class="mt-1 text-sm text-red-600">{errors.genre}</p>
+					<p class="field-error">{errors.genre}</p>
 				{/if}
 			</div>
 		</div>
 
-		<div>
-			<label for="description" class="block text-sm font-medium text-gray-700">Personal Notes</label>
+		<div class="field-group full-width">
+			<label for="description" class="field-label">Personal Notes</label>
 			<textarea
 				id="description"
 				rows="4"
 				bind:value={formData.description}
-				class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+				class="field-textarea"
 				placeholder="Add your personal notes about this book..."
 			></textarea>
 			{#if errors.description}
-				<p class="mt-1 text-sm text-red-600">{errors.description}</p>
+				<p class="field-error">{errors.description}</p>
 			{/if}
-			<p class="mt-1 text-xs text-gray-500">
+			<p class="char-counter">
 				{formData.description?.length || 0}/2000 characters
 			</p>
 		</div>
 
 		{#if $booksError}
-			<div class="rounded-md bg-red-50 p-4">
-				<div class="flex">
-					<div class="flex-shrink-0">
-						<svg class="h-5 w-5 text-red-400" fill="currentColor" viewBox="0 0 20 20">
-							<path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"/>
-						</svg>
-					</div>
-					<div class="ml-3">
-						<h3 class="text-sm font-medium text-red-800">Error</h3>
-						<p class="mt-1 text-sm text-red-700">{$booksError}</p>
-					</div>
+			<div class="error-message">
+				<div class="error-content">
+					<svg class="error-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+					</svg>
+					<p class="error-text">{$booksError}</p>
 				</div>
 			</div>
 		{/if}
 
-		<div class="flex justify-end space-x-3 pt-6 border-t border-gray-200">
+		<div class="form-actions">
 			<button
 				type="button"
 				on:click={handleCancel}
-				class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+				class="btn-cancel"
 				disabled={saving}
 			>
 				Cancel
 			</button>
 			<button
 				type="submit"
-				class="px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-md shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
+				class="btn-save"
 				disabled={saving}
 			>
-				{#if saving}
-					<div class="flex items-center">
-						<div class="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-						Saving...
-					</div>
-				{:else}
-					Save Changes
-				{/if}
+				{saving ? 'Saving...' : 'Save Changes'}
 			</button>
 		</div>
 	</form>
 </div>
+
+<style>
+	.edit-form-container {
+		background: white;
+		border-radius: 12px;
+		overflow: hidden;
+		box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+	}
+
+	.form-header {
+		padding: 1.5rem 1.5rem 1rem 1.5rem;
+		border-bottom: 1px solid #e2e8f0;
+		background: #f8f9fa;
+	}
+
+	.form-title {
+		color: #2d3748;
+		font-size: 1.25rem;
+		font-weight: 700;
+		margin: 0 0 0.5rem 0;
+	}
+
+	.form-subtitle {
+		color: #718096;
+		font-size: 0.9rem;
+		margin: 0;
+	}
+
+	.form-content {
+		padding: 1.5rem;
+		display: flex;
+		flex-direction: column;
+		gap: 1.5rem;
+	}
+
+	.book-info-section {
+		background: #f8f9fa;
+		border: 1px solid #e2e8f0;
+		border-radius: 8px;
+		padding: 1rem;
+	}
+
+	.info-title {
+		color: #2d3748;
+		font-size: 0.95rem;
+		font-weight: 600;
+		margin: 0 0 0.75rem 0;
+	}
+
+	.info-content {
+		display: flex;
+		flex-direction: column;
+		gap: 0.25rem;
+	}
+
+	.info-content p {
+		color: #4a5568;
+		font-size: 0.85rem;
+		margin: 0;
+		line-height: 1.4;
+	}
+
+	.info-label {
+		font-weight: 600;
+		color: #2d3748;
+	}
+
+	.fields-grid {
+		display: grid;
+		grid-template-columns: 1fr 1fr;
+		gap: 1.5rem;
+	}
+
+	@media (max-width: 640px) {
+		.fields-grid {
+			grid-template-columns: 1fr;
+		}
+	}
+
+	.field-group {
+		display: flex;
+		flex-direction: column;
+		gap: 0.5rem;
+	}
+
+	.field-group.full-width {
+		grid-column: span 2;
+	}
+
+	@media (max-width: 640px) {
+		.field-group.full-width {
+			grid-column: span 1;
+		}
+	}
+
+	.field-label {
+		color: #2d3748;
+		font-size: 0.9rem;
+		font-weight: 600;
+	}
+
+	.field-input,
+	.field-select,
+	.field-textarea {
+		padding: 0.75rem;
+		border: 1px solid #d1d5db;
+		border-radius: 8px;
+		font-size: 0.9rem;
+		background: white;
+		transition: all 0.2s ease;
+	}
+
+	.field-input:focus,
+	.field-select:focus,
+	.field-textarea:focus {
+		outline: none;
+		border-color: #8B2635;
+		box-shadow: 0 0 0 3px rgba(139, 38, 53, 0.1);
+	}
+
+	.field-textarea {
+		resize: vertical;
+		min-height: 4rem;
+		font-family: inherit;
+	}
+
+	.field-error {
+		color: #dc2626;
+		font-size: 0.8rem;
+		font-weight: 500;
+		margin: 0;
+	}
+
+	.char-counter {
+		color: #718096;
+		font-size: 0.75rem;
+		margin: 0;
+		align-self: flex-end;
+	}
+
+	.error-message {
+		background: #fed7d7;
+		border: 1px solid #feb2b2;
+		border-radius: 8px;
+		padding: 1rem;
+	}
+
+	.error-content {
+		display: flex;
+		align-items: center;
+		gap: 0.75rem;
+	}
+
+	.error-icon {
+		width: 20px;
+		height: 20px;
+		color: #c53030;
+		flex-shrink: 0;
+	}
+
+	.error-text {
+		color: #c53030;
+		font-weight: 500;
+		margin: 0;
+		font-size: 0.9rem;
+	}
+
+	.form-actions {
+		display: flex;
+		justify-content: flex-end;
+		gap: 0.75rem;
+		padding-top: 1rem;
+		border-top: 1px solid #e2e8f0;
+	}
+
+	.btn-cancel {
+		padding: 0.75rem 1.5rem;
+		background: white;
+		color: #4a5568;
+		border: 1px solid #d1d5db;
+		border-radius: 8px;
+		font-size: 0.9rem;
+		font-weight: 500;
+		cursor: pointer;
+		transition: all 0.2s ease;
+	}
+
+	.btn-cancel:hover:not(:disabled) {
+		background: #f8f9fa;
+		border-color: #8B2635;
+		color: #8B2635;
+	}
+
+	.btn-cancel:disabled {
+		opacity: 0.6;
+		cursor: not-allowed;
+	}
+
+	.btn-save {
+		padding: 0.75rem 1.5rem;
+		background: linear-gradient(135deg, #8B2635 0%, #722F37 100%);
+		color: #F5F5DC;
+		border: none;
+		border-radius: 8px;
+		font-size: 0.9rem;
+		font-weight: 600;
+		cursor: pointer;
+		transition: all 0.2s ease;
+		box-shadow: 0 4px 12px rgba(139, 38, 53, 0.3);
+	}
+
+	.btn-save:hover:not(:disabled) {
+		background: linear-gradient(135deg, #722F37 0%, #8B2635 100%);
+		transform: translateY(-1px);
+		box-shadow: 0 6px 20px rgba(139, 38, 53, 0.4);
+	}
+
+	.btn-save:disabled {
+		opacity: 0.6;
+		cursor: not-allowed;
+		transform: none;
+		box-shadow: 0 4px 12px rgba(139, 38, 53, 0.2);
+	}
+</style>
