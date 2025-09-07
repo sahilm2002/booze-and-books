@@ -9,32 +9,13 @@
 	let activeTab: 'incoming' | 'outgoing' = 'incoming';
 	let statusFilter: 'all' | 'pending' | 'accepted' | 'counter_offer' | 'cancelled' | 'completed' = 'all';
 
-	// Initialize stores with server data, with fallback handling
-	onMount(() => {
-		try {
-			// Check if data exists and is valid
-			if (data && typeof data === 'object') {
-				incomingSwapRequests.set(data.incomingRequests || []);
-				outgoingSwapRequests.set(data.outgoingRequests || []);
-				// Clear any previous errors since we have data
-				swapRequestsError.set(null);
-			} else {
-				// Fallback to empty arrays if data is invalid
-				console.warn('Invalid server data, using empty swap requests');
-				incomingSwapRequests.set([]);
-				outgoingSwapRequests.set([]);
-				swapRequestsError.set(null);
-			}
-		} catch (error) {
-			// If there's any error, fallback to empty arrays
-			console.error('Error initializing swap requests:', error);
-			incomingSwapRequests.set([]);
-			outgoingSwapRequests.set([]);
-			swapRequestsError.set(null);
-		}
-		
+	// Load swap requests on client side to avoid server-side issues
+	onMount(async () => {
 		// Set page title
 		document.title = 'Swap Requests - Booze & Books';
+		
+		// Fetch swap requests from client-side service
+		await swapStore.refresh();
 	});
 
 	// Filter requests based on status
