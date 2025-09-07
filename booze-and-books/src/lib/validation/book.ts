@@ -12,6 +12,22 @@ const blankToNull = (value: unknown) => {
 	return value;
 };
 
+// Helper to map legacy condition values to current enum values
+const mapLegacyCondition = (value: unknown) => {
+	if (typeof value === 'string') {
+		// Map legacy values to current enum values
+		switch (value) {
+			case 'AS_NEW':
+				return 'LIKE_NEW';
+			case 'FINE':
+				return 'LIKE_NEW'; // Map FINE to LIKE_NEW as closest equivalent
+			default:
+				return value;
+		}
+	}
+	return value;
+};
+
 // Validation schema for book input (creating new books)
 export const bookInputSchema = z.object({
 	title: z.string()
@@ -28,7 +44,7 @@ export const bookInputSchema = z.object({
 		.optional()
 		.nullable()),
 	
-	condition: z.nativeEnum(BookCondition),
+	condition: z.preprocess(mapLegacyCondition, z.nativeEnum(BookCondition)),
 	
 	genre: z.preprocess(blankToNull, z.string()
 		.max(100, 'Genre must be 100 characters or less')
@@ -71,7 +87,7 @@ export const bookUpdateSchema = z.object({
 		.optional()
 		.nullable()),
 	
-	condition: z.nativeEnum(BookCondition).optional(),
+	condition: z.preprocess(mapLegacyCondition, z.nativeEnum(BookCondition)).optional(),
 	
 	genre: z.preprocess(blankToNull, z.string()
 		.max(100, 'Genre must be 100 characters or less')
@@ -156,7 +172,24 @@ export function isValidIsbn(isbn: string): boolean {
 }
 
 // Helper function to get condition display name
-export function getConditionDisplayName(condition: BookCondition): string {
+export function getConditionDisplayName(condition: BookCondition | string): string {
+	// Handle legacy values that might still exist in some contexts
+	let mappedCondition: BookCondition;
+	if (typeof condition === 'string') {
+		switch (condition) {
+			case 'AS_NEW':
+				mappedCondition = BookCondition.LIKE_NEW;
+				break;
+			case 'FINE':
+				mappedCondition = BookCondition.LIKE_NEW;
+				break;
+			default:
+				mappedCondition = condition as BookCondition;
+		}
+	} else {
+		mappedCondition = condition;
+	}
+
 	const displayNames: Record<BookCondition, string> = {
 		[BookCondition.LIKE_NEW]: 'Like New',
 		[BookCondition.VERY_GOOD]: 'Very Good',
@@ -164,7 +197,7 @@ export function getConditionDisplayName(condition: BookCondition): string {
 		[BookCondition.FAIR]: 'Fair',
 		[BookCondition.POOR]: 'Poor'
 	};
-	return displayNames[condition];
+	return displayNames[mappedCondition] || mappedCondition;
 }
 
 // Helper function to get all condition options for dropdowns
