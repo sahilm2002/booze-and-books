@@ -410,4 +410,15 @@ export class BookService {
 
 		return !!data;
 	}
+
+	/**
+	 * Alias for getAvailableBooksForDiscovery (for backward compatibility)
+	 */
+	static async getAvailableBooksForSwapping(
+		currentUserId: string,
+		limit = 50,
+		offset = 0
+	): Promise<BookWithOwner[]> {
+		return this.getAvailableBooksForDiscovery(currentUserId, limit, offset);
+	}
 }

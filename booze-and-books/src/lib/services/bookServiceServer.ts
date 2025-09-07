@@ -48,7 +48,7 @@ export class BookServiceServer {
 	}
 
 	/**
-	 * Get available books for discovery (excluding current user's books)
+	 * Get available books for discovery (excluding current user's books and books in pending swaps)
 	 */
 	static async getAvailableBooksForDiscovery(
 		supabase: SupabaseClient,
@@ -56,7 +56,17 @@ export class BookServiceServer {
 		limit = 50,
 		offset = 0
 	): Promise<BookWithOwner[]> {
-		const { data, error } = await supabase
+		// First get books that are involved in pending swaps
+		const { data: booksInPendingSwaps, error: pendingSwapsError } = await supabase
+			.rpc('get_books_in_pending_swaps');
+
+		if (pendingSwapsError) {
+			console.warn('Failed to get books in pending swaps:', pendingSwapsError.message);
+		}
+
+		const excludedBookIds = booksInPendingSwaps || [];
+
+		let queryBuilder = supabase
 			.from('books')
 			.select(`
 				*,
@@ -67,7 +77,14 @@ export class BookServiceServer {
 				)
 			`)
 			.eq('is_available', true)
-			.neq('owner_id', currentUserId)
+			.neq('owner_id', currentUserId);
+
+		// Exclude books that are in pending swaps if we have any
+		if (excludedBookIds.length > 0) {
+			queryBuilder = queryBuilder.not('id', 'in', `(${excludedBookIds.join(',')})`);
+		}
+
+		const { data, error } = await queryBuilder
 			.order('created_at', { ascending: false })
 			.range(offset, offset + limit - 1);
 

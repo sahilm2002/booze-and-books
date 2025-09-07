@@ -4,8 +4,9 @@
 	import { getConditionDisplayName } from '$lib/validation/book';
 	import { user } from '$lib/stores/auth';
 	import { bookStore } from '$lib/stores/books';
-	import SwapRequestDialog from '../swaps/SwapRequestDialog.svelte';
+	import { SwapService } from '$lib/services/swapService';
 	import ConditionIndicator from './ConditionIndicator.svelte';
+	import BookSelectionModal from './BookSelectionModal.svelte';
 
 	export let book: Book | BookWithOwner;
 	export let showActions = true;
@@ -15,8 +16,16 @@
 	const dispatch = createEventDispatcher<{
 		edit: { book: Book };
 		delete: { book: Book };
-		swapRequested: { message: string };
+		swapRequested: { 
+			requestedBook: Book;
+			offeredBook?: Book;
+			message?: string;
+		};
 		'view-details': { book: Book };
+		notification: {
+			type: 'success' | 'error' | 'info';
+			message: string;
+		};
 	}>();
 
 	$: isOwner = $user?.id === book.owner_id;
@@ -25,11 +34,10 @@
 	$: authorsText = book.authors.join(', ');
 	$: isAvailable = book.is_available ?? true;
 	$: canRequestSwap = enableSwapRequests && !isOwner && isAvailable && $user?.id;
-	$: isDescriptionLong = book.description && book.description.length > 150;
 
-	let showSwapDialog = false;
 	let isToggling = false;
-	let isDescriptionExpanded = false;
+	let showBookSelectionModal = false;
+	let isCreatingSwapRequest = false;
 
 	function handleEdit() {
 		if (isOwner) {
@@ -71,22 +79,64 @@
 
 	function handleSwapRequest() {
 		if (canRequestSwap) {
-			showSwapDialog = true;
+			showBookSelectionModal = true;
 		}
 	}
 
-	function handleSwapRequestSuccess(event: CustomEvent<{ message: string }>) {
-		dispatch('swapRequested', event.detail);
-		showSwapDialog = false;
+	async function handleBookSelection(event: CustomEvent<{ book: Book }>) {
+		const offeredBook = event.detail.book;
+		
+		if (!$user?.id) {
+			dispatch('notification', {
+				type: 'error',
+				message: 'You must be logged in to create swap requests'
+			});
+			return;
+		}
+
+		isCreatingSwapRequest = true;
+		
+		try {
+			const swapRequest = await SwapService.createSwapRequest(
+				{
+					book_id: book.id,
+					offered_book_id: offeredBook.id,
+					message: `I'd like to swap "${offeredBook.title}" for "${book.title}"`
+				},
+				$user.id
+			);
+
+			dispatch('notification', {
+				type: 'success',
+				message: `Swap request sent! You offered "${offeredBook.title}" for "${book.title}"`
+			});
+
+			dispatch('swapRequested', {
+				requestedBook: book,
+				offeredBook: offeredBook,
+				message: `Swap request created for "${book.title}"`
+			});
+
+		} catch (error) {
+			console.error('Failed to create swap request:', error);
+			dispatch('notification', {
+				type: 'error',
+				message: error instanceof Error ? error.message : 'Failed to create swap request'
+			});
+		} finally {
+			isCreatingSwapRequest = false;
+			showBookSelectionModal = false;
+		}
+	}
+
+	function handleModalClose() {
+		showBookSelectionModal = false;
 	}
 
 	function handleViewDetails() {
 		dispatch('view-details', { book });
 	}
 
-	function toggleDescription() {
-		isDescriptionExpanded = !isDescriptionExpanded;
-	}
 
 	function getConditionBadgeClass(condition: string): string {
 		const baseClasses = 'inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium';
@@ -110,22 +160,25 @@
 
 <div class="book-card" class:opacity-60={!isAvailable && !isOwner}>
 	<div class="book-card-content">
+		{#if book.google_volume_id || book.thumbnail_url}
 		<div class="book-cover-section">
-			{#if book.thumbnail_url}
+			{#if book.google_volume_id}
+				<img 
+					src="https://books.google.com/books/content?id={book.google_volume_id}&printsec=frontcover&img=1&zoom=1&source=gbs_api"
+					alt="{book.title} cover"
+					class="book-cover"
+					loading="lazy"
+				/>
+			{:else if book.thumbnail_url}
 				<img 
 					src={book.thumbnail_url} 
 					alt="{book.title} cover"
 					class="book-cover"
 					loading="lazy"
 				/>
-			{:else}
-				<div class="book-cover-placeholder">
-					<svg class="book-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.746 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/>
-					</svg>
-				</div>
 			{/if}
 		</div>
+		{/if}
 
 		<div class="book-details">
 			<h3 class="book-title">{book.title}</h3>
@@ -139,22 +192,12 @@
 				<ConditionIndicator condition={book.condition} size="small" />
 			</div>
 
-			{#if book.description && isDescriptionLong}
+			{#if book.description}
 				<div class="description-section">
-					<p class="book-description" 
-					   class:expanded={isDescriptionExpanded}>
+					<div class="book-description">
 						{book.description}
-					</p>
-					<button
-						type="button"
-						on:click={toggleDescription}
-						class="show-more-btn"
-					>
-						{isDescriptionExpanded ? 'Show Less' : 'Show More'}
-					</button>
+					</div>
 				</div>
-			{:else if book.description}
-				<p class="book-description-short">{book.description}</p>
 			{/if}
 
 			<p class="book-date">Added {new Date(book.created_at).toLocaleDateString()}</p>
@@ -184,19 +227,29 @@
 				<button on:click={handleEdit} class="btn-edit">Edit</button>
 				<button on:click={handleDelete} class="btn-delete">Delete</button>
 			{:else if canRequestSwap}
-				<button on:click={handleSwapRequest} class="btn-swap">Request Swap</button>
+				<button on:click={handleSwapRequest} class="btn-swap" disabled={isCreatingSwapRequest}>
+					{#if isCreatingSwapRequest}
+						<div class="btn-spinner"></div>
+						Creating Request...
+					{:else}
+						Request Swap
+					{/if}
+				</button>
 			{/if}
 		</div>
 	{/if}
 </div>
 
-<!-- Swap Request Dialog -->
-<SwapRequestDialog
-	book={bookWithOwner}
-	isOpen={showSwapDialog}
-	on:close={() => showSwapDialog = false}
-	on:success={handleSwapRequestSuccess}
+<!-- Book Selection Modal -->
+<BookSelectionModal 
+	bind:isOpen={showBookSelectionModal}
+	title="Select a Book to Offer"
+	confirmText="Create Swap Request"
+	excludeBookIds={[book.id]}
+	on:select={handleBookSelection}
+	on:close={handleModalClose}
 />
+
 
 <style>
 	.book-card {
@@ -286,42 +339,34 @@
 		color: #4a5568;
 		font-size: 0.85rem;
 		line-height: 1.4;
-		max-height: 3.6em;
-		overflow: hidden;
-		display: -webkit-box;
-		-webkit-line-clamp: 3;
-		-webkit-box-orient: vertical;
-	}
-
-	.book-description.expanded {
-		max-height: 150px;
+		max-height: 4.5em;
 		overflow-y: auto;
-		-webkit-line-clamp: unset;
-		display: block;
+		padding: 0.5rem;
+		background: #f8f9fa;
+		border: 1px solid #e2e8f0;
+		border-radius: 6px;
+		scrollbar-width: thin;
+		scrollbar-color: #cbd5e0 #f8f9fa;
 	}
 
-	.book-description-short {
-		color: #4a5568;
-		font-size: 0.85rem;
-		line-height: 1.4;
-		margin-bottom: 0.75rem;
+	.book-description::-webkit-scrollbar {
+		width: 6px;
 	}
 
-	.show-more-btn {
-		color: #8B2635;
-		font-size: 0.75rem;
-		font-weight: 500;
-		background: none;
-		border: none;
-		padding: 0;
-		margin-top: 0.25rem;
-		cursor: pointer;
-		transition: color 0.2s;
+	.book-description::-webkit-scrollbar-track {
+		background: #f8f9fa;
+		border-radius: 3px;
 	}
 
-	.show-more-btn:hover {
-		color: #722F37;
+	.book-description::-webkit-scrollbar-thumb {
+		background: #cbd5e0;
+		border-radius: 3px;
 	}
+
+	.book-description::-webkit-scrollbar-thumb:hover {
+		background: #a0aec0;
+	}
+
 
 	.book-date {
 		color: #718096;
@@ -448,11 +493,37 @@
 		font-weight: 500;
 		cursor: pointer;
 		transition: all 0.2s;
-		flex: 1;
+		display: flex;
+		align-items: center;
+		justify-content: center;
 	}
 
-	.btn-swap:hover {
+	.btn-swap:hover:not(:disabled) {
 		background: #48bb78;
 		color: white;
+	}
+
+	.btn-swap:disabled {
+		background: #e2e8f0;
+		color: #a0aec0;
+		cursor: not-allowed;
+		border-color: #e2e8f0;
+	}
+
+	.btn-spinner {
+		width: 16px;
+		height: 16px;
+		border: 2px solid #a0aec0;
+		border-top-color: #4a5568;
+		border-radius: 50%;
+		animation: spin 1s linear infinite;
+		margin-right: 0.5rem;
+		flex-shrink: 0;
+	}
+
+	@keyframes spin {
+		to {
+			transform: rotate(360deg);
+		}
 	}
 </style>
