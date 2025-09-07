@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { createEventDispatcher } from 'svelte';
 	import type { Book, BookWithOwner } from '$lib/types/book';
+	import type { SwapRequestWithBook } from '$lib/types/swap';
 	import { getConditionDisplayName } from '$lib/validation/book';
 	import { user } from '$lib/stores/auth';
 	import { bookStore } from '$lib/stores/books';
@@ -38,7 +39,7 @@
 	let isToggling = false;
 	let showBookSelectionModal = false;
 	let isCreatingSwapRequest = false;
-	let existingSwapRequest: any = null;
+	let existingSwapRequest: SwapRequestWithBook | null = null;
 	let checkingExistingRequest = false;
 
 	// Check for existing swap request when user changes
@@ -110,7 +111,7 @@
 	}
 
 	async function handleCancelRequest() {
-		if (!existingSwapRequest || !$user?.id) return;
+		if (!existingSwapRequest?.id || !$user?.id) return;
 
 		try {
 			await SwapService.updateSwapRequestStatus(existingSwapRequest.id, 'CANCELLED', $user.id);
@@ -276,7 +277,7 @@
 				<span class="status-label">Swap Request:</span>
 				<span class="status-badge pending">Pending</span>
 			</div>
-			{#if existingSwapRequest.offered_book}
+			{#if existingSwapRequest?.offered_book}
 				<div class="offered-book-info">
 					You offered: <strong>{existingSwapRequest.offered_book.title}</strong>
 				</div>
