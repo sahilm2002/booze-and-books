@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { createEventDispatcher } from 'svelte';
 	import { goto } from '$app/navigation';
+	import { auth } from '$lib/stores/auth';
 	import { notificationStore } from '$lib/stores/notifications';
 	import type { Notification, NotificationType } from '$lib/types/notification';
 
@@ -64,6 +65,12 @@
 
 		// Navigate based on notification type
 		const data = notification.data as any;
+		
+		if (!$auth.user) {
+			goto('/auth/login?redirectTo=/app/swaps');
+			return;
+		}
+		
 		switch (notification.type) {
 			case 'SWAP_REQUEST':
 			case 'SWAP_ACCEPTED':
