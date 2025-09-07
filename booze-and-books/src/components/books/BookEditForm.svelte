@@ -14,16 +14,60 @@
 		cancel: void;
 	}>();
 
+	// Predefined genre options (same as BookAddForm)
+	const genreOptions = [
+		'Fiction',
+		'Non-Fiction',
+		'Mystery/Thriller',
+		'Science Fiction',
+		'Fantasy',
+		'Romance',
+		'Historical Fiction',
+		'Biography',
+		'Self-Help',
+		'Business',
+		'Health & Wellness',
+		'Cooking',
+		'Travel',
+		'Art & Design',
+		'Science & Nature',
+		'Philosophy',
+		'Religion & Spirituality',
+		'Poetry',
+		'Drama',
+		'Children\'s Books',
+		'Young Adult',
+		'Horror',
+		'Comedy/Humor',
+		'Sports',
+		'Politics',
+		'History'
+	];
+
+	// Parse existing genres into selectedGenres array
+	let selectedGenres: string[] = book.genre ? book.genre.split(',').map(g => g.trim()).filter(g => g.length > 0) : [];
+
 	let formData: BookUpdate = {
 		condition: book.condition,
 		genre: book.genre || '',
 		description: book.description || ''
 	};
 
+	// Update formData.genre when selectedGenres changes
+	$: formData.genre = selectedGenres.join(', ');
+
 	let saving = false;
 	let errors: Record<string, string> = {};
 
 	$: conditionOptions = getConditionOptions();
+
+	function toggleGenre(genre: string) {
+		if (selectedGenres.includes(genre)) {
+			selectedGenres = selectedGenres.filter(g => g !== genre);
+		} else {
+			selectedGenres = [...selectedGenres, genre];
+		}
+	}
 
 	function validateForm(): boolean {
 		const validation = validateBookUpdate(formData);
@@ -59,6 +103,7 @@
 
 	function handleCancel() {
 		// Reset form data
+		selectedGenres = book.genre ? book.genre.split(',').map(g => g.trim()).filter(g => g.length > 0) : [];
 		formData = {
 			condition: book.condition,
 			genre: book.genre || '',
@@ -113,15 +158,41 @@
 				{/if}
 			</div>
 
-			<div class="field-group">
-				<label for="genre" class="field-label">Genre</label>
-				<input
-					type="text"
-					id="genre"
-					bind:value={formData.genre}
-					class="field-input"
-					placeholder="e.g., Fiction, Science Fiction, Biography"
-				/>
+			<div class="field-group full-width">
+				<label class="field-label">Genres</label>
+				<div class="genre-selector">
+					<div class="selected-genres">
+						{#if selectedGenres.length === 0}
+							<span class="no-genres">No genres selected</span>
+						{:else}
+							{#each selectedGenres as genre}
+								<span class="selected-genre">
+									{genre}
+									<button
+										type="button"
+										class="remove-genre"
+										on:click={() => toggleGenre(genre)}
+										aria-label="Remove {genre}"
+									>
+										×
+									</button>
+								</span>
+							{/each}
+						{/if}
+					</div>
+					<div class="genre-options">
+						{#each genreOptions as genre}
+							<button
+								type="button"
+								class="genre-option"
+								class:selected={selectedGenres.includes(genre)}
+								on:click={() => toggleGenre(genre)}
+							>
+								{genre}
+							</button>
+						{/each}
+					</div>
+				</div>
 				{#if errors.genre}
 					<p class="field-error">{errors.genre}</p>
 				{/if}
@@ -397,5 +468,103 @@
 		cursor: not-allowed;
 		transform: none;
 		box-shadow: 0 4px 12px rgba(139, 38, 53, 0.2);
+	}
+
+	/* Genre Selector Styles (same as BookAddForm) */
+	.genre-selector {
+		background: #f8f9fa;
+		border: 1px solid #d1d5db;
+		border-radius: 8px;
+		padding: 1rem;
+	}
+
+	.selected-genres {
+		margin-bottom: 1rem;
+		min-height: 2.5rem;
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.5rem;
+		align-items: center;
+	}
+
+	.no-genres {
+		color: #9ca3af;
+		font-style: italic;
+		font-size: 0.9rem;
+	}
+
+	.selected-genre {
+		display: flex;
+		align-items: center;
+		background: linear-gradient(135deg, #8B2635 0%, #722F37 100%);
+		color: #F5F5DC;
+		padding: 0.375rem 0.75rem;
+		border-radius: 20px;
+		font-size: 0.85rem;
+		font-weight: 500;
+		gap: 0.5rem;
+		box-shadow: 0 2px 4px rgba(139, 38, 53, 0.2);
+	}
+
+	.remove-genre {
+		background: none;
+		border: none;
+		color: #F5F5DC;
+		font-size: 1.1rem;
+		line-height: 1;
+		cursor: pointer;
+		padding: 0;
+		width: 18px;
+		height: 18px;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		border-radius: 50%;
+		transition: background 0.2s;
+	}
+
+	.remove-genre:hover {
+		background: rgba(245, 245, 220, 0.2);
+	}
+
+	.genre-options {
+		display: grid;
+		grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+		gap: 0.5rem;
+		max-height: 200px;
+		overflow-y: auto;
+		border-top: 1px solid #e2e8f0;
+		padding-top: 1rem;
+	}
+
+	.genre-option {
+		padding: 0.5rem 0.75rem;
+		border: 1px solid #d1d5db;
+		border-radius: 6px;
+		background: white;
+		color: #374151;
+		font-size: 0.85rem;
+		font-weight: 500;
+		cursor: pointer;
+		transition: all 0.2s;
+		text-align: center;
+	}
+
+	.genre-option:hover {
+		border-color: #8B2635;
+		color: #8B2635;
+		background: #fef7f7;
+	}
+
+	.genre-option.selected {
+		background: linear-gradient(135deg, #8B2635 0%, #722F37 100%);
+		color: #F5F5DC;
+		border-color: #8B2635;
+		box-shadow: 0 2px 4px rgba(139, 38, 53, 0.2);
+	}
+
+	.genre-option.selected:hover {
+		background: linear-gradient(135deg, #722F37 0%, #8B2635 100%);
+		color: #F5F5DC;
 	}
 </style>
