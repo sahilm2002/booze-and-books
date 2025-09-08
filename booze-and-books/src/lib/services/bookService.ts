@@ -51,34 +51,16 @@ export class BookService {
 		limit = 50,
 		offset = 0
 	): Promise<BookWithOwner[]> {
-		// Robust UUID validation and conversion
-		let validUserId: string;
-		
-		if (!currentUserId) {
-			throw new Error('currentUserId is required');
-		}
-		
-		if (typeof currentUserId === 'string') {
-			validUserId = currentUserId;
-		} else if (typeof currentUserId === 'object' && currentUserId !== null) {
-			// Handle case where an object was passed instead of string
-			validUserId = (currentUserId as any).id || JSON.stringify(currentUserId);
-		} else {
-			validUserId = String(currentUserId);
-		}
-		
-		// Final validation - reject invalid UUIDs
-		if (!validUserId || 
-		    validUserId === 'undefined' || 
-		    validUserId === 'null' || 
-		    validUserId === '[object Object]' ||
-		    validUserId.length !== 36) {
-			throw new Error(`Invalid currentUserId format: ${JSON.stringify(currentUserId)}`);
-		}
-		
-		console.log('BookService input currentUserId:', typeof currentUserId, JSON.stringify(currentUserId));
-		console.log('BookService using validated userId:', validUserId);
-		
+        // Validate userId
+        const validUserId = (currentUserId || '').trim();
+        const UUID_V4_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+        if (!UUID_V4_REGEX.test(validUserId)) {
+          throw new Error(`Invalid currentUserId format: ${JSON.stringify(currentUserId)}`);
+        }
+
+        if (import.meta.env.DEV) {
+            console.debug('BookService: validated userId for discovery');
+        }
 		const { data, error } = await supabase
 			.from('books')
 			.select(`

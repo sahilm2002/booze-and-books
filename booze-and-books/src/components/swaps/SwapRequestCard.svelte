@@ -46,6 +46,7 @@
 	let isLoading = false;
 	let showCompletionDialog = false;
 	let showCounterOfferModal = false;
+	let imageLoadFailed = false;
 
 	async function handleAccept() {
 		if (!(isPending && isOwner) && !(isCounterOffer && isRequester)) return;
@@ -121,6 +122,15 @@
 
 	function handleCompletionCancel() {
 		showCompletionDialog = false;
+	}
+
+	function handleImageError(e: Event) {
+		// Only log in development mode to keep production consoles clean
+		if (import.meta.env.DEV) {
+			console.error('Failed to load cover for:', request.book.title, e);
+		}
+		// Set state to show fallback placeholder
+		imageLoadFailed = true;
 	}
 
 	function formatDate(dateString: string): string {
@@ -629,15 +639,13 @@
 	<div class="card-header">
 		
 		<div class="flex items-start gap-4">
-			{#if request.book.google_volume_id}
+			{#if request.book.google_volume_id && !imageLoadFailed}
 				<img
 					src="https://books.google.com/books/content?id={request.book.google_volume_id}&printsec=frontcover&img=1&zoom=1&source=gbs_api"
 					alt="{request.book.title} cover"
 					class="book-thumbnail"
 					loading="lazy"
-					on:error={(e) => {
-						console.error('Failed to load cover for:', request.book.title, e);
-					}}
+					on:error={handleImageError}
 				/>
 			{:else}
 				<div class="book-placeholder">
@@ -779,12 +787,12 @@
 			<div class="contact-details">
 				{#if type === 'incoming'}
 					<!-- Show requester's contact info to owner -->
-					{#if request.requester_profile.email || request.requester_profile.full_name || request.requester_profile.username}
+					{#if request.requester_profile?.email || request.requester_profile?.full_name || request.requester_profile?.username}
 						<div class="contact-card">
 							<div class="contact-person-header">
 								<div class="contact-avatar">
-									{#if request.requester_profile.avatar_url}
-										<img src="{request.requester_profile.avatar_url}" alt="Profile" class="contact-avatar-img">
+									{#if request.requester_profile?.avatar_url}
+										<img src="{request.requester_profile?.avatar_url}" alt="Profile" class="contact-avatar-img">
 									{:else}
 										<div class="contact-avatar-placeholder">
 											<svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
@@ -795,31 +803,31 @@
 								</div>
 								<div class="contact-person-info">
 									<h4 class="contact-person-name">
-										{request.requester_profile.full_name || request.requester_profile.username || 'Requester'}
+										{request.requester_profile?.full_name || request.requester_profile?.username || 'Requester'}
 									</h4>
 									<p class="contact-person-role">Book Requester</p>
 								</div>
 							</div>
 							
-							{#if request.requester_profile.email}
-								<a href="mailto:{request.requester_profile.email}" class="contact-email-button">
+							{#if request.requester_profile?.email}
+								<a href="mailto:{request.requester_profile?.email}" class="contact-email-button">
 									<svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
 										<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 4.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
 									</svg>
 									Send Email
-									<span class="contact-email-address">{request.requester_profile.email}</span>
+									<span class="contact-email-address">{request.requester_profile?.email}</span>
 								</a>
 							{/if}
 						</div>
 					{/if}
 				{:else}
 					<!-- Show owner's contact info to requester -->
-					{#if request.owner_profile.email || request.owner_profile.full_name || request.owner_profile.username}
+					{#if request.owner_profile?.email || request.owner_profile?.full_name || request.owner_profile?.username}
 						<div class="contact-card">
 							<div class="contact-person-header">
 								<div class="contact-avatar">
-									{#if request.owner_profile.avatar_url}
-										<img src="{request.owner_profile.avatar_url}" alt="Profile" class="contact-avatar-img">
+									{#if request.owner_profile?.avatar_url}
+										<img src="{request.owner_profile?.avatar_url}" alt="Profile" class="contact-avatar-img">
 									{:else}
 										<div class="contact-avatar-placeholder">
 											<svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
@@ -830,19 +838,19 @@
 								</div>
 								<div class="contact-person-info">
 									<h4 class="contact-person-name">
-										{request.owner_profile.full_name || request.owner_profile.username || 'Book Owner'}
+										{request.owner_profile?.full_name || request.owner_profile?.username || 'Book Owner'}
 									</h4>
 									<p class="contact-person-role">Book Owner</p>
 								</div>
 							</div>
 							
-							{#if request.owner_profile.email}
-								<a href="mailto:{request.owner_profile.email}" class="contact-email-button">
+							{#if request.owner_profile?.email}
+								<a href="mailto:{request.owner_profile?.email}" class="contact-email-button">
 									<svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
 										<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 4.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
 									</svg>
 									Send Email
-									<span class="contact-email-address">{request.owner_profile.email}</span>
+									<span class="contact-email-address">{request.owner_profile?.email}</span>
 								</a>
 							{/if}
 						</div>
