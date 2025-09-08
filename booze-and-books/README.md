@@ -128,12 +128,16 @@ We take your privacy seriously:
 
 ## 🛠️ Technical Features & Improvements
 
-### **Recent Enhancements (v1.2)**
+### **Recent Enhancements (v1.3)**
+- **Modernized Contact Interface**: Professional contact information cards with user avatars and styled email buttons
+- **Enhanced Swap UI**: Consistent button styling across all swap request interactions with proper spacing
+- **Status Badge Improvements**: Unified status indicator design matching discovery page aesthetics
+- **Database Optimization**: Fixed notification triggers and eliminated deprecated column references
+- **Robust Error Handling**: Comprehensive UUID validation preventing database parsing errors
+- **Visual Consistency**: Standardized spacing and typography throughout the swap interface
 - **Enhanced Notification System**: Visual book covers in notifications with comprehensive book details
 - **Smart Data Consistency**: Database triggers ensure accurate book ownership relationships
 - **Improved Type Safety**: Full TypeScript implementation with proper interfaces
-- **Modern UI/UX**: Consistent design language throughout the application
-- **Robust Swap Management**: Comprehensive validation and error handling
 - **Intelligent Navigation**: Context-aware routing based on notification types
 
 ### **Tech Stack**

@@ -86,9 +86,16 @@
 		
 		// Initialize discovery books with real-time updates
 		if ($user?.id) {
-			// Hydrate store with server data first, then load with realtime
+			// Hydrate store with server data first
 			bookStore.hydrateDiscoveryBooks(data.availableBooks);
-			await bookStore.loadDiscoveryBooks($user.id);
+			
+			// Only load from API if store is empty (avoid reloading on navigation)
+			if ($discoveryBooks.length === 0) {
+				console.log('Discovery books store is empty, loading from API...');
+				await bookStore.loadDiscoveryBooks($user.id);
+			} else {
+				console.log('Using cached discovery books:', $discoveryBooks.length, 'books');
+			}
 		}
 	});
 </script>
