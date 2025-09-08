@@ -246,10 +246,18 @@ export class SwapServiceServer {
 			}
 		}
 
+		// Prepare update object
+		const updateData: { status: SwapStatus; cancelled_by?: string } = { status };
+		
+		// If cancelling, record who cancelled it
+		if (status === SwapStatus.CANCELLED) {
+			updateData.cancelled_by = userId;
+		}
+
 		// Update the status
 		const { data, error } = await supabase
 			.from('swap_requests')
-			.update({ status })
+			.update(updateData)
 			.eq('id', requestId)
 			.select()
 			.single();

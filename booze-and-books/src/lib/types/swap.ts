@@ -15,6 +15,7 @@ export interface SwapRequest {
 	message: string | null;
 	offered_book_id: string | null;
 	counter_offered_book_id: string | null;
+	cancelled_by: string | null;
 	created_at: string;
 	updated_at: string;
 	completion_date: string | null;
