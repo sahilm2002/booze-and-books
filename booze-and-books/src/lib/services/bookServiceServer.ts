@@ -56,52 +56,15 @@ export class BookServiceServer {
 		limit = 50,
 		offset = 0
 	): Promise<BookWithOwner[]> {
-		// Robust UUID validation and conversion
-		let validUserId: string;
-		
-		if (!currentUserId) {
-			throw new Error('currentUserId is required');
-		}
-		
-		if (typeof currentUserId === 'string') {
-			validUserId = currentUserId;
-		} else if (typeof currentUserId === 'object' && currentUserId !== null) {
-			// Handle case where an object was passed instead of string
-			validUserId = (currentUserId as any).id || JSON.stringify(currentUserId);
-		} else {
-			validUserId = String(currentUserId);
-		}
-		
-		// Final validation - reject invalid UUIDs
-		if (!validUserId || 
-		    validUserId === 'undefined' || 
-		    validUserId === 'null' || 
-		    validUserId === '[object Object]' ||
-		    validUserId.length !== 36) {
-			throw new Error(`Invalid currentUserId format: ${JSON.stringify(currentUserId)}`);
-		}
-		
-		console.log('BookServiceServer input currentUserId:', typeof currentUserId, JSON.stringify(currentUserId));
-		console.log('BookServiceServer using validated userId:', validUserId);
-		// First get books that are involved in pending swaps
-		const { data: booksInPendingSwaps, error: pendingSwapsError } = await supabase
-			.rpc('get_books_in_pending_swaps');
-
-		if (pendingSwapsError) {
-			console.warn('Failed to get books in pending swaps:', pendingSwapsError.message);
-		}
-
-		const excludedBookIds = booksInPendingSwaps || [];
-
-		let queryBuilder = supabase
-			.from('books')
-			.select(`
-				*,
-				profiles!owner_id (
-					username,
-					full_name,
-					avatar_url
-				)
+    const validUserId = (currentUserId || '').trim();
+    const UUID_V4_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+    if (!UUID_V4_REGEX.test(validUserId)) {
+      throw new Error(`Invalid currentUserId format: ${JSON.stringify(currentUserId)}`);
+    }
+    if (process.env.NODE_ENV === 'development') {
+      console.debug('BookServiceServer: validated userId for discovery');
+    }
+    // First get books that are involved in pending swaps
 			`)
 			.eq('is_available', true)
 			.neq('owner_id', validUserId);

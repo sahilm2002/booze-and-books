@@ -12,7 +12,8 @@ BEGIN
     PERFORM set_config('search_path', 'pg_catalog,public', true);
     
     -- Get acting user ID, with fallback to auth.uid()
-    acting_user_id := COALESCE(NEW.cancelled_by, auth.uid());
+    -- Get acting user ID, with fallback to auth.uid()
+    acting_user_id := COALESCE(NEW.cancelled_by, auth.uid(), NEW.requester_id);
     
     -- Get book information including cover
     SELECT 

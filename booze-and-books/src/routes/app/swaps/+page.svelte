@@ -12,7 +12,10 @@
 
 	// Load swap requests on client side to avoid server-side issues
 	onMount(async () => {
-		console.log('Swaps page mounted, loading data...');
+		if (import.meta.env.DEV) {
+			console.log('Swaps page mounted, loading data...');
+		}
+		}
 		
 		// Set page title
 		document.title = 'Swap Requests - Booze & Books';
@@ -25,25 +28,33 @@
 			activeTab = 'incoming';
 		}
 		
-		console.log('Initial tab:', activeTab);
+		if (import.meta.env.DEV) {
+			console.log('Initial tab:', activeTab);
+		}
 		
 		// Only fetch swap requests if stores are empty (avoid reloading on navigation)
 		if ($incomingSwapRequests.length === 0 && $outgoingSwapRequests.length === 0) {
-			console.log('Stores are empty, fetching swap requests...');
+			if (import.meta.env.DEV) {
+				console.log('Stores are empty, fetching swap requests...');
+			}
 			await swapStore.refresh();
 		} else {
-			console.log('Using cached swap requests:', {
-				incoming: $incomingSwapRequests.length,
-				outgoing: $outgoingSwapRequests.length
-			});
+			if (import.meta.env.DEV) {
+				console.log('Using cached swap requests:', {
+					incoming: $incomingSwapRequests.length,
+					outgoing: $outgoingSwapRequests.length
+				});
+			}
 		}
 		
-		console.log('After mount:', {
-			incoming: $incomingSwapRequests.length,
-			outgoing: $outgoingSwapRequests.length,
-			loading: $swapRequestsLoading,
-			error: $swapRequestsError
-		});
+		if (import.meta.env.DEV) {
+			console.log('After mount:', {
+				incoming: $incomingSwapRequests.length,
+				outgoing: $outgoingSwapRequests.length,
+				loading: $swapRequestsLoading,
+				error: $swapRequestsError
+			});
+		}
 	});
 
 	// Filter requests based on status
@@ -463,12 +474,6 @@
 				class="tab-button"
 				class:active={activeTab === 'outgoing'}
 				on:click={() => {
-					console.log('My Requests tab clicked!', {
-						currentTab: activeTab,
-						outgoingRequests: $outgoingSwapRequests.length,
-						loading: $swapRequestsLoading,
-						error: $swapRequestsError
-					});
 					activeTab = 'outgoing';
 				}}
 			>
