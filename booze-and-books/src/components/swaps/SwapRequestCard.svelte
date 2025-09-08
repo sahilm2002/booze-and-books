@@ -1,4 +1,5 @@
 <script lang="ts">
+	// Force hot reload - changes applied
 	import { createEventDispatcher } from 'svelte';
 	import { 
 		getStatusDisplayName, 
@@ -20,6 +21,8 @@
 
 	export let request: SwapRequestWithBook;
 	export let type: 'incoming' | 'outgoing' = 'incoming';
+	
+	
 
 	const dispatch = createEventDispatcher<{
 		updated: void;
@@ -145,79 +148,562 @@
 	}
 </script>
 
-<div class="bg-white border border-gray-200 rounded-lg shadow-sm hover:shadow-md transition-shadow duration-200">
+<style>
+	.card {
+		background: white;
+		border: 1px solid #e2e8f0;
+		border-radius: 12px;
+		padding: 0;
+		box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+		transition: all 0.2s ease;
+	}
+
+	.card:hover {
+		box-shadow: 0 6px 12px -2px rgba(0, 0, 0, 0.15);
+		transform: translateY(-1px);
+	}
+
+	.card-header {
+		padding: 1.5rem;
+		border-bottom: 1px solid #f1f5f9;
+	}
+
+	.card-section {
+		padding: 1.5rem;
+		border-bottom: 1px solid #f1f5f9;
+	}
+
+	.card-actions {
+		padding: 1.5rem;
+	}
+
+	.book-thumbnail {
+		width: 48px;
+		height: 72px;
+		object-fit: cover;
+		border-radius: 8px;
+		box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+	}
+
+	.book-placeholder {
+		width: 48px;
+		height: 72px;
+		background: #f3f4f6;
+		border-radius: 8px;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+	}
+
+	.book-icon {
+		width: 24px;
+		height: 24px;
+		color: #9ca3af;
+	}
+
+	.status-badge {
+		padding: 0.25rem 0.75rem;
+		border-radius: 12px;
+		font-size: 0.75rem;
+		font-weight: 600;
+		text-transform: uppercase;
+		letter-spacing: 0.05em;
+	}
+
+	.status-badge.pending {
+		background: #fef5e7;
+		color: #d69e2e;
+		border: 1px solid #f6e05e;
+	}
+
+	.swap-request-status {
+		background: #e6fffa;
+		border: 1px solid #81e6d9;
+		border-radius: 8px;
+		padding: 1rem;
+		margin: 1rem 1.5rem;
+	}
+
+	.status-info {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		margin-bottom: 0.5rem;
+	}
+
+	.status-label {
+		color: #2d3748;
+		font-size: 0.9rem;
+		font-weight: 500;
+	}
+
+	.offered-book-info {
+		color: #4a5568;
+		font-size: 0.85rem;
+		line-height: 1.4;
+	}
+
+	.btn-primary {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		gap: 0.5rem;
+		padding: 0.75rem 1.5rem;
+		background: linear-gradient(135deg, #8B2635 0%, #722F37 100%);
+		color: #F5F5DC;
+		border: none;
+		border-radius: 8px;
+		font-weight: 600;
+		font-size: 0.875rem;
+		box-shadow: 0 4px 12px rgba(139, 38, 53, 0.3);
+		transition: all 0.2s ease;
+		cursor: pointer;
+		white-space: nowrap;
+	}
+
+	.btn-primary:hover {
+		background: linear-gradient(135deg, #722F37 0%, #8B2635 100%);
+		transform: translateY(-2px);
+		box-shadow: 0 6px 20px rgba(139, 38, 53, 0.4);
+	}
+
+	.btn-primary:disabled {
+		opacity: 0.6;
+		transform: none;
+		box-shadow: 0 4px 12px rgba(139, 38, 53, 0.3);
+		cursor: not-allowed;
+	}
+
+	.btn-secondary {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		gap: 0.5rem;
+		padding: 0.75rem 1.5rem;
+		background: #f8f9fa;
+		color: #8B2635;
+		border: 1px solid #e2e8f0;
+		border-radius: 8px;
+		font-weight: 600;
+		font-size: 0.875rem;
+		transition: all 0.2s ease;
+		cursor: pointer;
+		white-space: nowrap;
+	}
+
+	.btn-secondary:hover {
+		background: #F5F5DC;
+		border-color: #8B2635;
+		color: #722F37;
+	}
+
+	.btn-danger {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		gap: 0.5rem;
+		padding: 0.75rem 1.5rem;
+		background: #fef2f2;
+		color: #dc2626;
+		border: 1px solid #fecaca;
+		border-radius: 8px;
+		font-weight: 600;
+		font-size: 0.875rem;
+		transition: all 0.2s ease;
+		cursor: pointer;
+		white-space: nowrap;
+	}
+
+	.btn-danger:hover {
+		background: #fee2e2;
+		border-color: #f87171;
+		color: #b91c1c;
+	}
+
+	.btn-success {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		gap: 0.5rem;
+		padding: 0.75rem 1.5rem;
+		background: #dcfce7;
+		color: #16a34a;
+		border: 1px solid #bbf7d0;
+		border-radius: 8px;
+		font-weight: 600;
+		font-size: 0.875rem;
+		transition: all 0.2s ease;
+		cursor: pointer;
+		white-space: nowrap;
+	}
+
+	.btn-success:hover {
+		background: #bbf7d0;
+		border-color: #4ade80;
+		color: #15803d;
+	}
+
+	.action-buttons {
+		display: flex;
+		flex-direction: row;
+		flex-wrap: wrap;
+		gap: 0.75rem;
+		align-items: center;
+	}
+
+	.button-row {
+		display: flex;
+		gap: 0.75rem;
+	}
+
+	.button-row {
+		justify-content: flex-start;
+		align-items: center;
+	}
+
+	.loading-spinner {
+		width: 1rem;
+		height: 1rem;
+		animation: spin 1s linear infinite;
+	}
+
+	@keyframes spin {
+		from {
+			transform: rotate(0deg);
+		}
+		to {
+			transform: rotate(360deg);
+		}
+	}
+
+	/* Modern Contact Information Styles */
+	.contact-information-section {
+		background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+		border: 1px solid #0ea5e9;
+		border-radius: 12px;
+		padding: 1.5rem;
+		margin: 1rem 1.5rem;
+		box-shadow: 0 4px 12px rgba(14, 165, 233, 0.1);
+	}
+
+	.contact-header {
+		display: flex;
+		align-items: center;
+		gap: 1rem;
+		margin-bottom: 1.5rem;
+		padding-bottom: 1rem;
+		border-bottom: 1px solid rgba(14, 165, 233, 0.2);
+	}
+
+	.contact-icon {
+		width: 48px;
+		height: 48px;
+		background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+		border-radius: 12px;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		color: white;
+		flex-shrink: 0;
+		box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+	}
+
+	.contact-header-content {
+		flex: 1;
+	}
+
+	.contact-title {
+		font-size: 1.25rem;
+		font-weight: 700;
+		color: #0c4a6e;
+		margin: 0 0 0.25rem 0;
+	}
+
+	.contact-subtitle {
+		color: #0369a1;
+		font-size: 0.95rem;
+		margin: 0;
+	}
+
+	.contact-details {
+		margin-bottom: 1.5rem;
+	}
+
+	.contact-card {
+		background: white;
+		border: 1px solid rgba(14, 165, 233, 0.2);
+		border-radius: 12px;
+		padding: 1.25rem;
+		box-shadow: 0 2px 8px rgba(14, 165, 233, 0.1);
+	}
+
+	.contact-person-header {
+		display: flex;
+		align-items: center;
+		gap: 1rem;
+		margin-bottom: 1rem;
+	}
+
+	.contact-avatar {
+		width: 48px;
+		height: 48px;
+		border-radius: 12px;
+		overflow: hidden;
+		flex-shrink: 0;
+		border: 2px solid #e0f2fe;
+	}
+
+	.contact-avatar-img {
+		width: 100%;
+		height: 100%;
+		object-fit: cover;
+	}
+
+	.contact-avatar-placeholder {
+		width: 100%;
+		height: 100%;
+		background: linear-gradient(135deg, #64748b 0%, #475569 100%);
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		color: white;
+	}
+
+	.contact-person-info {
+		flex: 1;
+	}
+
+	.contact-person-name {
+		font-size: 1.1rem;
+		font-weight: 600;
+		color: #0c4a6e;
+		margin: 0 0 0.25rem 0;
+	}
+
+	.contact-person-role {
+		font-size: 0.875rem;
+		color: #0369a1;
+		margin: 0;
+		font-weight: 500;
+	}
+
+	.contact-email-button {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.75rem;
+		padding: 0.75rem 1.25rem;
+		background: linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%);
+		color: white;
+		border: none;
+		border-radius: 8px;
+		font-weight: 600;
+		font-size: 0.9rem;
+		text-decoration: none;
+		transition: all 0.2s ease;
+		box-shadow: 0 2px 8px rgba(14, 165, 233, 0.3);
+	}
+
+	.contact-email-button:hover {
+		background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%);
+		transform: translateY(-1px);
+		box-shadow: 0 4px 12px rgba(14, 165, 233, 0.4);
+		text-decoration: none;
+		color: white;
+	}
+
+	.contact-email-address {
+		font-weight: 500;
+		opacity: 0.9;
+	}
+
+	.next-steps-card {
+		background: rgba(255, 255, 255, 0.8);
+		border: 1px solid rgba(14, 165, 233, 0.2);
+		border-radius: 12px;
+		padding: 1.25rem;
+		display: flex;
+		gap: 1rem;
+		align-items: flex-start;
+	}
+
+	.next-steps-icon {
+		width: 40px;
+		height: 40px;
+		background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+		border-radius: 10px;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		color: white;
+		flex-shrink: 0;
+		box-shadow: 0 2px 8px rgba(245, 158, 11, 0.3);
+	}
+
+	.next-steps-content {
+		flex: 1;
+	}
+
+	.next-steps-title {
+		font-size: 1rem;
+		font-weight: 600;
+		color: #0c4a6e;
+		margin: 0 0 0.75rem 0;
+	}
+
+	.next-steps-list {
+		list-style: none;
+		padding: 0;
+		margin: 0;
+		display: flex;
+		flex-direction: column;
+		gap: 0.5rem;
+	}
+
+	.next-steps-list li {
+		color: #0369a1;
+		font-size: 0.9rem;
+		line-height: 1.4;
+	}
+
+	.offered-book-card {
+		background: white;
+		border: 1px solid #e5e7eb;
+		border-radius: 8px;
+		padding: 1rem;
+	}
+
+	.counter-offer-card {
+		background: #faf5ff;
+		border: 1px solid #d8b4fe;
+		border-radius: 8px;
+		padding: 1rem;
+	}
+
+	.contact-section {
+		background: #f0fdf4;
+		border-radius: 8px;
+		padding: 1rem;
+		border: 1px solid #bbf7d0;
+	}
+
+	.completion-section {
+		background: #eff6ff;
+		border-radius: 8px;
+		padding: 1rem;
+		border: 1px solid #bfdbfe;
+	}
+
+	.meta-text {
+		color: #6b7280;
+		font-size: 0.875rem;
+		margin: 0;
+	}
+
+	.title-text {
+		color: #1f2937;
+		font-size: 1rem;
+		font-weight: 600;
+		margin: 0;
+		line-height: 1.4;
+	}
+
+	.author-text {
+		color: #6b7280;
+		font-size: 0.875rem;
+		margin: 0;
+		line-height: 1.4;
+	}
+
+	.message-text {
+		color: #374151;
+		font-size: 0.875rem;
+		line-height: 1.6;
+		margin: 0;
+		font-style: italic;
+	}
+</style>
+
+<div class="card">
 	<!-- Header -->
-	<div class="p-4 border-b border-gray-100">
-		<div class="flex items-start justify-between">
-			<div class="flex items-start space-x-3">
-				{#if request.book.thumbnail_url}
-					<img
-						src={request.book.thumbnail_url}
-						alt="{request.book.title} cover"
-						class="w-12 h-18 object-cover rounded shadow-sm"
-					/>
-				{:else}
-					<div class="w-12 h-18 bg-gray-200 rounded flex items-center justify-center">
-						<svg class="w-6 h-6 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
-							<path d="M9 4.804A7.968 7.968 0 005.5 4c-1.255 0-2.443.29-3.5.804v10A7.969 7.969 0 015.5 14c1.669 0 3.218.51 4.5 1.385A7.962 7.962 0 0114.5 14c1.255 0 2.443.29 3.5.804v-10A7.968 7.968 0 0014.5 4c-1.255 0-2.443.29-3.5.804V12a1 1 0 11-2 0V4.804z" />
-						</svg>
-					</div>
-				{/if}
-				<div class="flex-1 min-w-0">
-					<h3 class="font-medium text-gray-900 truncate">{request.book.title}</h3>
-					<p class="text-sm text-gray-600 truncate">by {request.book.authors.join(', ')}</p>
-					<div class="mt-1 flex items-center text-xs text-gray-500">
-						{#if type === 'incoming'}
-							<span>From: {request.requester_profile.username || request.requester_profile.full_name || 'Unknown'}</span>
-						{:else}
-							<span>To: {request.owner_profile.username || request.owner_profile.full_name || 'Unknown'}</span>
-						{/if}
-						<span class="mx-2">•</span>
-						<span>{getRelativeTime(request.created_at)}</span>
-					</div>
+	<div class="card-header">
+		
+		<div class="flex items-start gap-4">
+			{#if request.book.google_volume_id}
+				<img
+					src="https://books.google.com/books/content?id={request.book.google_volume_id}&printsec=frontcover&img=1&zoom=1&source=gbs_api"
+					alt="{request.book.title} cover"
+					class="book-thumbnail"
+					loading="lazy"
+					on:error={(e) => {
+						console.error('Failed to load cover for:', request.book.title, e);
+					}}
+				/>
+			{:else}
+				<div class="book-placeholder">
+					<svg class="book-icon" fill="currentColor" viewBox="0 0 20 20">
+						<path d="M9 4.804A7.968 7.968 0 005.5 4c-1.255 0-2.443.29-3.5.804v10A7.969 7.969 0 715.5 14c1.669 0 3.218.51 4.5 1.385A7.962 7.962 0 0114.5 14c1.255 0 2.443.29 3.5.804v-10A7.968 7.968 0 0014.5 4c-1.255 0-2.443.29-3.5.804V12a1 1 0 11-2 0V4.804z" />
+					</svg>
+				</div>
+			{/if}
+			<div class="flex-1 min-w-0">
+				<h3 class="title-text">{request.book.title}</h3>
+				<p class="author-text">by {request.book.authors.join(', ')}</p>
+				<div class="mt-3 flex items-center text-xs text-gray-500">
+					{#if type === 'incoming'}
+						<span>From: {request.requester_profile?.username || request.requester_profile?.full_name || 'Unknown User'}</span>
+					{:else}
+						<span>To: {request.owner_profile?.username || request.owner_profile?.full_name || 'Unknown User'}</span>
+					{/if}
+					<span class="mx-2">•</span>
+					<span>{getRelativeTime(request.created_at)}</span>
 				</div>
 			</div>
-			<span class="px-2 py-1 text-xs font-medium rounded-full {statusColor}">
-				{statusDisplay}
-			</span>
 		</div>
+	</div>
+
+	<!-- Status Section -->
+	<div class="swap-request-status">
+		<div class="status-info">
+			<span class="status-label">Swap Request:</span>
+			<span class="status-badge pending">{statusDisplay}</span>
+		</div>
+		{#if request.offered_book}
+			<div class="offered-book-info">
+				{#if type === 'incoming'}
+					They offered: <strong>{request.offered_book.title}</strong>
+				{:else}
+					You offered: <strong>{request.offered_book.title}</strong>
+				{/if}
+			</div>
+		{/if}
 	</div>
 
 	<!-- Message -->
 	{#if request.message}
-		<div class="px-4 py-3 border-b border-gray-100">
-			<p class="text-sm text-gray-700 leading-relaxed">"{request.message}"</p>
+		<div class="card-section">
+			<p class="message-text">"{request.message}"</p>
 		</div>
 	{/if}
 
 	<!-- Offered Books Section -->
 	{#if request.offered_book || request.counter_offered_book}
-		<div class="px-4 py-3 border-b border-gray-100 bg-gray-50">
+		<div class="card-section" style="background: #f8fafc;">
 			<div class="space-y-3">
 				<!-- Original offered book (from requester) -->
 				{#if request.offered_book}
-					<div class="bg-white rounded-lg p-3 border border-gray-200">
-						<div class="flex items-center gap-3">
-							<div class="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">
-								{type === 'incoming' ? 'They are offering:' : 'You are offering:'}
-							</div>
+					<div class="offered-book-card">
+						<div class="text-xs font-medium text-gray-500 uppercase tracking-wide" style="margin-bottom: 24px;">
+							{type === 'incoming' ? 'They are offering:' : 'You are offering:'}
 						</div>
-						<div class="flex items-start gap-3">
-							{#if request.offered_book.google_volume_id || request.offered_book.thumbnail_url}
+						<div class="flex items-start gap-4">
+							{#if request.offered_book.google_volume_id}
 								<div class="w-10 h-14 flex-shrink-0">
-									{#if request.offered_book.google_volume_id}
-										<img
-											src="https://books.google.com/books/content?id={request.offered_book.google_volume_id}&printsec=frontcover&img=1&zoom=1&source=gbs_api"
-											alt="{request.offered_book.title} cover"
-											class="w-full h-full object-cover rounded shadow-sm"
-										/>
-									{:else if request.offered_book.thumbnail_url}
-										<img
-											src={request.offered_book.thumbnail_url}
-											alt="{request.offered_book.title} cover"
-											class="w-full h-full object-cover rounded shadow-sm"
-										/>
-									{/if}
+									<img
+										src="https://books.google.com/books/content?id={request.offered_book.google_volume_id}&printsec=frontcover&img=1&zoom=1&source=gbs_api"
+										alt="{request.offered_book.title} cover"
+										class="w-full h-full object-cover rounded shadow-sm"
+									/>
 								</div>
 							{:else}
 								<div class="w-10 h-14 bg-gray-200 rounded flex items-center justify-center flex-shrink-0">
@@ -239,28 +725,18 @@
 
 				<!-- Counter offered book (from owner) -->
 				{#if request.counter_offered_book}
-					<div class="bg-purple-50 rounded-lg p-3 border border-purple-200">
-						<div class="flex items-center gap-3">
-							<div class="text-xs font-medium text-purple-600 uppercase tracking-wide mb-2">
-								Counter-offer: {type === 'outgoing' ? 'They are offering instead:' : 'You are offering instead:'}
-							</div>
+					<div class="counter-offer-card">
+						<div class="text-xs font-medium text-purple-600 uppercase tracking-wide" style="margin-bottom: 24px;">
+							Counter-offer: {type === 'outgoing' ? 'They are offering instead:' : 'You are offering instead:'}
 						</div>
-						<div class="flex items-start gap-3">
-							{#if request.counter_offered_book.google_volume_id || request.counter_offered_book.thumbnail_url}
+						<div class="flex items-start gap-4">
+							{#if request.counter_offered_book.google_volume_id}
 								<div class="w-10 h-14 flex-shrink-0">
-									{#if request.counter_offered_book.google_volume_id}
-										<img
-											src="https://books.google.com/books/content?id={request.counter_offered_book.google_volume_id}&printsec=frontcover&img=1&zoom=1&source=gbs_api"
-											alt="{request.counter_offered_book.title} cover"
-											class="w-full h-full object-cover rounded shadow-sm"
-										/>
-									{:else if request.counter_offered_book.thumbnail_url}
-										<img
-											src={request.counter_offered_book.thumbnail_url}
-											alt="{request.counter_offered_book.title} cover"
-											class="w-full h-full object-cover rounded shadow-sm"
-										/>
-									{/if}
+									<img
+										src="https://books.google.com/books/content?id={request.counter_offered_book.google_volume_id}&printsec=frontcover&img=1&zoom=1&source=gbs_api"
+										alt="{request.counter_offered_book.title} cover"
+										class="w-full h-full object-cover rounded shadow-sm"
+									/>
 								</div>
 							{:else}
 								<div class="w-10 h-14 bg-gray-200 rounded flex items-center justify-center flex-shrink-0">
@@ -285,65 +761,109 @@
 
 	<!-- Contact Information (ACCEPTED status only) -->
 	{#if isAccepted && (isOwner || isRequester)}
-		<div class="px-4 py-3 border-b border-gray-100 bg-green-50">
-			<div class="flex items-start gap-3">
-				<div class="flex-shrink-0 w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
-					<svg class="w-5 h-5 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 4.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+		<div class="contact-information-section">
+			<div class="contact-header">
+				<div class="contact-icon">
+					<svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
 					</svg>
 				</div>
-				<div class="flex-1">
-					<h4 class="text-sm font-medium text-green-900 mb-2">Swap Approved - Contact Information</h4>
-					<p class="text-sm text-green-800 mb-3">
-						Your swap has been approved! You can now contact each other to arrange the exchange.
+				<div class="contact-header-content">
+					<h3 class="contact-title">🎉 Swap Approved!</h3>
+					<p class="contact-subtitle">
+						Great news! You can now coordinate the book exchange directly.
 					</p>
-					
-					<div class="space-y-2">
-						{#if type === 'incoming'}
-							<!-- Show requester's contact info to owner -->
+				</div>
+			</div>
+			
+			<div class="contact-details">
+				{#if type === 'incoming'}
+					<!-- Show requester's contact info to owner -->
+					{#if request.requester_profile.email || request.requester_profile.full_name || request.requester_profile.username}
+						<div class="contact-card">
+							<div class="contact-person-header">
+								<div class="contact-avatar">
+									{#if request.requester_profile.avatar_url}
+										<img src="{request.requester_profile.avatar_url}" alt="Profile" class="contact-avatar-img">
+									{:else}
+										<div class="contact-avatar-placeholder">
+											<svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+												<path fill-rule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clip-rule="evenodd" />
+											</svg>
+										</div>
+									{/if}
+								</div>
+								<div class="contact-person-info">
+									<h4 class="contact-person-name">
+										{request.requester_profile.full_name || request.requester_profile.username || 'Requester'}
+									</h4>
+									<p class="contact-person-role">Book Requester</p>
+								</div>
+							</div>
+							
 							{#if request.requester_profile.email}
-								<div class="flex items-center gap-2">
-									<span class="text-xs font-medium text-green-700 uppercase tracking-wide">Requester Contact:</span>
-									<a 
-										href="mailto:{request.requester_profile.email}" 
-										class="text-sm text-green-800 hover:text-green-900 underline font-medium"
-									>
-										{request.requester_profile.email}
-									</a>
-								</div>
+								<a href="mailto:{request.requester_profile.email}" class="contact-email-button">
+									<svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+										<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 4.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+									</svg>
+									Send Email
+									<span class="contact-email-address">{request.requester_profile.email}</span>
+								</a>
 							{/if}
-							{#if request.requester_profile.full_name || request.requester_profile.username}
-								<div class="text-xs text-green-700">
-									Name: {request.requester_profile.full_name || request.requester_profile.username}
+						</div>
+					{/if}
+				{:else}
+					<!-- Show owner's contact info to requester -->
+					{#if request.owner_profile.email || request.owner_profile.full_name || request.owner_profile.username}
+						<div class="contact-card">
+							<div class="contact-person-header">
+								<div class="contact-avatar">
+									{#if request.owner_profile.avatar_url}
+										<img src="{request.owner_profile.avatar_url}" alt="Profile" class="contact-avatar-img">
+									{:else}
+										<div class="contact-avatar-placeholder">
+											<svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+												<path fill-rule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clip-rule="evenodd" />
+											</svg>
+										</div>
+									{/if}
 								</div>
-							{/if}
-						{:else}
-							<!-- Show owner's contact info to requester -->
+								<div class="contact-person-info">
+									<h4 class="contact-person-name">
+										{request.owner_profile.full_name || request.owner_profile.username || 'Book Owner'}
+									</h4>
+									<p class="contact-person-role">Book Owner</p>
+								</div>
+							</div>
+							
 							{#if request.owner_profile.email}
-								<div class="flex items-center gap-2">
-									<span class="text-xs font-medium text-green-700 uppercase tracking-wide">Owner Contact:</span>
-									<a 
-										href="mailto:{request.owner_profile.email}" 
-										class="text-sm text-green-800 hover:text-green-900 underline font-medium"
-									>
-										{request.owner_profile.email}
-									</a>
-								</div>
+								<a href="mailto:{request.owner_profile.email}" class="contact-email-button">
+									<svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+										<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 4.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+									</svg>
+									Send Email
+									<span class="contact-email-address">{request.owner_profile.email}</span>
+								</a>
 							{/if}
-							{#if request.owner_profile.full_name || request.owner_profile.username}
-								<div class="text-xs text-green-700">
-									Name: {request.owner_profile.full_name || request.owner_profile.username}
-								</div>
-							{/if}
-						{/if}
-					</div>
-					
-					<div class="mt-3 p-2 bg-green-100 rounded-md">
-						<p class="text-xs text-green-800">
-							<strong>Next steps:</strong> Send an email to coordinate the book exchange. 
-							Once you've completed the swap, come back here to mark it as completed and leave a rating.
-						</p>
-					</div>
+						</div>
+					{/if}
+				{/if}
+			</div>
+			
+			<div class="next-steps-card">
+				<div class="next-steps-icon">
+					<svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+					</svg>
+				</div>
+				<div class="next-steps-content">
+					<h4 class="next-steps-title">Next Steps</h4>
+					<ul class="next-steps-list">
+						<li>📧 Send an email to coordinate pickup/delivery details</li>
+						<li>📍 Agree on a meeting location and time</li>
+						<li>📚 Exchange your books safely</li>
+						<li>⭐ Return here to mark as completed and leave a rating</li>
+					</ul>
 				</div>
 			</div>
 		</div>
@@ -398,14 +918,14 @@
 
 	<!-- Actions -->
 	{#if (isPending && (isOwner || isRequester)) || (isCounterOffer && (isOwner || isRequester)) || (isAccepted && canComplete)}
-		<div class="px-4 py-3">
+		<div class="card-actions">
 			{#if isPending && isOwner}
 				<!-- Owner actions for PENDING: Accept/Counter-Offer/Cancel -->
-				<div class="space-y-2">
-					<div class="flex space-x-2">
+				<div class="action-buttons">
+					<div class="button-row">
 						<button
 							type="button"
-							class="flex-1 px-3 py-2 text-sm font-medium text-white bg-green-600 border border-transparent rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+							class="btn-success"
 							on:click={handleAccept}
 							disabled={isLoading}
 						>
@@ -423,7 +943,7 @@
 						</button>
 						<button
 							type="button"
-							class="flex-1 px-3 py-2 text-sm font-medium text-white bg-purple-600 border border-transparent rounded-md hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+							class="btn-secondary"
 							on:click={handleCounterOffer}
 							disabled={isLoading}
 						>
@@ -432,7 +952,7 @@
 					</div>
 					<button
 						type="button"
-						class="w-full px-3 py-2 text-sm font-medium text-red-700 bg-red-50 border border-red-200 rounded-md hover:bg-red-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+						class="btn-danger"
 						on:click={handleCancel}
 						disabled={isLoading}
 					>
@@ -444,7 +964,7 @@
 				<!-- Requester actions for PENDING: Cancel -->
 				<button
 					type="button"
-					class="w-full px-3 py-2 text-sm font-medium text-red-700 bg-red-50 border border-red-200 rounded-md hover:bg-red-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+					class="btn-danger"
 					on:click={handleCancel}
 					disabled={isLoading}
 				>
@@ -456,7 +976,7 @@
 				<div class="space-y-2">
 					<button
 						type="button"
-						class="w-full px-3 py-2 text-sm font-medium text-white bg-green-600 border border-transparent rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+						class="btn-success"
 						on:click={handleAccept}
 						disabled={isLoading}
 					>
@@ -474,7 +994,7 @@
 					</button>
 					<button
 						type="button"
-						class="w-full px-3 py-2 text-sm font-medium text-red-700 bg-red-50 border border-red-200 rounded-md hover:bg-red-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+						class="btn-danger"
 						on:click={handleCancel}
 						disabled={isLoading}
 					>
@@ -486,7 +1006,7 @@
 				<!-- Owner actions for COUNTER_OFFER: Cancel -->
 				<button
 					type="button"
-					class="w-full px-3 py-2 text-sm font-medium text-red-700 bg-red-50 border border-red-200 rounded-md hover:bg-red-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+					class="btn-danger"
 					on:click={handleCancel}
 					disabled={isLoading}
 				>
@@ -497,7 +1017,7 @@
 				<!-- Complete swap action -->
 				<button
 					type="button"
-					class="w-full px-3 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+					class="btn-primary"
 					on:click={handleCompleteSwap}
 					disabled={isLoading}
 				>

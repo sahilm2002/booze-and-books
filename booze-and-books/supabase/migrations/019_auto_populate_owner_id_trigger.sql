@@ -4,21 +4,18 @@
 -- Create function to populate owner_id from book_id
 CREATE OR REPLACE FUNCTION public.populate_swap_request_owner_id()
 RETURNS TRIGGER AS $$
-DECLARE
 BEGIN
-    -- Set search_path to public for safety
-    PERFORM set_config('search_path', 'public', true);
-    -- Get the owner_id from the books table, fail fast if not found
-    BEGIN
-        SELECT owner_id INTO STRICT NEW.owner_id
-        FROM public.books
-        WHERE id = NEW.book_id;
-    EXCEPTION WHEN NO_DATA_FOUND THEN
-        RAISE EXCEPTION 'Book with id % not found when populating owner_id for swap_requests', NEW.book_id;
-    END;
+    -- Get the owner_id from the books table
+    SELECT owner_id INTO NEW.owner_id
+    FROM public.books
+    WHERE id = NEW.book_id;
+    
+    -- If book not found, the foreign key constraint will handle the error
+    -- This just ensures owner_id is always populated correctly
+    
     RETURN NEW;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$ LANGUAGE plpgsql;
 
 -- Drop existing trigger if it exists for idempotency
 DROP TRIGGER IF EXISTS trigger_populate_swap_request_owner_id ON public.swap_requests;
