@@ -141,15 +141,32 @@ export class SwapService {
 					id,
 					title,
 					authors,
-					thumbnail_url,
+					google_volume_id,
 					condition
 				),
 				offered_book:books!swap_requests_offered_book_id_fkey (
 					id,
 					title,
 					authors,
-					thumbnail_url,
+					google_volume_id,
 					condition
+				),
+				counter_offered_book:books!swap_requests_counter_offered_book_id_fkey (
+					id,
+					title,
+					authors,
+					google_volume_id,
+					condition
+				),
+				requester_profile:profiles!swap_requests_requester_id_fkey (
+					username,
+					full_name,
+					avatar_url
+				),
+				owner_profile:profiles!swap_requests_owner_id_fkey (
+					username,
+					full_name,
+					avatar_url
 				)
 			`)
 			.eq('owner_id', userId)
@@ -168,15 +185,32 @@ export class SwapService {
 					id,
 					title,
 					authors,
-					thumbnail_url,
+					google_volume_id,
 					condition
 				),
 				offered_book:books!swap_requests_offered_book_id_fkey (
 					id,
 					title,
 					authors,
-					thumbnail_url,
+					google_volume_id,
 					condition
+				),
+				counter_offered_book:books!swap_requests_counter_offered_book_id_fkey (
+					id,
+					title,
+					authors,
+					google_volume_id,
+					condition
+				),
+				requester_profile:profiles!swap_requests_requester_id_fkey (
+					username,
+					full_name,
+					avatar_url
+				),
+				owner_profile:profiles!swap_requests_owner_id_fkey (
+					username,
+					full_name,
+					avatar_url
 				)
 			`)
 			.eq('requester_id', userId)
@@ -250,10 +284,18 @@ export class SwapService {
 			}
 		}
 
+		// Prepare update object
+		const updateData: { status: SwapStatus; cancelled_by?: string } = { status };
+		
+		// If cancelling, record who cancelled it
+		if (status === SwapStatus.CANCELLED) {
+			updateData.cancelled_by = userId;
+		}
+
 		// Update the status
 		const { data, error } = await supabase
 			.from('swap_requests')
-			.update({ status })
+			.update(updateData)
 			.eq('id', requestId)
 			.select()
 			.single();
@@ -275,21 +317,21 @@ export class SwapService {
 					id,
 					title,
 					authors,
-					thumbnail_url,
+					google_volume_id,
 					condition
 				),
 				offered_book:books!swap_requests_offered_book_id_fkey (
 					id,
 					title,
 					authors,
-					thumbnail_url,
+					google_volume_id,
 					condition
 				),
 				counter_offered_book:books!swap_requests_counter_offered_book_id_fkey (
 					id,
 					title,
 					authors,
-					thumbnail_url,
+					google_volume_id,
 					condition
 				),
 				requester_profile:profiles!swap_requests_requester_id_fkey (
@@ -483,21 +525,21 @@ export class SwapService {
 					id,
 					title,
 					authors,
-					thumbnail_url,
+					google_volume_id,
 					condition
 				),
 				offered_book:books!swap_requests_offered_book_id_fkey (
 					id,
 					title,
 					authors,
-					thumbnail_url,
+					google_volume_id,
 					condition
 				),
 				counter_offered_book:books!swap_requests_counter_offered_book_id_fkey (
 					id,
 					title,
 					authors,
-					thumbnail_url,
+					google_volume_id,
 					condition
 				),
 				requester_profile:profiles!swap_requests_requester_id_fkey (
