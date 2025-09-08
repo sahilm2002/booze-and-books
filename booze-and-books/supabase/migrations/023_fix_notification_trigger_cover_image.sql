@@ -10,8 +10,8 @@ BEGIN
     -- Pin search_path to trusted schemas
     PERFORM set_config('search_path', 'pg_catalog,public', true);
     
-    -- Get acting user ID, with fallback to auth.uid()
-    acting_user_id := COALESCE(NEW.cancelled_by, auth.uid());
+    -- Get acting user ID, with fallback to auth.uid() and then requester_id
+    acting_user_id := COALESCE(NEW.cancelled_by, auth.uid(), NEW.requester_id);
     
     -- Get book information including google_volume_id (instead of cover_image)
     SELECT 

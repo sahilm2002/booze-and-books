@@ -14,22 +14,9 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 		throw error(401, 'Unauthorized');
 	}
 
-	// Safely extract user ID - handle various formats
-	let currentUserId: string;
-	
-	if (typeof user.id === 'string') {
-		currentUserId = user.id;
-	} else if (typeof user.id === 'object' && user.id !== null) {
-		// Sometimes user.id might be an object with an id property
-		currentUserId = (user.id as any).id || String(user.id);
-	} else {
-		currentUserId = String(user.id);
-	}
-	
-	// Final validation
-	if (!currentUserId || currentUserId === 'undefined' || currentUserId === 'null' || currentUserId === '[object Object]') {
-		console.error('Invalid user ID format. User object:', JSON.stringify(user, null, 2));
-		throw error(401, 'Invalid user session - unable to extract user ID');
+	const currentUserId = user.id;
+	if (!currentUserId?.trim()) {
+		throw error(401, 'Invalid user session - missing user ID');
 	}
 	const limit = 50;
 	const offset = 0;

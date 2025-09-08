@@ -18,8 +18,8 @@ BEGIN
     -- Pin search_path to trusted schemas
     PERFORM set_config('search_path', 'pg_catalog,public', true);
     
-    -- Get current acting user (can be NULL for service role/background jobs)
-    acting_user_id := auth.uid();
+    -- Get acting user ID, with fallback to auth.uid() and then requester_id
+    acting_user_id := COALESCE(NEW.cancelled_by, auth.uid(), NEW.requester_id);
     
     -- Get book information including cover
     SELECT 
