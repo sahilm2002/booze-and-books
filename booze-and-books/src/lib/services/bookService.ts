@@ -51,6 +51,34 @@ export class BookService {
 		limit = 50,
 		offset = 0
 	): Promise<BookWithOwner[]> {
+		// Robust UUID validation and conversion
+		let validUserId: string;
+		
+		if (!currentUserId) {
+			throw new Error('currentUserId is required');
+		}
+		
+		if (typeof currentUserId === 'string') {
+			validUserId = currentUserId;
+		} else if (typeof currentUserId === 'object' && currentUserId !== null) {
+			// Handle case where an object was passed instead of string
+			validUserId = (currentUserId as any).id || JSON.stringify(currentUserId);
+		} else {
+			validUserId = String(currentUserId);
+		}
+		
+		// Final validation - reject invalid UUIDs
+		if (!validUserId || 
+		    validUserId === 'undefined' || 
+		    validUserId === 'null' || 
+		    validUserId === '[object Object]' ||
+		    validUserId.length !== 36) {
+			throw new Error(`Invalid currentUserId format: ${JSON.stringify(currentUserId)}`);
+		}
+		
+		console.log('BookService input currentUserId:', typeof currentUserId, JSON.stringify(currentUserId));
+		console.log('BookService using validated userId:', validUserId);
+		
 		const { data, error } = await supabase
 			.from('books')
 			.select(`
@@ -62,7 +90,7 @@ export class BookService {
 				)
 			`)
 			.eq('is_available', true)
-			.neq('owner_id', currentUserId)
+			.neq('owner_id', validUserId)
 			.order('created_at', { ascending: false })
 			.range(offset, offset + limit - 1);
 

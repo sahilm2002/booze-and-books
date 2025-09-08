@@ -12,6 +12,8 @@
 
 	// Load swap requests on client side to avoid server-side issues
 	onMount(async () => {
+		console.log('Swaps page mounted, loading data...');
+		
 		// Set page title
 		document.title = 'Swap Requests - Booze & Books';
 		
@@ -23,8 +25,25 @@
 			activeTab = 'incoming';
 		}
 		
-		// Fetch swap requests from client-side service
-		await swapStore.refresh();
+		console.log('Initial tab:', activeTab);
+		
+		// Only fetch swap requests if stores are empty (avoid reloading on navigation)
+		if ($incomingSwapRequests.length === 0 && $outgoingSwapRequests.length === 0) {
+			console.log('Stores are empty, fetching swap requests...');
+			await swapStore.refresh();
+		} else {
+			console.log('Using cached swap requests:', {
+				incoming: $incomingSwapRequests.length,
+				outgoing: $outgoingSwapRequests.length
+			});
+		}
+		
+		console.log('After mount:', {
+			incoming: $incomingSwapRequests.length,
+			outgoing: $outgoingSwapRequests.length,
+			loading: $swapRequestsLoading,
+			error: $swapRequestsError
+		});
 	});
 
 	// Filter requests based on status
@@ -443,7 +462,15 @@
 				type="button"
 				class="tab-button"
 				class:active={activeTab === 'outgoing'}
-				on:click={() => activeTab = 'outgoing'}
+				on:click={() => {
+					console.log('My Requests tab clicked!', {
+						currentTab: activeTab,
+						outgoingRequests: $outgoingSwapRequests.length,
+						loading: $swapRequestsLoading,
+						error: $swapRequestsError
+					});
+					activeTab = 'outgoing';
+				}}
 			>
 				My Requests
 				{#if outgoingCounts.pending > 0}

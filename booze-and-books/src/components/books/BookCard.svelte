@@ -2,6 +2,7 @@
 	import { createEventDispatcher } from 'svelte';
 	import type { Book, BookWithOwner } from '$lib/types/book';
 	import type { SwapRequestWithBook } from '$lib/types/swap';
+import { SwapStatus } from '$lib/types/swap';
 	import { getConditionDisplayName } from '$lib/validation/book';
 	import { user } from '$lib/stores/auth';
 	import { bookStore } from '$lib/stores/books';
@@ -105,8 +106,22 @@
 	}
 
 	function handleSwapRequest() {
+		console.log('Swap button clicked!', {
+			canRequestSwap,
+			existingSwapRequest,
+			user: $user?.id,
+			enableSwapRequests,
+			isOwner
+		});
+		
 		if (canRequestSwap && !existingSwapRequest) {
 			showBookSelectionModal = true;
+		} else {
+			console.log('Swap request blocked:', {
+				canRequestSwap,
+				existingSwapRequest,
+				reason: !canRequestSwap ? 'Cannot request swap' : 'Existing swap request'
+			});
 		}
 	}
 
@@ -114,7 +129,7 @@
 		if (!existingSwapRequest?.id || !$user?.id) return;
 
 		try {
-			await SwapService.updateSwapRequestStatus(existingSwapRequest.id, 'CANCELLED', $user.id);
+			await SwapService.updateSwapRequestStatus(existingSwapRequest.id, SwapStatus.CANCELLED, $user.id);
 			existingSwapRequest = null;
 			
 			dispatch('notification', {
@@ -183,11 +198,6 @@
 		showBookSelectionModal = false;
 	}
 
-	function handleViewDetails() {
-		dispatch('view-details', { book });
-	}
-
-
 	function getConditionBadgeClass(condition: string): string {
 		const baseClasses = 'inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium';
 		
@@ -210,23 +220,14 @@
 
 <div class="book-card" class:opacity-60={!isAvailable && !isOwner}>
 	<div class="book-card-content">
-		{#if book.google_volume_id || book.thumbnail_url}
+		{#if book.google_volume_id}
 		<div class="book-cover-section">
-			{#if book.google_volume_id}
-				<img 
-					src="https://books.google.com/books/content?id={book.google_volume_id}&printsec=frontcover&img=1&zoom=1&source=gbs_api"
-					alt="{book.title} cover"
-					class="book-cover"
-					loading="lazy"
-				/>
-			{:else if book.thumbnail_url}
-				<img 
-					src={book.thumbnail_url} 
-					alt="{book.title} cover"
-					class="book-cover"
-					loading="lazy"
-				/>
-			{/if}
+			<img 
+				src="https://books.google.com/books/content?id={book.google_volume_id}&printsec=frontcover&img=1&zoom=1&source=gbs_api"
+				alt="{book.title} cover"
+				class="book-cover"
+				loading="lazy"
+			/>
 		</div>
 		{/if}
 
@@ -360,22 +361,6 @@
 		border: 1px solid #e2e8f0;
 	}
 
-	.book-cover-placeholder {
-		width: 60px;
-		height: 84px;
-		background: #f8f9fa;
-		border: 1px solid #e2e8f0;
-		border-radius: 6px;
-		display: flex;
-		align-items: center;
-		justify-content: center;
-	}
-
-	.book-icon {
-		width: 24px;
-		height: 24px;
-		color: #718096;
-	}
 
 	.book-details {
 		flex: 1;
