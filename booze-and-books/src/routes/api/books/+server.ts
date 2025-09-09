@@ -4,6 +4,7 @@ import { validateBookInput } from '$lib/validation/book';
 import { createErrorResponse, ErrorTypes, createValidationError } from '$lib/utils/errorHandler';
 import { applyRateLimit, addRateLimitHeaders, RateLimitConfigs } from '$lib/utils/rateLimiter';
 import { logInfo, logError } from '$lib/utils/logger';
+import { sanitizeBookData } from '$lib/utils/sanitizer';
 import type { RequestHandler } from './$types';
 
 export const GET: RequestHandler = async ({ url, locals, request }) => {
@@ -47,8 +48,11 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 
 		const bookData = await request.json();
 		
+		// Sanitize input data to prevent XSS
+		const sanitizedData = sanitizeBookData(bookData);
+		
 		// Validate using shared schema
-		const validation = validateBookInput(bookData);
+		const validation = validateBookInput(sanitizedData);
 		if (!validation.success) {
 			throw createValidationError(validation.errors);
 		}
