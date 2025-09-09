@@ -1,4 +1,5 @@
 import type { GoogleBookResult } from '../types/book.js';
+import { logError } from '../utils/logger.js';
 
 const GOOGLE_BOOKS_API_BASE = 'https://www.googleapis.com/books/v1/volumes';
 
@@ -49,7 +50,7 @@ export class GoogleBooksService {
 				totalItems: data.totalItems || 0
 			};
 		} catch (error) {
-			console.error('Google Books API search error:', error);
+			logError('Google Books API search error', error, { query, options });
 			throw new Error('Failed to search books. Please try again.');
 		}
 	}
@@ -99,7 +100,7 @@ export class GoogleBooksService {
 
 			return await response.json();
 		} catch (error) {
-			console.error('Google Books API get book error:', error);
+			logError('Google Books API get book error', error, { volumeId });
 			return null;
 		}
 	}

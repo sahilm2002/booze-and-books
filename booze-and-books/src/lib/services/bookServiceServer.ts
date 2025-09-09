@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Book, BookInput, BookUpdate, BookWithOwner } from '$lib/types/book';
+import { logError } from '../utils/logger.js';
 
 export class BookServiceServer {
 	/**
@@ -75,7 +76,7 @@ export class BookServiceServer {
 	): Promise<BookWithOwner[]> {
 		// Handle case where object is passed instead of string
 		if (typeof currentUserId !== 'string') {
-			console.error('BookServiceServer ERROR - non-string userId detected:', {
+			logError('BookServiceServer ERROR - non-string userId detected', new Error('Invalid userId type'), {
 				value: currentUserId,
 				type: typeof currentUserId
 			});
@@ -94,7 +95,7 @@ export class BookServiceServer {
 		
 		// Extra safety check - if we somehow get here with an invalid userId, throw early
 		if (typeof validUserId !== 'string' || validUserId.includes('object') || validUserId === '[object Object]') {
-			console.error('BookServiceServer ERROR - invalid userId detected:', {
+			logError('BookServiceServer ERROR - invalid userId detected', new Error('Invalid userId format'), {
 				original: currentUserId,
 				validated: validUserId,
 				type: typeof currentUserId
