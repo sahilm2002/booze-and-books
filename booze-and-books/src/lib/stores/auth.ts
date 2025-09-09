@@ -4,6 +4,7 @@ import { supabase } from '$lib/supabase';
 import { goto, invalidateAll } from '$app/navigation';
 import { browser } from '$app/environment';
 import { activityService } from '$lib/services/activityService';
+import { logInfo, logError, logDebug } from '$lib/utils/logger';
 
 export interface AuthState {
 	session: Session | null;
@@ -39,7 +40,7 @@ function createAuthStore() {
 				// remove prior listener if any
 				unsubscribe?.();
 				const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-					console.log('Auth state changed:', event, session?.user?.email);
+					logDebug('Auth state changed', { event, userEmail: session?.user?.email });
 					
 					update(state => ({
 						...state,
@@ -50,6 +51,7 @@ function createAuthStore() {
 
 					// Handle sign out
 					if (event === 'SIGNED_OUT') {
+						logInfo('User signed out, cleaning up activity tracking');
 						// Stop activity tracking when user signs out
 						activityService.destroy();
 						await goto('/auth/login', { replaceState: true });
@@ -57,9 +59,10 @@ function createAuthStore() {
 					
 					// Handle sign in - start activity tracking
 					if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+						logInfo('User signed in, initializing activity tracking');
 						// Initialize activity tracking for auto-logout
 						activityService.initialize(async () => {
-							console.log('Auto-logout triggered due to inactivity');
+							logInfo('Auto-logout triggered due to inactivity');
 							await auth.signOut();
 						});
 						await invalidateAll();
@@ -70,7 +73,7 @@ function createAuthStore() {
 				// If we already have a session, start activity tracking
 				if (session) {
 					activityService.initialize(async () => {
-						console.log('Auto-logout triggered due to inactivity');
+						logInfo('Auto-logout triggered due to inactivity');
 						await auth.signOut();
 					});
 				}
@@ -93,7 +96,7 @@ function createAuthStore() {
 			const { error } = await supabase.auth.signOut();
 			
 			if (error) {
-				console.error('Error signing out:', error);
+				logError('Error signing out', error);
 				update(state => ({ ...state, loading: false }));
 				return { error };
 			}

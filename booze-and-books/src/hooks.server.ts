@@ -1,6 +1,7 @@
 import { createServerClient } from '@supabase/ssr';
 import { type Handle, redirect } from '@sveltejs/kit';
 import { PUBLIC_SUPABASE_URL, PUBLIC_SUPABASE_ANON_KEY } from '$env/static/public';
+import { logError, logInfo } from '$lib/utils/logger';
 
 export const handle: Handle = async ({ event, resolve }) => {
 	/**
@@ -32,7 +33,7 @@ export const handle: Handle = async ({ event, resolve }) => {
 			error,
 		} = await event.locals.supabase.auth.getSession();
 		if (error) {
-			console.error('Error getting session:', error);
+			logError('Error getting session', error);
 			return { session: null, user: null };
 		}
 
