@@ -1,6 +1,7 @@
 import { json, error } from '@sveltejs/kit';
 import { SwapServiceServer } from '$lib/services/swapServiceServer';
 import { validateSwapRequestUpdate, validateSwapCompletion } from '$lib/validation/swap';
+import { SwapStatus } from '$lib/types/swap';
 import type { RequestHandler } from './$types';
 
 export const GET: RequestHandler = async ({ params, locals }) => {
@@ -60,10 +61,8 @@ export const PUT: RequestHandler = async ({ params, request, locals }) => {
 	// Validate request data
 	const validation = validateSwapRequestUpdate(requestData);
 	if (!validation.success) {
-		throw error(400, {
-			message: 'Invalid request data',
-			errors: validation.errors
-		});
+		const errorMessages = Object.values(validation.errors).join(', ');
+		throw error(400, `Invalid request data: ${errorMessages}`);
 	}
 
 	try {
@@ -116,10 +115,8 @@ export const PATCH: RequestHandler = async ({ params, request, locals }) => {
 	// Validate completion data
 	const validation = validateSwapCompletion(requestData);
 	if (!validation.success) {
-		throw error(400, {
-			message: 'Invalid completion data',
-			errors: validation.errors
-		});
+		const errorMessages = Object.values(validation.errors).join(', ');
+		throw error(400, `Invalid completion data: ${errorMessages}`);
 	}
 
 	try {
@@ -166,7 +163,7 @@ export const DELETE: RequestHandler = async ({ params, locals }) => {
 		await SwapServiceServer.updateSwapRequestStatus(
 			locals.supabase,
 			id,
-			'CANCELLED',
+			SwapStatus.CANCELLED,
 			userId
 		);
 

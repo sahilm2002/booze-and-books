@@ -252,11 +252,14 @@ export class RealtimeService {
 				table: 'books'
 			}, (payload: RealtimePostgresChangesPayload<{ id: string; is_available: boolean }>) => {
 				// Only notify if availability actually changed
-				if (payload.old?.is_available !== payload.new?.is_available) {
+				const oldData = payload.old as { id: string; is_available: boolean } | null;
+				const newData = payload.new as { id: string; is_available: boolean } | null;
+				
+				if (oldData?.is_available !== newData?.is_available) {
 					const event: RealtimeChangeEvent<{ id: string; is_available: boolean }> = {
 						eventType: 'UPDATE',
-						new: payload.new,
-						old: payload.old,
+						new: newData || undefined,
+						old: oldData || undefined,
 						table: 'books'
 					};
 					

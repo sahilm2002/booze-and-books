@@ -43,10 +43,8 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 	// Validate request data
 	const validation = validateSwapRequestInput(requestData);
 	if (!validation.success) {
-		throw error(400, {
-			message: 'Invalid request data',
-			errors: validation.errors
-		});
+		const errorMessages = Object.values(validation.errors).join(', ');
+		throw error(400, `Invalid request data: ${errorMessages}`);
 	}
 
 	try {

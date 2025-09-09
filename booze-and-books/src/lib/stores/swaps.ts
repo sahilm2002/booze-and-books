@@ -338,7 +338,7 @@ export class SwapStore {
 			// Get request details for notifications
 			const swapRequest = await SwapService.getSwapRequestById(requestId);
 			
-			const updatedRequest = await this.updateSwapRequestStatus(requestId, 'ACCEPTED');
+			const updatedRequest = await this.updateSwapRequestStatus(requestId, SwapStatus.ACCEPTED);
 			
 			// Send email notification for approval
 			if (swapRequest && updatedRequest) {
@@ -394,7 +394,8 @@ export class SwapStore {
 				
 				if (requesterEmail) {
 					// We need to get the counter-offered book title
-					const { data: counterBook } = await import('../supabase.js').then(s => s.supabase)
+					const supabaseModule = await import('../supabase.js');
+					const { data: counterBook } = await supabaseModule.supabase
 						.from('books')
 						.select('title')
 						.eq('id', counterOfferedBookId)
@@ -420,7 +421,7 @@ export class SwapStore {
 
 	// Cancel a swap request (requester only)
 	async cancelSwapRequest(requestId: string): Promise<SwapRequest | null> {
-		return this.updateSwapRequestStatus(requestId, 'CANCELLED');
+		return this.updateSwapRequestStatus(requestId, SwapStatus.CANCELLED);
 	}
 
 	// Complete a swap request with rating and feedback

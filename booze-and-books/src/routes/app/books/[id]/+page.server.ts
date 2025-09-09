@@ -4,9 +4,7 @@ import { BookServiceServer } from '$lib/services/bookServiceServer.js';
 import { SwapServiceServer } from '$lib/services/swapServiceServer.js';
 import type { BookWithOwner } from '$lib/types/book.js';
 
-export const load: PageServerLoad = async ({ params, locals: { supabase, getSession } }) => {
-	const session = await getSession();
-
+export const load: PageServerLoad = async ({ params, locals: { supabase, session } }) => {
 	if (!session) {
 		throw error(401, 'Unauthorized');
 	}

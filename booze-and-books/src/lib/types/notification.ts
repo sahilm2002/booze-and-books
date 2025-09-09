@@ -1,7 +1,9 @@
 export enum NotificationType {
 	SWAP_REQUEST = 'SWAP_REQUEST',
 	SWAP_ACCEPTED = 'SWAP_ACCEPTED',
+	SWAP_APPROVED = 'SWAP_APPROVED', // Add missing type
 	SWAP_COUNTER_OFFER = 'SWAP_COUNTER_OFFER',
+	COUNTER_OFFER_RECEIVED = 'COUNTER_OFFER_RECEIVED', // Add missing type
 	SWAP_CANCELLED = 'SWAP_CANCELLED',
 	SWAP_COMPLETED = 'SWAP_COMPLETED'
 }
@@ -28,7 +30,9 @@ export interface NotificationInput {
 export type NotificationData = 
 	| SwapRequestNotificationData
 	| SwapAcceptedNotificationData
+	| SwapApprovedNotificationData
 	| SwapCounterOfferNotificationData
+	| CounterOfferReceivedNotificationData
 	| SwapCancelledNotificationData
 	| SwapCompletedNotificationData;
 
@@ -52,11 +56,32 @@ export interface SwapAcceptedNotificationData {
 	book_condition?: string;
 }
 
+export interface SwapApprovedNotificationData {
+	swap_request_id: string;
+	book_id?: string;
+	owner_id?: string;
+	book_title?: string;
+	book_cover?: string;
+	book_authors?: string[];
+	book_condition?: string;
+}
+
 export interface SwapCounterOfferNotificationData {
 	swap_request_id: string;
 	book_id: string;
 	counter_offered_book_id: string;
 	owner_id: string;
+	book_title?: string;
+	book_cover?: string;
+	book_authors?: string[];
+	book_condition?: string;
+}
+
+export interface CounterOfferReceivedNotificationData {
+	swap_request_id: string;
+	book_id?: string;
+	counter_offered_book_id?: string;
+	owner_id?: string;
 	book_title?: string;
 	book_cover?: string;
 	book_authors?: string[];

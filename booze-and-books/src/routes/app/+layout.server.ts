@@ -14,10 +14,11 @@ export const load: LayoutServerLoad = async ({ locals }) => {
 		let profile = await ProfileServiceServer.getProfile(locals.supabase, locals.user.id);
 		
 		if (!profile) {
-			const sanitizedUsername = ProfileServiceServer.sanitizeUsername(locals.user.email);
+			const userEmail = locals.user.email || locals.user.id;
+			const sanitizedUsername = ProfileServiceServer.sanitizeUsername(userEmail);
 			profile = await ProfileServiceServer.createProfile(locals.supabase, locals.user.id, {
 				username: sanitizedUsername,
-				full_name: locals.user.email
+				full_name: userEmail
 			});
 		}
 

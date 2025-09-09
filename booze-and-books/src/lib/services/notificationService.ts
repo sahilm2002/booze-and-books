@@ -1,5 +1,6 @@
 import { supabase } from '$lib/supabase';
 import type { Notification, NotificationInput } from '../types/notification.js';
+import { NotificationType } from '../types/notification.js';
 
 export class NotificationService {
 	// Get notifications for a user
@@ -205,7 +206,7 @@ export class NotificationService {
 				// Notify requester
 				await this.createNotification({
 					user_id: swapRequest.requester_id,
-					type: 'swap_approved',
+					type: NotificationType.SWAP_APPROVED,
 					title: 'Swap Request Approved!',
 					message: `Your swap request for "${bookTitle}" has been approved. Check your swaps page for contact information.`,
 					data: { swap_request_id: swapRequestId }
@@ -214,7 +215,7 @@ export class NotificationService {
 				// Notify owner  
 				await this.createNotification({
 					user_id: swapRequest.owner_id,
-					type: 'swap_approved',
+					type: NotificationType.SWAP_APPROVED,
 					title: 'Swap Request Approved',
 					message: `You approved a swap request for "${bookTitle}". The requester's contact information is now available.`,
 					data: { swap_request_id: swapRequestId }
@@ -248,7 +249,7 @@ export class NotificationService {
 			if (swapRequest) {
 				await this.createNotification({
 					user_id: swapRequest.requester_id,
-					type: 'counter_offer_received',
+					type: NotificationType.COUNTER_OFFER_RECEIVED,
 					title: 'Counter-Offer Received',
 					message: `The owner made a counter-offer for "${bookTitle}". They're offering "${counterOfferedBookTitle}" instead. Check your swaps to respond.`,
 					data: { swap_request_id: swapRequestId }

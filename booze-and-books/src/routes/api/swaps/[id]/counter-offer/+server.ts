@@ -34,15 +34,12 @@ export const POST: RequestHandler = async ({ params, request, locals }) => {
 	const validation = counterOfferSchema.safeParse(requestData);
 	if (!validation.success) {
 		const errors: Record<string, string> = {};
-		validation.error.errors.forEach(error => {
-			const path = error.path.join('.');
-			errors[path] = error.message;
+		validation.error.issues.forEach(issue => {
+			const path = issue.path.join('.');
+			errors[path] = issue.message;
 		});
 		
-		throw error(400, {
-			message: 'Invalid request data',
-			errors
-		});
+		throw error(400, `Invalid request data: ${Object.values(errors).join(', ')}`);
 	}
 
 	try {

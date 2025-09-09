@@ -550,7 +550,8 @@ export class SwapService {
 			console.error('Book ownership transfer failed:', ownershipError);
 			// Note: The swap is already marked as completed, but ownership transfer failed
 			// In a production system, you might want to implement a rollback mechanism
-			throw new Error(`Swap completed but ownership transfer failed: ${ownershipError.message}`);
+			const errorMessage = ownershipError instanceof Error ? ownershipError.message : String(ownershipError);
+			throw new Error(`Swap completed but ownership transfer failed: ${errorMessage}`);
 		}
 
 		return data;

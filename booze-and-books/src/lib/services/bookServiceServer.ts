@@ -26,7 +26,7 @@ export class BookServiceServer {
 		const filteredBooks = (data || []).filter(book => {
 			const swapRequests = book.swap_requests || [];
 			// Exclude books that have any completed swap requests
-			return !swapRequests.some(swap => swap.status === 'COMPLETED');
+			return !swapRequests.some((swap: any) => swap.status === 'COMPLETED');
 		});
 
 		// Remove the swap_requests field from the response to match Book type
@@ -132,7 +132,7 @@ export class BookServiceServer {
 			
 			// Exclude books that have any ongoing swap requests (PENDING, ACCEPTED, COUNTER_OFFER) 
 			// or completed swaps
-			const hasOngoingOrCompletedSwap = swapRequests.some(swap => 
+			const hasOngoingOrCompletedSwap = swapRequests.some((swap: any) => 
 				swap.status === 'PENDING' || 
 				swap.status === 'ACCEPTED' || 
 				swap.status === 'COUNTER_OFFER' ||

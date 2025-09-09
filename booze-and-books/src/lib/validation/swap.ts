@@ -30,7 +30,7 @@ export const swapRequestInputSchema = z.object({
 // Validation schema for swap request updates (status changes)
 export const swapRequestUpdateSchema = z.object({
 	status: z.nativeEnum(SwapStatus, {
-		errorMap: () => ({ message: 'Invalid swap status' })
+		message: 'Invalid swap status'
 	}),
 	completion_date: z.string().datetime().optional().nullable(),
 	counter_offered_book_id: z.string()
@@ -70,9 +70,9 @@ export function validateSwapRequestInput(data: unknown) {
 		};
 	} else {
 		const errors: Record<string, string> = {};
-		result.error.errors.forEach(error => {
-			const path = error.path.join('.');
-			errors[path] = error.message;
+		result.error.issues.forEach(issue => {
+			const path = issue.path.join('.');
+			errors[path] = issue.message;
 		});
 		
 		return { 
@@ -95,9 +95,9 @@ export function validateSwapRequestUpdate(data: unknown) {
 		};
 	} else {
 		const errors: Record<string, string> = {};
-		result.error.errors.forEach(error => {
-			const path = error.path.join('.');
-			errors[path] = error.message;
+		result.error.issues.forEach(issue => {
+			const path = issue.path.join('.');
+			errors[path] = issue.message;
 		});
 		
 		return { 
@@ -120,9 +120,9 @@ export function validateSwapCompletion(data: unknown) {
 		};
 	} else {
 		const errors: Record<string, string> = {};
-		result.error.errors.forEach(error => {
-			const path = error.path.join('.');
-			errors[path] = error.message;
+		result.error.issues.forEach(issue => {
+			const path = issue.path.join('.');
+			errors[path] = issue.message;
 		});
 		
 		return { 
