@@ -515,11 +515,15 @@ export class SwapService {
 		// Transfer book ownership - swap the owners
 		// The original book owner becomes the owner of the requested book
 		// The requester becomes the owner of the original book
+		// Set both books as unavailable for swap (user needs time to read)
 		try {
-			// Update the original book to be owned by the requester
+			// Update the original book to be owned by the requester and set as unavailable
 			const { error: bookOwnershipError1 } = await supabase
 				.from('books')
-				.update({ owner_id: request.requester_id })
+				.update({ 
+					owner_id: request.requester_id,
+					is_available: false  // User needs time to read the new book
+				})
 				.eq('id', request.book_id);
 
 			if (bookOwnershipError1) {
@@ -531,7 +535,10 @@ export class SwapService {
 			if (request.counter_offered_book_id) {
 				const { error: bookOwnershipError2 } = await supabase
 					.from('books')
-					.update({ owner_id: request.owner_id })
+					.update({ 
+						owner_id: request.owner_id,
+						is_available: false  // User needs time to read the new book
+					})
 					.eq('id', request.counter_offered_book_id);
 
 				if (bookOwnershipError2) {

@@ -127,10 +127,10 @@ export class NotificationService {
 					const data = notification.data as any;
 					
 					if (data && data.book_id) {
-						// Fetch book information
+						// Fetch book information - using * to avoid field selection issues
 						const { data: book, error } = await supabase
 							.from('books')
-							.select('id, title, cover_image, authors, condition')
+							.select('*')
 							.eq('id', data.book_id)
 							.single();
 
