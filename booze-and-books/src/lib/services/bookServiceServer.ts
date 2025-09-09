@@ -3,12 +3,18 @@ import type { Book, BookInput, BookUpdate, BookWithOwner } from '$lib/types/book
 
 export class BookServiceServer {
 	/**
-	 * Get all books for a specific user
+	 * Get all books for a specific user (excluding books with completed swaps)
 	 */
 	static async getUserBooks(supabase: SupabaseClient, userId: string): Promise<Book[]> {
 		const { data, error } = await supabase
 			.from('books')
-			.select('*')
+			.select(`
+				*,
+				swap_requests!book_id (
+					id,
+					status
+				)
+			`)
 			.eq('owner_id', userId)
 			.order('created_at', { ascending: false });
 
@@ -16,7 +22,18 @@ export class BookServiceServer {
 			throw new Error(`Failed to fetch user books: ${error.message}`);
 		}
 
-		return data || [];
+		// Filter out books that have completed swaps
+		const filteredBooks = (data || []).filter(book => {
+			const swapRequests = book.swap_requests || [];
+			// Exclude books that have any completed swap requests
+			return !swapRequests.some(swap => swap.status === 'COMPLETED');
+		});
+
+		// Remove the swap_requests field from the response to match Book type
+		return filteredBooks.map(book => {
+			const { swap_requests, ...bookWithoutSwaps } = book;
+			return bookWithoutSwaps;
+		});
 	}
 
 	/**
@@ -48,7 +65,7 @@ export class BookServiceServer {
 	}
 
 	/**
-	 * Get available books for discovery (excluding current user's books and books in pending swaps)
+	 * Get available books for discovery (excluding current user's books and books with ongoing swaps)
 	 */
 	static async getAvailableBooksForDiscovery(
 		supabase: SupabaseClient,
@@ -56,25 +73,52 @@ export class BookServiceServer {
 		limit = 50,
 		offset = 0
 	): Promise<BookWithOwner[]> {
-    const validUserId = (currentUserId || '').trim();
-    const UUID_V4_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-    if (!UUID_V4_REGEX.test(validUserId)) {
-      throw new Error(`Invalid currentUserId format: ${JSON.stringify(currentUserId)}`);
-    }
-    if (process.env.NODE_ENV === 'development') {
-      console.debug('BookServiceServer: validated userId for discovery');
-    }
-    // First get books that are involved in pending swaps
-			`)
-			.eq('is_available', true)
-			.neq('owner_id', validUserId);
-
-		// Exclude books that are in pending swaps if we have any
-		if (excludedBookIds.length > 0) {
-			queryBuilder = queryBuilder.not('id', 'in', `(${excludedBookIds.join(',')})`);
+		// Handle case where object is passed instead of string
+		if (typeof currentUserId !== 'string') {
+			console.error('BookServiceServer ERROR - non-string userId detected:', {
+				value: currentUserId,
+				type: typeof currentUserId
+			});
+			throw new Error(`BookServiceServer: Expected string userId, got ${typeof currentUserId}: ${JSON.stringify(currentUserId)}`);
+		}
+		
+		const validUserId = (currentUserId || '').trim();
+		const UUID_V4_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+		if (!UUID_V4_REGEX.test(validUserId)) {
+			throw new Error(`Invalid currentUserId format: ${JSON.stringify(currentUserId)}`);
+		}
+		if (process.env.NODE_ENV === 'development') {
+			console.debug('BookServiceServer input currentUserId:', typeof currentUserId, JSON.stringify(currentUserId));
+			console.debug('BookServiceServer using validated userId:', validUserId);
+		}
+		
+		// Extra safety check - if we somehow get here with an invalid userId, throw early
+		if (typeof validUserId !== 'string' || validUserId.includes('object') || validUserId === '[object Object]') {
+			console.error('BookServiceServer ERROR - invalid userId detected:', {
+				original: currentUserId,
+				validated: validUserId,
+				type: typeof currentUserId
+			});
+			throw new Error(`BookServiceServer: Invalid userId detected - got ${typeof currentUserId}: ${JSON.stringify(currentUserId)}`);
 		}
 
-		const { data, error } = await queryBuilder
+		const { data, error } = await supabase
+			.from('books')
+			.select(`
+				*,
+				profiles!owner_id (
+					username,
+					full_name,
+					avatar_url
+				),
+				swap_requests!book_id (
+					id,
+					status,
+					requester_id
+				)
+			`)
+			.eq('is_available', true)
+			.neq('owner_id', validUserId)
 			.order('created_at', { ascending: false })
 			.range(offset, offset + limit - 1);
 
@@ -82,7 +126,27 @@ export class BookServiceServer {
 			throw new Error(`Failed to fetch available books: ${error.message}`);
 		}
 
-		return data || [];
+		// Filter out books with ongoing swap negotiations or completed swaps
+		const filteredBooks = (data || []).filter(book => {
+			const swapRequests = book.swap_requests || [];
+			
+			// Exclude books that have any ongoing swap requests (PENDING, ACCEPTED, COUNTER_OFFER) 
+			// or completed swaps
+			const hasOngoingOrCompletedSwap = swapRequests.some(swap => 
+				swap.status === 'PENDING' || 
+				swap.status === 'ACCEPTED' || 
+				swap.status === 'COUNTER_OFFER' ||
+				swap.status === 'COMPLETED'
+			);
+			
+			return !hasOngoingOrCompletedSwap;
+		});
+
+		// Remove the swap_requests field from the response to match BookWithOwner type
+		return filteredBooks.map(book => {
+			const { swap_requests, ...bookWithoutSwaps } = book;
+			return bookWithoutSwaps;
+		});
 	}
 
 	/**

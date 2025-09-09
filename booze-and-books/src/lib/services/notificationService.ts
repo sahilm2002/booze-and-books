@@ -15,7 +15,9 @@ export class NotificationService {
 			throw new Error(`Failed to fetch notifications: ${error.message}`);
 		}
 
-		return data || [];
+		// Enhance notifications with book information
+		const enhancedNotifications = await this.enhanceNotificationsWithBookInfo(data || []);
+		return enhancedNotifications;
 	}
 
 	// Get unread notifications count
@@ -112,7 +114,51 @@ export class NotificationService {
 			throw new Error(`Failed to fetch recent notifications: ${error.message}`);
 		}
 
-		return data || [];
+		// Enhance notifications with book information
+		const enhancedNotifications = await this.enhanceNotificationsWithBookInfo(data || []);
+		return enhancedNotifications;
+	}
+
+	// Enhance notifications with book information
+	static async enhanceNotificationsWithBookInfo(notifications: Notification[]): Promise<Notification[]> {
+		const enhancedNotifications = await Promise.all(
+			notifications.map(async (notification) => {
+				try {
+					const data = notification.data as any;
+					
+					if (data && data.book_id) {
+						// Fetch book information
+						const { data: book, error } = await supabase
+							.from('books')
+							.select('id, title, cover_image, authors, condition')
+							.eq('id', data.book_id)
+							.single();
+
+						if (!error && book) {
+							// Add book information to notification data
+							const enhancedData = {
+								...data,
+								book_title: book.title,
+								book_cover: book.cover_image,
+								book_authors: book.authors,
+								book_condition: book.condition
+							};
+
+							return {
+								...notification,
+								data: enhancedData
+							};
+						}
+					}
+				} catch (error) {
+					console.error('Error enhancing notification with book info:', error);
+				}
+				
+				return notification;
+			})
+		);
+
+		return enhancedNotifications;
 	}
 
 	// Get notification by ID

@@ -512,6 +512,40 @@ export class SwapService {
 			throw new Error(`Failed to complete swap: ${error.message}`);
 		}
 
+		// Transfer book ownership - swap the owners
+		// The original book owner becomes the owner of the requested book
+		// The requester becomes the owner of the original book
+		try {
+			// Update the original book to be owned by the requester
+			const { error: bookOwnershipError1 } = await supabase
+				.from('books')
+				.update({ owner_id: request.requester_id })
+				.eq('id', request.book_id);
+
+			if (bookOwnershipError1) {
+				console.error('Failed to transfer original book ownership:', bookOwnershipError1);
+				throw new Error(`Failed to transfer original book ownership: ${bookOwnershipError1.message}`);
+			}
+
+			// Update the requested book to be owned by the original owner (if there is a counter-offer book)
+			if (request.counter_offered_book_id) {
+				const { error: bookOwnershipError2 } = await supabase
+					.from('books')
+					.update({ owner_id: request.owner_id })
+					.eq('id', request.counter_offered_book_id);
+
+				if (bookOwnershipError2) {
+					console.error('Failed to transfer counter-offer book ownership:', bookOwnershipError2);
+					throw new Error(`Failed to transfer counter-offer book ownership: ${bookOwnershipError2.message}`);
+				}
+			}
+		} catch (ownershipError) {
+			console.error('Book ownership transfer failed:', ownershipError);
+			// Note: The swap is already marked as completed, but ownership transfer failed
+			// In a production system, you might want to implement a rollback mechanism
+			throw new Error(`Swap completed but ownership transfer failed: ${ownershipError.message}`);
+		}
+
 		return data;
 	}
 

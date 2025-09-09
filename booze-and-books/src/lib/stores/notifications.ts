@@ -26,6 +26,11 @@ export const recentNotifications = derived(
 	($notifications) => $notifications.slice(0, 10)
 );
 
+export const allNotifications = derived(
+	notifications,
+	($notifications) => $notifications
+);
+
 // Notification store class for managing state
 export class NotificationStore {
 	private static instance: NotificationStore;
@@ -142,6 +147,33 @@ export class NotificationStore {
 			notifications.set(recentNotifications);
 		} catch (error) {
 			console.error('Error loading recent notifications:', error);
+		}
+	}
+
+	// Load all notifications for the notifications page
+	async loadAllNotifications(): Promise<void> {
+		const { user: currentUser } = get(auth);
+		if (!currentUser?.id) {
+			notificationsError.set('User not authenticated');
+			return;
+		}
+
+		notificationsLoading.set(true);
+		notificationsError.set(null);
+
+		try {
+			const allUserNotifications = await NotificationService.getNotifications(
+				currentUser.id,
+				1000, // Load a large number to get all notifications
+				0
+			);
+			notifications.set(allUserNotifications);
+		} catch (error) {
+			const errorMessage = error instanceof Error ? error.message : 'Failed to load all notifications';
+			notificationsError.set(errorMessage);
+			console.error('Error loading all notifications:', error);
+		} finally {
+			notificationsLoading.set(false);
 		}
 	}
 

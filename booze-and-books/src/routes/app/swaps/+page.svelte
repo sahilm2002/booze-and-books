@@ -15,7 +15,6 @@
 		if (import.meta.env.DEV) {
 			console.log('Swaps page mounted, loading data...');
 		}
-		}
 		
 		// Set page title
 		document.title = 'Swap Requests - Booze & Books';

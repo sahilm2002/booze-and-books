@@ -309,10 +309,11 @@ class BookStore {
 	// Discovery methods
 	async loadDiscoveryBooks(userId?: string): Promise<BookWithOwner[]> {
 		const currentUser = get(user);
-		const targetUserId = userId || currentUser?.id;
+		// Ensure we extract just the ID string, not the whole user object
+		const targetUserId = userId || (typeof currentUser?.id === 'string' ? currentUser.id : null);
 		
-		if (!targetUserId) {
-			discoveryBooksError.set('No user ID provided');
+		if (!targetUserId || typeof targetUserId !== 'string') {
+			discoveryBooksError.set('No valid user ID provided');
 			return [];
 		}
 

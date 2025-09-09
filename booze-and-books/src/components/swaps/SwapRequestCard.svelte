@@ -1,5 +1,4 @@
 <script lang="ts">
-	// Force hot reload - changes applied
 	import { createEventDispatcher } from 'svelte';
 	import { 
 		getStatusDisplayName, 
@@ -133,32 +132,32 @@
 		imageLoadFailed = true;
 	}
 
-	function formatDate(dateString: string): string {
+	function formatExactTimestamp(dateString: string): string {
 		const date = new Date(dateString);
 		return new Intl.DateTimeFormat('en-US', {
+			year: 'numeric',
 			month: 'short',
 			day: 'numeric',
 			hour: '2-digit',
-			minute: '2-digit'
+			minute: '2-digit',
+			second: '2-digit',
+			timeZoneName: 'short'
 		}).format(date);
-	}
-
-	function getRelativeTime(dateString: string): string {
-		const date = new Date(dateString);
-		const now = new Date();
-		const diffInHours = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60));
-		
-		if (diffInHours < 1) return 'Just now';
-		if (diffInHours < 24) return `${diffInHours}h ago`;
-		
-		const diffInDays = Math.floor(diffInHours / 24);
-		if (diffInDays < 7) return `${diffInDays}d ago`;
-		
-		return formatDate(dateString);
 	}
 </script>
 
 <style>
+	/* Books & Booze Theme Variables */
+	:root {
+		--primary-burgundy: #8B2635;
+		--secondary-gold: #D4AF37;
+		--accent-cream: #F5F5DC;
+		--warm-brown: #8B4513;
+		--deep-red: #722F37;
+		--light-cream: #FFF8DC;
+		--parchment: #F4F1E8;
+	}
+
 	.card {
 		background: white;
 		border: 1px solid #e2e8f0;
@@ -188,22 +187,45 @@
 	}
 
 	.book-thumbnail {
-		width: 48px;
-		height: 72px;
+		width: 80px;
+		height: 120px;
 		object-fit: cover;
 		border-radius: 8px;
-		box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+		box-shadow: 0 2px 8px rgba(139, 38, 53, 0.15);
+		border: 1px solid var(--accent-cream);
 	}
 
 	.book-placeholder {
-		width: 48px;
-		height: 72px;
-		background: #f3f4f6;
+		width: 80px;
+		height: 120px;
+		background: var(--parchment);
+		border: 1px solid var(--accent-cream);
 		border-radius: 8px;
 		display: flex;
 		align-items: center;
 		justify-content: center;
-		box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+		box-shadow: 0 2px 8px rgba(139, 38, 53, 0.15);
+	}
+
+	.offered-book-thumbnail {
+		width: 80px;
+		height: 120px;
+		object-fit: cover;
+		border-radius: 8px;
+		box-shadow: 0 2px 8px rgba(139, 38, 53, 0.15);
+		border: 1px solid var(--accent-cream);
+	}
+
+	.offered-book-placeholder {
+		width: 80px;
+		height: 120px;
+		background: var(--parchment);
+		border: 1px solid var(--accent-cream);
+		border-radius: 8px;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		box-shadow: 0 2px 8px rgba(139, 38, 53, 0.15);
 	}
 
 	.book-icon {
@@ -657,14 +679,31 @@
 			<div class="flex-1 min-w-0">
 				<h3 class="title-text">{request.book.title}</h3>
 				<p class="author-text">by {request.book.authors.join(', ')}</p>
-				<div class="mt-3 flex items-center text-xs text-gray-500">
-					{#if type === 'incoming'}
-						<span>From: {request.requester_profile?.username || request.requester_profile?.full_name || 'Unknown User'}</span>
-					{:else}
-						<span>To: {request.owner_profile?.username || request.owner_profile?.full_name || 'Unknown User'}</span>
-					{/if}
-					<span class="mx-2">•</span>
-					<span>{getRelativeTime(request.created_at)}</span>
+				
+				<!-- Book Condition -->
+				<div class="mt-2">
+					<ConditionIndicator condition={request.book.condition} size="small" />
+				</div>
+				
+				<!-- Book Description -->
+				{#if request.book.description}
+					<p class="mt-2 text-sm text-gray-600 line-clamp-2">{request.book.description}</p>
+				{/if}
+				
+				<div class="mt-3 flex flex-col gap-1 text-xs text-gray-500">
+					<div class="flex items-center">
+						{#if type === 'incoming'}
+							<span>From: {request.requester_profile?.username || request.requester_profile?.full_name || 'Unknown User'}</span>
+						{:else}
+							<span>To: {request.owner_profile?.username || request.owner_profile?.full_name || 'Unknown User'}</span>
+						{/if}
+					</div>
+					<div class="flex items-center">
+						<svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+						</svg>
+						<span>Requested: {formatExactTimestamp(request.created_at)}</span>
+					</div>
 				</div>
 			</div>
 		</div>
@@ -706,26 +745,32 @@
 						</div>
 						<div class="flex items-start gap-4">
 							{#if request.offered_book.google_volume_id}
-								<div class="w-10 h-14 flex-shrink-0">
-									<img
-										src="https://books.google.com/books/content?id={request.offered_book.google_volume_id}&printsec=frontcover&img=1&zoom=1&source=gbs_api"
-										alt="{request.offered_book.title} cover"
-										class="w-full h-full object-cover rounded shadow-sm"
-									/>
-								</div>
+								<img
+									src="https://books.google.com/books/content?id={request.offered_book.google_volume_id}&printsec=frontcover&img=1&zoom=1&source=gbs_api"
+									alt="{request.offered_book.title} cover"
+									class="offered-book-thumbnail"
+									loading="lazy"
+								/>
 							{:else}
-								<div class="w-10 h-14 bg-gray-200 rounded flex items-center justify-center flex-shrink-0">
-									<svg class="w-4 h-4 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
+								<div class="offered-book-placeholder">
+									<svg class="book-icon" fill="currentColor" viewBox="0 0 20 20">
 										<path d="M9 4.804A7.968 7.968 0 005.5 4c-1.255 0-2.443.29-3.5.804v10A7.969 7.969 0 015.5 14c1.669 0 3.218.51 4.5 1.385A7.962 7.962 0 0114.5 14c1.255 0 2.443.29 3.5.804v-10A7.968 7.968 0 0014.5 4c-1.255 0-2.443.29-3.5.804V12a1 1 0 11-2 0V4.804z" />
 									</svg>
 								</div>
 							{/if}
 							<div class="flex-1 min-w-0">
-								<h4 class="font-medium text-sm text-gray-900 truncate">{request.offered_book.title}</h4>
-								<p class="text-xs text-gray-600 truncate">by {request.offered_book.authors.join(', ')}</p>
-								<div class="mt-1">
+								<h4 class="title-text">{request.offered_book.title}</h4>
+								<p class="author-text">by {request.offered_book.authors.join(', ')}</p>
+								
+								<!-- Book Condition -->
+								<div class="mt-2">
 									<ConditionIndicator condition={request.offered_book.condition} size="small" />
 								</div>
+								
+								<!-- Book Description -->
+								{#if request.offered_book.description}
+									<p class="mt-2 text-sm text-gray-600 line-clamp-2">{request.offered_book.description}</p>
+								{/if}
 							</div>
 						</div>
 					</div>
@@ -739,26 +784,32 @@
 						</div>
 						<div class="flex items-start gap-4">
 							{#if request.counter_offered_book.google_volume_id}
-								<div class="w-10 h-14 flex-shrink-0">
-									<img
-										src="https://books.google.com/books/content?id={request.counter_offered_book.google_volume_id}&printsec=frontcover&img=1&zoom=1&source=gbs_api"
-										alt="{request.counter_offered_book.title} cover"
-										class="w-full h-full object-cover rounded shadow-sm"
-									/>
-								</div>
+								<img
+									src="https://books.google.com/books/content?id={request.counter_offered_book.google_volume_id}&printsec=frontcover&img=1&zoom=1&source=gbs_api"
+									alt="{request.counter_offered_book.title} cover"
+									class="offered-book-thumbnail"
+									loading="lazy"
+								/>
 							{:else}
-								<div class="w-10 h-14 bg-gray-200 rounded flex items-center justify-center flex-shrink-0">
-									<svg class="w-4 h-4 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
+								<div class="offered-book-placeholder">
+									<svg class="book-icon" fill="currentColor" viewBox="0 0 20 20">
 										<path d="M9 4.804A7.968 7.968 0 005.5 4c-1.255 0-2.443.29-3.5.804v10A7.969 7.969 0 015.5 14c1.669 0 3.218.51 4.5 1.385A7.962 7.962 0 0114.5 14c1.255 0 2.443.29 3.5.804v-10A7.968 7.968 0 0014.5 4c-1.255 0-2.443.29-3.5.804V12a1 1 0 11-2 0V4.804z" />
 									</svg>
 								</div>
 							{/if}
 							<div class="flex-1 min-w-0">
-								<h4 class="font-medium text-sm text-purple-900 truncate">{request.counter_offered_book.title}</h4>
-								<p class="text-xs text-purple-700 truncate">by {request.counter_offered_book.authors.join(', ')}</p>
-								<div class="mt-1">
+								<h4 class="title-text" style="color: #581c87;">{request.counter_offered_book.title}</h4>
+								<p class="author-text" style="color: #7c3aed;">by {request.counter_offered_book.authors.join(', ')}</p>
+								
+								<!-- Book Condition -->
+								<div class="mt-2">
 									<ConditionIndicator condition={request.counter_offered_book.condition} size="small" />
 								</div>
+								
+								<!-- Book Description -->
+								{#if request.counter_offered_book.description}
+									<p class="mt-2 text-sm text-purple-600 line-clamp-2">{request.counter_offered_book.description}</p>
+								{/if}
 							</div>
 						</div>
 					</div>
@@ -883,7 +934,7 @@
 			<div class="flex items-center justify-between mb-2">
 				<h4 class="text-sm font-medium text-blue-900">Swap Completed</h4>
 				{#if request.completion_date}
-					<span class="text-xs text-blue-700">{formatDate(request.completion_date)}</span>
+					<span class="text-xs text-blue-700">{formatExactTimestamp(request.completion_date)}</span>
 				{/if}
 			</div>
 			

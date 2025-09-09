@@ -36,12 +36,20 @@ export interface SwapRequestNotificationData {
 	swap_request_id: string;
 	book_id: string;
 	requester_id: string;
+	book_title?: string;
+	book_cover?: string;
+	book_authors?: string[];
+	book_condition?: string;
 }
 
 export interface SwapAcceptedNotificationData {
 	swap_request_id: string;
 	book_id: string;
 	owner_id: string;
+	book_title?: string;
+	book_cover?: string;
+	book_authors?: string[];
+	book_condition?: string;
 }
 
 export interface SwapCounterOfferNotificationData {
@@ -49,12 +57,20 @@ export interface SwapCounterOfferNotificationData {
 	book_id: string;
 	counter_offered_book_id: string;
 	owner_id: string;
+	book_title?: string;
+	book_cover?: string;
+	book_authors?: string[];
+	book_condition?: string;
 }
 
 export interface SwapCancelledNotificationData {
 	swap_request_id: string;
 	book_id: string;
 	cancelled_by: string;
+	book_title?: string;
+	book_cover?: string;
+	book_authors?: string[];
+	book_condition?: string;
 }
 
 export interface SwapCompletedNotificationData {
@@ -62,4 +78,8 @@ export interface SwapCompletedNotificationData {
 	book_id: string;
 	rating: number;
 	completed_by: string;
+	book_title?: string;
+	book_cover?: string;
+	book_authors?: string[];
+	book_condition?: string;
 }

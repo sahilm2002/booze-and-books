@@ -30,11 +30,12 @@
 		};
 	});
 
-	function toggleDropdown() {
+	async function toggleDropdown() {
 		isOpen = !isOpen;
 		if (isOpen) {
-			// Load recent notifications when opening
-			notificationStore.loadRecentNotifications();
+			// Force reload recent notifications with enhanced book data when opening
+			// Clear existing notifications first to force a fresh reload
+			await notificationStore.loadRecentNotifications();
 		}
 	}
 
@@ -106,7 +107,7 @@
 							class="mark-all-read-button"
 							on:click={markAllAsRead}
 						>
-							Mark all read
+							Mark all as read
 						</button>
 					{/if}
 				</div>
@@ -150,6 +151,17 @@
 {/if}
 
 <style>
+	/* Books & Booze Theme Variables */
+	:root {
+		--primary-burgundy: #8B2635;
+		--secondary-gold: #D4AF37;
+		--accent-cream: #F5F5DC;
+		--warm-brown: #8B4513;
+		--deep-red: #722F37;
+		--light-cream: #FFF8DC;
+		--parchment: #F4F1E8;
+	}
+
 	.notification-bell-button {
 		position: relative;
 		display: inline-flex;
@@ -237,7 +249,7 @@
 		left: 0;
 		right: 0;
 		bottom: 0;
-		background-color: rgba(0, 0, 0, 0.3);
+		background-color: rgba(139, 38, 53, 0.4);
 		display: flex;
 		align-items: flex-start;
 		justify-content: center;
@@ -246,15 +258,16 @@
 	}
 
 	.notification-modal {
-		background: white;
-		border-radius: 0.75rem;
-		box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+		background: linear-gradient(135deg, var(--light-cream) 0%, white 100%);
+		border: 2px solid var(--secondary-gold);
+		border-radius: 1rem;
+		box-shadow: 0 20px 40px rgba(139, 38, 53, 0.3), 0 10px 20px rgba(212, 175, 55, 0.2);
 		width: 90vw;
-		max-width: 28rem;
-		max-height: 80vh;
+		max-width: 32rem;
+		max-height: 85vh;
 		position: relative;
 		overflow: hidden;
-		animation: modal-enter 0.2s ease-out;
+		animation: modal-enter 0.3s ease-out;
 	}
 
 	@keyframes modal-enter {
@@ -270,34 +283,41 @@
 
 	.modal-close-button {
 		position: absolute;
-		top: 1rem;
-		right: 1rem;
-		background: #f7fafc;
-		border: none;
+		top: 1.2rem;
+		right: 1.2rem;
+		background: var(--accent-cream);
+		border: 1px solid var(--secondary-gold);
 		border-radius: 50%;
-		width: 2rem;
-		height: 2rem;
+		width: 2.5rem;
+		height: 2.5rem;
 		display: flex;
 		align-items: center;
 		justify-content: center;
 		cursor: pointer;
-		transition: background-color 0.2s;
+		transition: all 0.3s ease;
 		z-index: 10;
 	}
 
 	.modal-close-button:hover {
-		background: #edf2f7;
+		background: var(--secondary-gold);
+		transform: scale(1.1);
+		box-shadow: 0 4px 8px rgba(212, 175, 55, 0.4);
 	}
 
 	.modal-close-icon {
-		width: 1rem !important;
-		height: 1rem !important;
-		color: #4a5568;
+		width: 1.2rem !important;
+		height: 1.2rem !important;
+		color: var(--warm-brown);
+	}
+
+	.modal-close-button:hover .modal-close-icon {
+		color: var(--deep-red);
 	}
 
 	.modal-header {
-		padding: 1.5rem 1rem 1rem;
-		border-bottom: 1px solid #e2e8f0;
+		padding: 2rem 2rem 1rem;
+		border-bottom: 2px solid var(--accent-cream);
+		background: linear-gradient(135deg, var(--parchment) 0%, var(--light-cream) 100%);
 	}
 
 	.modal-header-content {
@@ -307,46 +327,63 @@
 	}
 
 	.modal-title {
-		font-size: 1.125rem;
-		font-weight: 600;
-		color: #2d3748;
+		font-size: 1.4rem;
+		font-weight: 700;
+		color: var(--primary-burgundy);
 		margin: 0;
+		text-shadow: 1px 1px 2px rgba(139, 38, 53, 0.1);
 	}
 
 	.mark-all-read-button {
-		font-size: 0.75rem;
-		color: #4299e1;
-		background: none;
-		border: none;
+		font-size: 0.85rem;
+		font-weight: 600;
+		color: var(--warm-brown);
+		background: var(--accent-cream);
+		border: 1px solid var(--secondary-gold);
+		border-radius: 0.5rem;
+		padding: 0.5rem 1rem;
 		cursor: pointer;
-		transition: color 0.2s;
+		transition: all 0.3s ease;
 	}
 
 	.mark-all-read-button:hover {
-		color: #3182ce;
+		background: var(--secondary-gold);
+		color: var(--deep-red);
+		transform: translateY(-1px);
+		box-shadow: 0 4px 8px rgba(212, 175, 55, 0.3);
 	}
 
 	.modal-content {
 		max-height: 24rem;
 		overflow-y: auto;
 		padding: 0;
+		background: white;
 	}
 
 	.modal-footer {
-		padding: 1rem;
-		border-top: 1px solid #e2e8f0;
+		padding: 1.5rem 2rem;
+		border-top: 2px solid var(--accent-cream);
 		text-align: center;
+		background: linear-gradient(135deg, var(--parchment) 0%, var(--light-cream) 100%);
 	}
 
 	.view-all-link {
-		display: block;
-		font-size: 0.875rem;
-		color: #4299e1;
+		display: inline-block;
+		font-size: 1rem;
+		font-weight: 600;
+		color: var(--warm-brown);
+		background: linear-gradient(135deg, var(--secondary-gold) 0%, #B8941A 100%);
+		padding: 0.75rem 1.5rem;
+		border-radius: 0.5rem;
 		text-decoration: none;
-		transition: color 0.2s;
+		transition: all 0.3s ease;
+		border: 1px solid var(--secondary-gold);
 	}
 
 	.view-all-link:hover {
-		color: #3182ce;
+		background: linear-gradient(135deg, #B8941A 0%, var(--secondary-gold) 100%);
+		color: var(--deep-red);
+		transform: translateY(-2px);
+		box-shadow: 0 6px 12px rgba(212, 175, 55, 0.4);
 	}
 </style>
