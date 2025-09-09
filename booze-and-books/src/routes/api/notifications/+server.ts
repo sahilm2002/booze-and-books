@@ -1,10 +1,20 @@
 import { json, error } from '@sveltejs/kit';
 import { NotificationServiceServer } from '$lib/services/notificationServiceServer';
+import { logError } from '$lib/utils/logger';
+import { createErrorResponse } from '$lib/utils/errorHandler';
+import { applyRateLimit, RateLimitConfigs } from '$lib/utils/rateLimiter';
 import type { RequestHandler } from './$types';
 
-export const GET: RequestHandler = async ({ locals, url }) => {
+export const GET: RequestHandler = async ({ request, locals, url }) => {
 	if (!locals.session?.user) {
 		throw error(401, 'Unauthorized');
+	}
+
+	// Apply rate limiting
+	try {
+		applyRateLimit(request, RateLimitConfigs.API_GENERAL);
+	} catch (rateLimitError) {
+		throw error(429, 'Too many requests');
 	}
 
 	const userId = locals.session.user.id;
@@ -45,14 +55,21 @@ export const GET: RequestHandler = async ({ locals, url }) => {
 			}
 		});
 	} catch (err) {
-		console.error('Error fetching notifications:', err);
-		throw error(500, 'Failed to fetch notifications');
+		logError('Error fetching notifications', err, { userId, limit, offset });
+		return createErrorResponse(err, 'Failed to fetch notifications', { userId });
 	}
 };
 
-export const PUT: RequestHandler = async ({ locals }) => {
+export const PUT: RequestHandler = async ({ request, locals }) => {
 	if (!locals.session?.user) {
 		throw error(401, 'Unauthorized');
+	}
+
+	// Apply rate limiting
+	try {
+		applyRateLimit(request, RateLimitConfigs.MUTATION);
+	} catch (rateLimitError) {
+		throw error(429, 'Too many requests');
 	}
 
 	const userId = locals.session.user.id;
@@ -62,7 +79,7 @@ export const PUT: RequestHandler = async ({ locals }) => {
 		
 		return json({ success: true });
 	} catch (err) {
-		console.error('Error marking all notifications as read:', err);
-		throw error(500, 'Failed to mark notifications as read');
+		logError('Error marking all notifications as read', err, { userId });
+		return createErrorResponse(err, 'Failed to mark notifications as read', { userId });
 	}
 };

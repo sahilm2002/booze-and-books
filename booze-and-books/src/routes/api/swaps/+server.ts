@@ -1,11 +1,21 @@
 import { json, error } from '@sveltejs/kit';
 import { SwapServiceServer } from '$lib/services/swapServiceServer';
 import { validateSwapRequestInput } from '$lib/validation/swap';
+import { logError } from '$lib/utils/logger';
+import { createErrorResponse } from '$lib/utils/errorHandler';
+import { applyRateLimit, RateLimitConfigs } from '$lib/utils/rateLimiter';
 import type { RequestHandler } from './$types';
 
-export const GET: RequestHandler = async ({ locals, url }) => {
+export const GET: RequestHandler = async ({ request, locals, url }) => {
 	if (!locals.session?.user) {
 		throw error(401, 'Unauthorized');
+	}
+
+	// Apply rate limiting
+	try {
+		applyRateLimit(request, RateLimitConfigs.API_GENERAL);
+	} catch (rateLimitError) {
+		throw error(429, 'Too many requests');
 	}
 
 	const userId = locals.session.user.id;
@@ -21,14 +31,21 @@ export const GET: RequestHandler = async ({ locals, url }) => {
 			outgoing
 		});
 	} catch (err) {
-		console.error('Error fetching swap requests:', err);
-		throw error(500, 'Failed to fetch swap requests');
+		logError('Error fetching swap requests', err, { userId });
+		return createErrorResponse(err, 'Failed to fetch swap requests', { userId });
 	}
 };
 
 export const POST: RequestHandler = async ({ request, locals }) => {
 	if (!locals.session?.user) {
 		throw error(401, 'Unauthorized');
+	}
+
+	// Apply rate limiting
+	try {
+		applyRateLimit(request, RateLimitConfigs.MUTATION);
+	} catch (rateLimitError) {
+		throw error(429, 'Too many requests');
 	}
 
 	const userId = locals.session.user.id;
@@ -56,13 +73,13 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 
 		return json(swapRequest, { status: 201 });
 	} catch (err) {
-		console.error('Error creating swap request:', err);
+		logError('Error creating swap request', err, { userId, requestData: validation.data });
 		const message = err instanceof Error ? err.message : 'Failed to create swap request';
 		
 		if (message.includes('not available') || message.includes('own book')) {
 			throw error(400, message);
 		}
 		
-		throw error(500, message);
+		return createErrorResponse(err, 'Failed to create swap request', { userId });
 	}
 };

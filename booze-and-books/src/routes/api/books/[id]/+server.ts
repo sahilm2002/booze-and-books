@@ -1,11 +1,22 @@
 import { json } from '@sveltejs/kit';
 import { BookServiceServer } from '$lib/services/bookServiceServer';
 import { validateBookUpdate } from '$lib/validation/book';
+import { logError } from '$lib/utils/logger';
+import { createErrorResponse } from '$lib/utils/errorHandler';
+import { applyRateLimit, RateLimitConfigs } from '$lib/utils/rateLimiter';
+import { sanitizeBookData } from '$lib/utils/sanitizer';
 import type { RequestHandler } from './$types';
 
-export const GET: RequestHandler = async ({ params, locals }) => {
+export const GET: RequestHandler = async ({ request, params, locals }) => {
 	if (!locals.user) {
 		return json({ error: 'Unauthorized' }, { status: 401 });
+	}
+
+	// Apply rate limiting
+	try {
+		applyRateLimit(request, RateLimitConfigs.API_GENERAL);
+	} catch (rateLimitError) {
+		return json({ error: 'Too many requests' }, { status: 429 });
 	}
 
 	try {
@@ -21,14 +32,21 @@ export const GET: RequestHandler = async ({ params, locals }) => {
 
 		return json({ book });
 	} catch (error) {
-		console.error('Failed to fetch book:', error);
-		return json({ error: 'Failed to fetch book' }, { status: 500 });
+		logError('Failed to fetch book', error, { userId: locals.user.id, bookId: params.id });
+		return createErrorResponse(error, 'Failed to fetch book', { userId: locals.user.id });
 	}
 };
 
 export const PUT: RequestHandler = async ({ params, request, locals }) => {
 	if (!locals.user) {
 		return json({ error: 'Unauthorized' }, { status: 401 });
+	}
+
+	// Apply rate limiting
+	try {
+		applyRateLimit(request, RateLimitConfigs.MUTATION);
+	} catch (rateLimitError) {
+		return json({ error: 'Too many requests' }, { status: 429 });
 	}
 
 	try {
@@ -39,8 +57,11 @@ export const PUT: RequestHandler = async ({ params, request, locals }) => {
 
 		const updates = await request.json();
 		
+		// Sanitize input data
+		const sanitizedUpdates = sanitizeBookData(updates);
+		
 		// Validate using shared schema
-		const validation = validateBookUpdate(updates);
+		const validation = validateBookUpdate(sanitizedUpdates);
 		if (!validation.success) {
 			const firstError = Object.values(validation.errors)[0];
 			return json({ error: firstError || 'Invalid book data' }, { status: 400 });
@@ -55,7 +76,7 @@ export const PUT: RequestHandler = async ({ params, request, locals }) => {
 		
 		return json({ book: updatedBook });
 	} catch (error) {
-		console.error('Failed to update book:', error);
+		logError('Failed to update book', error, { userId: locals.user.id, bookId: params.id });
 		
 		if (error instanceof Error) {
 			if (error.message === 'Book not found') {
@@ -66,13 +87,20 @@ export const PUT: RequestHandler = async ({ params, request, locals }) => {
 			}
 		}
 		
-		return json({ error: 'Failed to update book' }, { status: 500 });
+		return createErrorResponse(error, 'Failed to update book', { userId: locals.user.id });
 	}
 };
 
-export const DELETE: RequestHandler = async ({ params, locals }) => {
+export const DELETE: RequestHandler = async ({ request, params, locals }) => {
 	if (!locals.user) {
 		return json({ error: 'Unauthorized' }, { status: 401 });
+	}
+
+	// Apply rate limiting
+	try {
+		applyRateLimit(request, RateLimitConfigs.MUTATION);
+	} catch (rateLimitError) {
+		return json({ error: 'Too many requests' }, { status: 429 });
 	}
 
 	try {
@@ -85,7 +113,7 @@ export const DELETE: RequestHandler = async ({ params, locals }) => {
 		
 		return json({ success: true });
 	} catch (error) {
-		console.error('Failed to delete book:', error);
+		logError('Failed to delete book', error, { userId: locals.user.id, bookId: params.id });
 		
 		if (error instanceof Error) {
 			if (error.message === 'Book not found') {
@@ -96,6 +124,6 @@ export const DELETE: RequestHandler = async ({ params, locals }) => {
 			}
 		}
 		
-		return json({ error: 'Failed to delete book' }, { status: 500 });
+		return createErrorResponse(error, 'Failed to delete book', { userId: locals.user.id });
 	}
 };

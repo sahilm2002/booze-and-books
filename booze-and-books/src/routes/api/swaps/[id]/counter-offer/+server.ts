@@ -1,6 +1,9 @@
 import { json, error } from '@sveltejs/kit';
 import { SwapServiceServer } from '$lib/services/swapServiceServer';
 import { z } from 'zod';
+import { logError } from '$lib/utils/logger';
+import { createErrorResponse } from '$lib/utils/errorHandler';
+import { applyRateLimit, RateLimitConfigs } from '$lib/utils/rateLimiter';
 import type { RequestHandler } from './$types';
 
 // Validation schema for counter-offer
@@ -13,6 +16,13 @@ const counterOfferSchema = z.object({
 export const POST: RequestHandler = async ({ params, request, locals }) => {
 	if (!locals.session?.user) {
 		throw error(401, 'Unauthorized');
+	}
+
+	// Apply rate limiting
+	try {
+		applyRateLimit(request, RateLimitConfigs.MUTATION);
+	} catch (rateLimitError) {
+		throw error(429, 'Too many requests');
 	}
 
 	const { id } = params;
@@ -52,7 +62,11 @@ export const POST: RequestHandler = async ({ params, request, locals }) => {
 
 		return json(updatedRequest);
 	} catch (err) {
-		console.error('Error making counter-offer:', err);
+		logError('Error making counter-offer', err, { 
+			userId, 
+			swapId: id, 
+			counterOfferedBookId: validation.data.counter_offered_book_id 
+		});
 		const message = err instanceof Error ? err.message : 'Failed to make counter-offer';
 		
 		if (message.includes('not found')) {
@@ -65,6 +79,6 @@ export const POST: RequestHandler = async ({ params, request, locals }) => {
 			throw error(400, message);
 		}
 		
-		throw error(500, message);
+		return createErrorResponse(err, 'Failed to make counter-offer', { userId });
 	}
 };

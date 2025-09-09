@@ -2,11 +2,21 @@ import { json, error } from '@sveltejs/kit';
 import { SwapServiceServer } from '$lib/services/swapServiceServer';
 import { validateSwapRequestUpdate, validateSwapCompletion } from '$lib/validation/swap';
 import { SwapStatus } from '$lib/types/swap';
+import { logError } from '$lib/utils/logger';
+import { createErrorResponse } from '$lib/utils/errorHandler';
+import { applyRateLimit, RateLimitConfigs } from '$lib/utils/rateLimiter';
 import type { RequestHandler } from './$types';
 
-export const GET: RequestHandler = async ({ params, locals }) => {
+export const GET: RequestHandler = async ({ request, params, locals }) => {
 	if (!locals.session?.user) {
 		throw error(401, 'Unauthorized');
+	}
+
+	// Apply rate limiting
+	try {
+		applyRateLimit(request, RateLimitConfigs.API_GENERAL);
+	} catch (rateLimitError) {
+		throw error(429, 'Too many requests');
 	}
 
 	const { id } = params;
@@ -33,14 +43,21 @@ export const GET: RequestHandler = async ({ params, locals }) => {
 		if (err instanceof Response) {
 			throw err;
 		}
-		console.error('Error fetching swap request:', err);
-		throw error(500, 'Failed to fetch swap request');
+		logError('Error fetching swap request', err, { userId, swapId: id });
+		return createErrorResponse(err, 'Failed to fetch swap request', { userId });
 	}
 };
 
 export const PUT: RequestHandler = async ({ params, request, locals }) => {
 	if (!locals.session?.user) {
 		throw error(401, 'Unauthorized');
+	}
+
+	// Apply rate limiting
+	try {
+		applyRateLimit(request, RateLimitConfigs.MUTATION);
+	} catch (rateLimitError) {
+		throw error(429, 'Too many requests');
 	}
 
 	const { id } = params;
@@ -75,7 +92,7 @@ export const PUT: RequestHandler = async ({ params, request, locals }) => {
 
 		return json(updatedRequest);
 	} catch (err) {
-		console.error('Error updating swap request:', err);
+		logError('Error updating swap request', err, { userId, swapId: id, status: validation.data.status });
 		const message = err instanceof Error ? err.message : 'Failed to update swap request';
 		
 		if (message.includes('not found')) {
@@ -88,13 +105,20 @@ export const PUT: RequestHandler = async ({ params, request, locals }) => {
 			throw error(400, message);
 		}
 		
-		throw error(500, message);
+		return createErrorResponse(err, 'Failed to update swap request', { userId });
 	}
 };
 
 export const PATCH: RequestHandler = async ({ params, request, locals }) => {
 	if (!locals.session?.user) {
 		throw error(401, 'Unauthorized');
+	}
+
+	// Apply rate limiting
+	try {
+		applyRateLimit(request, RateLimitConfigs.MUTATION);
+	} catch (rateLimitError) {
+		throw error(429, 'Too many requests');
 	}
 
 	const { id } = params;
@@ -129,7 +153,7 @@ export const PATCH: RequestHandler = async ({ params, request, locals }) => {
 
 		return json(completedRequest);
 	} catch (err) {
-		console.error('Error completing swap request:', err);
+		logError('Error completing swap request', err, { userId, swapId: id, completionData: validation.data });
 		const message = err instanceof Error ? err.message : 'Failed to complete swap request';
 		
 		if (message.includes('not found')) {
@@ -142,13 +166,20 @@ export const PATCH: RequestHandler = async ({ params, request, locals }) => {
 			throw error(400, message);
 		}
 		
-		throw error(500, message);
+		return createErrorResponse(err, 'Failed to complete swap request', { userId });
 	}
 };
 
-export const DELETE: RequestHandler = async ({ params, locals }) => {
+export const DELETE: RequestHandler = async ({ request, params, locals }) => {
 	if (!locals.session?.user) {
 		throw error(401, 'Unauthorized');
+	}
+
+	// Apply rate limiting
+	try {
+		applyRateLimit(request, RateLimitConfigs.MUTATION);
+	} catch (rateLimitError) {
+		throw error(429, 'Too many requests');
 	}
 
 	const { id } = params;
@@ -169,7 +200,7 @@ export const DELETE: RequestHandler = async ({ params, locals }) => {
 
 		return json({ success: true });
 	} catch (err) {
-		console.error('Error cancelling swap request:', err);
+		logError('Error cancelling swap request', err, { userId, swapId: id });
 		const message = err instanceof Error ? err.message : 'Failed to cancel swap request';
 		
 		if (message.includes('not found')) {
@@ -182,6 +213,6 @@ export const DELETE: RequestHandler = async ({ params, locals }) => {
 			throw error(400, message);
 		}
 		
-		throw error(500, message);
+		return createErrorResponse(err, 'Failed to cancel swap request', { userId });
 	}
 };

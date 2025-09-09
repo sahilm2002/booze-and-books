@@ -1,10 +1,20 @@
 import { json, error } from '@sveltejs/kit';
 import { NotificationServiceServer } from '$lib/services/notificationServiceServer';
+import { logError } from '$lib/utils/logger';
+import { createErrorResponse } from '$lib/utils/errorHandler';
+import { applyRateLimit, RateLimitConfigs } from '$lib/utils/rateLimiter';
 import type { RequestHandler } from './$types';
 
-export const PUT: RequestHandler = async ({ params, locals }) => {
+export const PUT: RequestHandler = async ({ request, params, locals }) => {
 	if (!locals.session?.user) {
 		throw error(401, 'Unauthorized');
+	}
+
+	// Apply rate limiting
+	try {
+		applyRateLimit(request, RateLimitConfigs.MUTATION);
+	} catch (rateLimitError) {
+		throw error(429, 'Too many requests');
 	}
 
 	const { id } = params;
@@ -41,14 +51,21 @@ export const PUT: RequestHandler = async ({ params, locals }) => {
 		if (err instanceof Response) {
 			throw err;
 		}
-		console.error('Error marking notification as read:', err);
-		throw error(500, 'Failed to mark notification as read');
+		logError('Error marking notification as read', err, { userId, notificationId: id });
+		return createErrorResponse(err, 'Failed to mark notification as read', { userId });
 	}
 };
 
-export const DELETE: RequestHandler = async ({ params, locals }) => {
+export const DELETE: RequestHandler = async ({ request, params, locals }) => {
 	if (!locals.session?.user) {
 		throw error(401, 'Unauthorized');
+	}
+
+	// Apply rate limiting
+	try {
+		applyRateLimit(request, RateLimitConfigs.MUTATION);
+	} catch (rateLimitError) {
+		throw error(429, 'Too many requests');
 	}
 
 	const { id } = params;
@@ -82,7 +99,7 @@ export const DELETE: RequestHandler = async ({ params, locals }) => {
 		if (err instanceof Response) {
 			throw err;
 		}
-		console.error('Error deleting notification:', err);
-		throw error(500, 'Failed to delete notification');
+		logError('Error deleting notification', err, { userId, notificationId: id });
+		return createErrorResponse(err, 'Failed to delete notification', { userId });
 	}
 };
