@@ -1,10 +1,12 @@
 <script lang="ts">
 	import { page } from '$app/stores';
 	import { goto } from '$app/navigation';
+	import { auth } from '$lib/stores/auth';
 	import { onMount } from 'svelte';
 	import BookCard from '../../../components/books/BookCard.svelte';
 	import BookEditForm from '../../../components/books/BookEditForm.svelte';
 	import { bookStore, books, booksLoading, booksError } from '$lib/stores/books';
+	import { getConditionDisplayName } from '$lib/validation/book';
 	import type { Book } from '$lib/types/book';
 	import type { PageData } from './$types';
 
@@ -69,8 +71,12 @@
 
 	function handleViewDetails(event: CustomEvent<{ book: Book }>) {
 		const { book } = event.detail;
-		// Navigate to a book details page or show a modal with details
-		// For now, let's navigate to a book details route
+		
+		if (!$auth.user) {
+			goto(`/auth/login?redirectTo=/app/books/${book.id}`);
+			return;
+		}
+		
 		goto(`/app/books/${book.id}`);
 	}
 </script>
@@ -81,87 +87,77 @@
 
 <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
 	<!-- Header -->
-	<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-8">
-		<div>
-			<h1 class="text-3xl font-bold text-gray-900">My Books</h1>
-			<p class="mt-2 text-gray-600">
+	<div class="page-header">
+		<div class="header-content">
+			<h1 class="page-title">My Books</h1>
+			<p class="page-subtitle">
 				{data.bookCount || $books.length} book{(data.bookCount || $books.length) !== 1 ? 's' : ''} in your collection
 			</p>
 		</div>
-		<div class="mt-4 sm:mt-0">
-			<a
-				href="/app/books/add"
-				class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-			>
-				<svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
-				</svg>
-				Add Book
-			</a>
-		</div>
+		{#if $books.length > 0}
+			<div class="header-actions">
+				<button type="button" class="btn-add" on:click={async () => {
+					console.log('Add Book clicked - Auth state:', $auth.user ? 'Logged in' : 'Not logged in');
+					
+					if (!$auth.user) {
+						console.log('User not authenticated, redirecting to login');
+						goto('/auth/login?redirectTo=/app/books/add');
+						return;
+					}
+					
+					console.log('User authenticated, navigating to /app/books/add');
+					goto('/app/books/add');
+				}}>
+					<svg class="btn-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
+					</svg>
+					Add Book
+				</button>
+			</div>
+		{/if}
 	</div>
 
 	<!-- Filters -->
 	{#if $books.length > 0}
-		<div class="bg-white shadow rounded-lg p-6 mb-8">
-			<div class="flex flex-col lg:flex-row lg:items-center gap-4">
-				<div class="flex-1">
-					<label for="search" class="sr-only">Search books</label>
-					<div class="relative">
-						<div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-							<svg class="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
-							</svg>
-						</div>
-						<input
-							type="text"
-							id="search"
-							bind:value={searchTerm}
-							class="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md leading-5 bg-white placeholder-gray-500 focus:outline-none focus:placeholder-gray-400 focus:ring-1 focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-							placeholder="Search by title, author, or genre..."
-						/>
-					</div>
+		<div class="filters-section">
+			<div class="search-container">
+				<div class="search-input-wrapper">
+					<svg class="search-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+					</svg>
+					<input
+						type="text"
+						bind:value={searchTerm}
+						class="search-input"
+						placeholder="Search by title, author, or genre..."
+					/>
+				</div>
+			</div>
+			
+			<div class="filters-container">
+				<div class="filter-group">
+					<select bind:value={selectedGenre} class="filter-select">
+						<option value="">All Genres</option>
+						{#each genres as genre}
+							<option value={genre}>{genre}</option>
+						{/each}
+					</select>
 				</div>
 				
-				<div class="flex flex-col sm:flex-row gap-4">
-					<div>
-						<label for="genre-filter" class="sr-only">Filter by genre</label>
-						<select
-							id="genre-filter"
-							bind:value={selectedGenre}
-							class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-						>
-							<option value="">All Genres</option>
-							{#each genres as genre}
-								<option value={genre}>{genre}</option>
-							{/each}
-						</select>
-					</div>
-					
-					<div>
-						<label for="condition-filter" class="sr-only">Filter by condition</label>
-						<select
-							id="condition-filter"
-							bind:value={selectedCondition}
-							class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-						>
-							<option value="">All Conditions</option>
-							{#each conditions as condition}
-								<option value={condition}>{condition.replace('_', ' ')}</option>
-							{/each}
-						</select>
-					</div>
-					
-					{#if searchTerm || selectedGenre || selectedCondition}
-						<button
-							type="button"
-							on:click={clearFilters}
-							class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-						>
-							Clear
-						</button>
-					{/if}
+				<div class="filter-group">
+					<select bind:value={selectedCondition} class="filter-select">
+						<option value="">All Conditions</option>
+						{#each conditions as condition}
+							<option value={condition}>{getConditionDisplayName(condition)}</option>
+						{/each}
+					</select>
 				</div>
+				
+				{#if searchTerm || selectedGenre || selectedCondition}
+					<button type="button" on:click={clearFilters} class="btn-clear">
+						Clear
+					</button>
+				{/if}
 			</div>
 		</div>
 	{/if}
@@ -210,15 +206,35 @@
 				<h3 class="mt-2 text-sm font-medium text-gray-900">No books yet</h3>
 				<p class="mt-1 text-sm text-gray-500">Get started by adding your first book.</p>
 				<div class="mt-6">
-					<a
-						href="/app/books/add"
-						class="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-					>
-						<svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+					<button type="button" class="btn-add" on:click={async () => {
+						console.log('Add Your First Book clicked');
+						console.log('Auth state:', $auth.user ? 'Logged in' : 'Not logged in');
+						console.log('Auth user:', $auth.user);
+						console.log('Window location:', window.location.href);
+						
+						if (!$auth.user) {
+							console.log('User not authenticated, redirecting to login');
+							goto('/auth/login?redirectTo=/app/books/add');
+							return;
+						}
+						
+						console.log('User authenticated, navigating to /app/books/add');
+						
+						// Try direct navigation first
+						try {
+							await goto('/app/books/add');
+							console.log('Navigation completed successfully');
+						} catch (error) {
+							console.error('Navigation failed:', error);
+							// Fallback to window.location for debugging
+							window.location.href = '/app/books/add';
+						}
+					}}>
+						<svg class="btn-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
 						</svg>
 						Add Your First Book
-					</a>
+					</button>
 				</div>
 			{:else}
 				<svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -227,11 +243,7 @@
 				<h3 class="mt-2 text-sm font-medium text-gray-900">No books found</h3>
 				<p class="mt-1 text-sm text-gray-500">Try adjusting your search or filter criteria.</p>
 				<div class="mt-6">
-					<button
-						type="button"
-						on:click={clearFilters}
-						class="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-blue-600 bg-blue-100 hover:bg-blue-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-					>
+					<button type="button" on:click={clearFilters} class="btn-clear">
 						Clear Filters
 					</button>
 				</div>
@@ -239,14 +251,16 @@
 		</div>
 	<!-- Books Grid -->
 	{:else}
-		<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+		<div class="grid grid-cols-1 sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-8">
 			{#each filteredBooks as book (book.id)}
-				<BookCard
-					{book}
-					on:edit={handleEditBook}
-					on:delete={handleDeleteBook}
-					on:view-details={handleViewDetails}
-				/>
+				<div class="flex">
+					<BookCard
+						{book}
+						on:edit={handleEditBook}
+						on:delete={handleDeleteBook}
+						on:view-details={handleViewDetails}
+					/>
+				</div>
 			{/each}
 		</div>
 	{/if}
@@ -254,8 +268,8 @@
 
 <!-- Edit Book Modal -->
 {#if showEditModal && editingBook}
-	<div class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50" on:click={handleEditCancel} role="dialog" aria-modal="true">
-		<div class="relative top-20 mx-auto p-5 border w-11/12 md:w-3/4 lg:w-1/2 shadow-lg rounded-md bg-white" on:click|stopPropagation>
+	<div class="modal-overlay" on:click={handleEditCancel} role="dialog" aria-modal="true">
+		<div class="modal-container" on:click|stopPropagation>
 			<BookEditForm 
 				book={editingBook}
 				onSave={handleEditSave}
@@ -264,3 +278,272 @@
 		</div>
 	</div>
 {/if}
+
+<style>
+	/* Page Header */
+	.page-header {
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+		margin-bottom: 2rem;
+		gap: 1rem;
+	}
+
+	@media (max-width: 640px) {
+		.page-header {
+			flex-direction: column;
+			align-items: flex-start;
+			gap: 1.5rem;
+		}
+	}
+
+	.header-content {
+		flex: 1;
+	}
+
+	.page-title {
+		color: #2d3748;
+		font-size: 2rem;
+		font-weight: 700;
+		margin-bottom: 0.5rem;
+		line-height: 1.2;
+	}
+
+	.page-subtitle {
+		color: #718096;
+		font-size: 1rem;
+		margin: 0;
+	}
+
+	.header-actions {
+		flex-shrink: 0;
+	}
+
+	.btn-add {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.5rem;
+		padding: 0.75rem 1.5rem;
+		background: linear-gradient(135deg, #8B2635 0%, #722F37 100%);
+		color: #F5F5DC;
+		text-decoration: none;
+		border-radius: 8px;
+		font-weight: 600;
+		font-size: 0.95rem;
+		box-shadow: 0 4px 12px rgba(139, 38, 53, 0.3);
+		transition: all 0.2s ease;
+		border: none;
+		cursor: pointer;
+		z-index: 10;
+		position: relative;
+	}
+
+	.btn-add:hover {
+		background: linear-gradient(135deg, #722F37 0%, #8B2635 100%);
+		transform: translateY(-2px);
+		box-shadow: 0 6px 20px rgba(139, 38, 53, 0.4);
+	}
+
+	.btn-icon {
+		width: 18px;
+		height: 18px;
+		flex-shrink: 0;
+	}
+
+	/* Filters Section */
+	.filters-section {
+		background: white;
+		border: 1px solid #e2e8f0;
+		border-radius: 12px;
+		padding: 1.5rem;
+		margin-bottom: 2rem;
+		box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+	}
+
+	.search-container {
+		margin-bottom: 1rem;
+	}
+
+	.search-input-wrapper {
+		position: relative;
+		max-width: 400px;
+	}
+
+	.search-icon {
+		position: absolute;
+		left: 12px;
+		top: 50%;
+		transform: translateY(-50%);
+		width: 20px;
+		height: 20px;
+		color: #9ca3af;
+		pointer-events: none;
+	}
+
+	.search-input {
+		width: 100%;
+		padding: 0.75rem 1rem 0.75rem 2.5rem;
+		border: 1px solid #d1d5db;
+		border-radius: 8px;
+		font-size: 0.95rem;
+		background: #f8f9fa;
+		transition: all 0.2s ease;
+	}
+
+	.search-input:focus {
+		outline: none;
+		border-color: #8B2635;
+		background: white;
+		box-shadow: 0 0 0 3px rgba(139, 38, 53, 0.1);
+	}
+
+	.search-input::placeholder {
+		color: #9ca3af;
+	}
+
+	.filters-container {
+		display: flex;
+		gap: 1rem;
+		align-items: center;
+		flex-wrap: wrap;
+	}
+
+	@media (max-width: 640px) {
+		.filters-container {
+			flex-direction: column;
+			align-items: stretch;
+			gap: 0.75rem;
+		}
+	}
+
+	.filter-group {
+		flex-shrink: 0;
+	}
+
+	.filter-select {
+		padding: 0.75rem 1rem;
+		border: 1px solid #d1d5db;
+		border-radius: 8px;
+		background: #f8f9fa;
+		font-size: 0.95rem;
+		color: #374151;
+		min-width: 140px;
+		transition: all 0.2s ease;
+		cursor: pointer;
+	}
+
+	.filter-select:focus {
+		outline: none;
+		border-color: #8B2635;
+		background: white;
+		box-shadow: 0 0 0 3px rgba(139, 38, 53, 0.1);
+	}
+
+	.filter-select:hover {
+		background: #f1f3f4;
+	}
+
+	.btn-clear {
+		padding: 0.75rem 1rem;
+		background: #f8f9fa;
+		color: #8B2635;
+		border: 1px solid #e2e8f0;
+		border-radius: 8px;
+		font-size: 0.9rem;
+		font-weight: 500;
+		cursor: pointer;
+		transition: all 0.2s ease;
+		white-space: nowrap;
+	}
+
+	.btn-clear:hover {
+		background: #F5F5DC;
+		border-color: #8B2635;
+		color: #722F37;
+	}
+
+	/* Override Tailwind classes for consistency */
+	:global(.max-w-7xl) {
+		max-width: 1200px;
+	}
+
+	:global(.mx-auto) {
+		margin-left: auto;
+		margin-right: auto;
+	}
+
+	:global(.px-4) {
+		padding-left: 1rem;
+		padding-right: 1rem;
+	}
+
+	:global(.py-8) {
+		padding-top: 2rem;
+		padding-bottom: 2rem;
+	}
+
+	@media (min-width: 640px) {
+		:global(.sm\:px-6) {
+			padding-left: 1.5rem;
+			padding-right: 1.5rem;
+		}
+	}
+
+	@media (min-width: 1024px) {
+		:global(.lg\:px-8) {
+			padding-left: 2rem;
+			padding-right: 2rem;
+		}
+	}
+
+	/* Modal Styles */
+	.modal-overlay {
+		position: fixed;
+		top: 0;
+		left: 0;
+		right: 0;
+		bottom: 0;
+		background: rgba(0, 0, 0, 0.5);
+		backdrop-filter: blur(2px);
+		z-index: 9999;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		padding: 1rem;
+		overflow-y: auto;
+	}
+
+	.modal-container {
+		background: white;
+		border-radius: 12px;
+		box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+		max-width: 90%;
+		width: 600px;
+		max-height: 90vh;
+		overflow-y: auto;
+		animation: modal-appear 0.2s ease-out;
+	}
+
+	@keyframes modal-appear {
+		from {
+			opacity: 0;
+			transform: scale(0.95) translateY(-10px);
+		}
+		to {
+			opacity: 1;
+			transform: scale(1) translateY(0);
+		}
+	}
+
+	@media (max-width: 768px) {
+		.modal-container {
+			max-width: 95%;
+			width: auto;
+			margin: 0.5rem;
+		}
+
+		.modal-overlay {
+			padding: 0.5rem;
+		}
+	}
+</style>
