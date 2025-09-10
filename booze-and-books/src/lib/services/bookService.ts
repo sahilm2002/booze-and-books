@@ -51,6 +51,16 @@ export class BookService {
 		limit = 50,
 		offset = 0
 	): Promise<BookWithOwner[]> {
+        // Validate userId
+        const validUserId = (currentUserId || '').trim();
+        const UUID_V4_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+        if (!UUID_V4_REGEX.test(validUserId)) {
+          throw new Error(`Invalid currentUserId format: ${JSON.stringify(currentUserId)}`);
+        }
+
+        if (import.meta.env.DEV) {
+            console.debug('BookService: validated userId for discovery');
+        }
 		const { data, error } = await supabase
 			.from('books')
 			.select(`
@@ -62,7 +72,7 @@ export class BookService {
 				)
 			`)
 			.eq('is_available', true)
-			.neq('owner_id', currentUserId)
+			.neq('owner_id', validUserId)
 			.order('created_at', { ascending: false })
 			.range(offset, offset + limit - 1);
 
@@ -409,5 +419,16 @@ export class BookService {
 		}
 
 		return !!data;
+	}
+
+	/**
+	 * Alias for getAvailableBooksForDiscovery (for backward compatibility)
+	 */
+	static async getAvailableBooksForSwapping(
+		currentUserId: string,
+		limit = 50,
+		offset = 0
+	): Promise<BookWithOwner[]> {
+		return this.getAvailableBooksForDiscovery(currentUserId, limit, offset);
 	}
 }

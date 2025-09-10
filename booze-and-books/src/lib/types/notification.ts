@@ -1,7 +1,9 @@
 export enum NotificationType {
 	SWAP_REQUEST = 'SWAP_REQUEST',
 	SWAP_ACCEPTED = 'SWAP_ACCEPTED',
-	SWAP_DECLINED = 'SWAP_DECLINED'
+	SWAP_COUNTER_OFFER = 'SWAP_COUNTER_OFFER',
+	SWAP_CANCELLED = 'SWAP_CANCELLED',
+	SWAP_COMPLETED = 'SWAP_COMPLETED'
 }
 
 export interface Notification {
@@ -26,7 +28,9 @@ export interface NotificationInput {
 export type NotificationData = 
 	| SwapRequestNotificationData
 	| SwapAcceptedNotificationData
-	| SwapDeclinedNotificationData;
+	| SwapCounterOfferNotificationData
+	| SwapCancelledNotificationData
+	| SwapCompletedNotificationData;
 
 export interface SwapRequestNotificationData {
 	swap_request_id: string;
@@ -40,8 +44,22 @@ export interface SwapAcceptedNotificationData {
 	owner_id: string;
 }
 
-export interface SwapDeclinedNotificationData {
+export interface SwapCounterOfferNotificationData {
 	swap_request_id: string;
 	book_id: string;
+	counter_offered_book_id: string;
 	owner_id: string;
+}
+
+export interface SwapCancelledNotificationData {
+	swap_request_id: string;
+	book_id: string;
+	cancelled_by: string;
+}
+
+export interface SwapCompletedNotificationData {
+	swap_request_id: string;
+	book_id: string;
+	rating: number;
+	completed_by: string;
 }

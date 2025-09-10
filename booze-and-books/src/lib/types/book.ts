@@ -1,6 +1,5 @@
 export enum BookCondition {
-	AS_NEW = 'AS_NEW',
-	FINE = 'FINE',
+	LIKE_NEW = 'LIKE_NEW',
 	VERY_GOOD = 'VERY_GOOD',
 	GOOD = 'GOOD',
 	FAIR = 'FAIR',
@@ -16,7 +15,6 @@ export interface Book {
 	condition: BookCondition;
 	genre: string | null;
 	description: string | null;
-	thumbnail_url: string | null;
 	google_volume_id: string | null;
 	is_available: boolean;
 	created_at: string;
@@ -30,7 +28,6 @@ export interface BookInput {
 	condition: BookCondition;
 	genre?: string | null;
 	description?: string | null;
-	thumbnail_url?: string | null;
 	google_volume_id?: string | null;
 	is_available?: boolean;
 }
@@ -42,7 +39,6 @@ export interface BookUpdate {
 	condition?: BookCondition;
 	genre?: string | null;
 	description?: string | null;
-	thumbnail_url?: string | null;
 	is_available?: boolean;
 }
 
