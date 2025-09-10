@@ -132,4 +132,85 @@ export class NotificationService {
 
 		return data;
 	}
+
+	// Send email notification for swap approval
+	static async sendSwapApprovalNotification(
+		swapRequestId: string,
+		requesterEmail: string,
+		ownerEmail: string,
+		bookTitle: string
+	): Promise<void> {
+		try {
+			// In a real application, this would trigger an email service
+			// For now, we'll create in-app notifications and log the email intent
+			
+			console.log('Email notification would be sent:');
+			console.log(`To requester (${requesterEmail}): Your swap request for "${bookTitle}" has been approved!`);
+			console.log(`To owner (${ownerEmail}): You approved a swap request for "${bookTitle}". Contact the requester to coordinate the exchange.`);
+
+			// Create in-app notifications as a fallback
+			const { data: swapRequest } = await supabase
+				.from('swap_requests')
+				.select('requester_id, owner_id')
+				.eq('id', swapRequestId)
+				.single();
+
+			if (swapRequest) {
+				// Notify requester
+				await this.createNotification({
+					user_id: swapRequest.requester_id,
+					type: 'swap_approved',
+					title: 'Swap Request Approved!',
+					message: `Your swap request for "${bookTitle}" has been approved. Check your swaps page for contact information.`,
+					data: { swap_request_id: swapRequestId }
+				});
+
+				// Notify owner  
+				await this.createNotification({
+					user_id: swapRequest.owner_id,
+					type: 'swap_approved',
+					title: 'Swap Request Approved',
+					message: `You approved a swap request for "${bookTitle}". The requester's contact information is now available.`,
+					data: { swap_request_id: swapRequestId }
+				});
+			}
+
+		} catch (error) {
+			console.error('Failed to send swap approval notifications:', error);
+			// Don't throw error - notifications are not critical
+		}
+	}
+
+	// Send email notification for counter-offer
+	static async sendCounterOfferNotification(
+		swapRequestId: string,
+		requesterEmail: string,
+		bookTitle: string,
+		counterOfferedBookTitle: string
+	): Promise<void> {
+		try {
+			console.log('Email notification would be sent:');
+			console.log(`To requester (${requesterEmail}): The owner made a counter-offer for your request of "${bookTitle}". They're offering "${counterOfferedBookTitle}" instead.`);
+
+			// Create in-app notification
+			const { data: swapRequest } = await supabase
+				.from('swap_requests')
+				.select('requester_id')
+				.eq('id', swapRequestId)
+				.single();
+
+			if (swapRequest) {
+				await this.createNotification({
+					user_id: swapRequest.requester_id,
+					type: 'counter_offer_received',
+					title: 'Counter-Offer Received',
+					message: `The owner made a counter-offer for "${bookTitle}". They're offering "${counterOfferedBookTitle}" instead. Check your swaps to respond.`,
+					data: { swap_request_id: swapRequestId }
+				});
+			}
+
+		} catch (error) {
+			console.error('Failed to send counter-offer notifications:', error);
+		}
+	}
 }

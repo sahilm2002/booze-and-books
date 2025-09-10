@@ -129,7 +129,6 @@ export class GoogleBooksService {
 			authors: volumeInfo.authors || ['Unknown Author'],
 			isbn,
 			description: volumeInfo.description || null,
-			thumbnail_url: thumbnailUrl,
 			google_volume_id: googleBook.id,
 			genre
 		};
@@ -141,8 +140,12 @@ export class GoogleBooksService {
 	static formatSearchResults(results: GoogleBookResult[]) {
 		return results.map(book => {
 			const extracted = this.extractBookData(book);
+			const thumbnailUrl = book.volumeInfo.imageLinks?.thumbnail || 
+							   book.volumeInfo.imageLinks?.smallThumbnail || null;
+			
 			return {
 				...extracted,
+				thumbnail_url: thumbnailUrl,
 				displayText: `${extracted.title} by ${extracted.authors.join(', ')}`,
 				googleBookId: book.id
 			};

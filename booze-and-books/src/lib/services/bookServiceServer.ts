@@ -48,7 +48,7 @@ export class BookServiceServer {
 	}
 
 	/**
-	 * Get available books for discovery (excluding current user's books)
+	 * Get available books for discovery (excluding current user's books and books in pending swaps)
 	 */
 	static async getAvailableBooksForDiscovery(
 		supabase: SupabaseClient,
@@ -56,18 +56,25 @@ export class BookServiceServer {
 		limit = 50,
 		offset = 0
 	): Promise<BookWithOwner[]> {
-		const { data, error } = await supabase
-			.from('books')
-			.select(`
-				*,
-				profiles!owner_id (
-					username,
-					full_name,
-					avatar_url
-				)
+    const validUserId = (currentUserId || '').trim();
+    const UUID_V4_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+    if (!UUID_V4_REGEX.test(validUserId)) {
+      throw new Error(`Invalid currentUserId format: ${JSON.stringify(currentUserId)}`);
+    }
+    if (process.env.NODE_ENV === 'development') {
+      console.debug('BookServiceServer: validated userId for discovery');
+    }
+    // First get books that are involved in pending swaps
 			`)
 			.eq('is_available', true)
-			.neq('owner_id', currentUserId)
+			.neq('owner_id', validUserId);
+
+		// Exclude books that are in pending swaps if we have any
+		if (excludedBookIds.length > 0) {
+			queryBuilder = queryBuilder.not('id', 'in', `(${excludedBookIds.join(',')})`);
+		}
+
+		const { data, error } = await queryBuilder
 			.order('created_at', { ascending: false })
 			.range(offset, offset + limit - 1);
 

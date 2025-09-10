@@ -19,7 +19,12 @@ export const swapRequestInputSchema = z.object({
 		.max(500, 'Message must be 500 characters or less')
 		.trim()
 		.optional()
-		.nullable())
+		.nullable()),
+	
+	offered_book_id: z.string()
+		.uuid('Invalid offered book ID format')
+		.optional()
+		.nullable()
 });
 
 // Validation schema for swap request updates (status changes)
@@ -27,7 +32,11 @@ export const swapRequestUpdateSchema = z.object({
 	status: z.nativeEnum(SwapStatus, {
 		errorMap: () => ({ message: 'Invalid swap status' })
 	}),
-	completion_date: z.string().datetime().optional().nullable()
+	completion_date: z.string().datetime().optional().nullable(),
+	counter_offered_book_id: z.string()
+		.uuid('Invalid counter-offered book ID format')
+		.optional()
+		.nullable()
 });
 
 // Validation schema for swap completion (rating and feedback)
@@ -137,7 +146,7 @@ export function getStatusDisplayName(status: SwapStatus): string {
 	const displayNames: Record<SwapStatus, string> = {
 		[SwapStatus.PENDING]: 'Pending',
 		[SwapStatus.ACCEPTED]: 'Accepted',
-		[SwapStatus.DECLINED]: 'Declined',
+		[SwapStatus.COUNTER_OFFER]: 'Counter Offer',
 		[SwapStatus.CANCELLED]: 'Cancelled',
 		[SwapStatus.COMPLETED]: 'Completed'
 	};
@@ -149,7 +158,7 @@ export function getStatusColor(status: SwapStatus): string {
 	const colors: Record<SwapStatus, string> = {
 		[SwapStatus.PENDING]: 'text-yellow-600 bg-yellow-100',
 		[SwapStatus.ACCEPTED]: 'text-green-600 bg-green-100',
-		[SwapStatus.DECLINED]: 'text-red-600 bg-red-100',
+		[SwapStatus.COUNTER_OFFER]: 'text-purple-600 bg-purple-100',
 		[SwapStatus.CANCELLED]: 'text-gray-600 bg-gray-100',
 		[SwapStatus.COMPLETED]: 'text-blue-600 bg-blue-100'
 	};
@@ -165,4 +174,28 @@ export function formatRating(rating: number | null): string {
 // Helper function to check if user can complete swap
 export function canCompleteSwap(status: SwapStatus, userId: string, requesterId: string, ownerId: string): boolean {
 	return status === SwapStatus.ACCEPTED && (userId === requesterId || userId === ownerId);
+}
+
+// Helper function to check if user can make counter-offer
+export function canMakeCounterOffer(status: SwapStatus, userId: string, ownerId: string): boolean {
+	return status === SwapStatus.PENDING && userId === ownerId;
+}
+
+// Helper function to check if user can accept counter-offer
+export function canAcceptCounterOffer(status: SwapStatus, userId: string, requesterId: string): boolean {
+	return status === SwapStatus.COUNTER_OFFER && userId === requesterId;
+}
+
+// Helper function to check if user can cancel swap
+export function canCancelSwap(status: SwapStatus, userId: string, requesterId: string, ownerId: string): boolean {
+	return (status === SwapStatus.PENDING || status === SwapStatus.COUNTER_OFFER) && 
+		   (userId === requesterId || userId === ownerId);
+}
+
+// Helper function to validate counter-offer workflow
+export function validateCounterOfferWorkflow(status: SwapStatus, currentStatus: SwapStatus, userId: string, ownerId: string): boolean {
+	if (status === SwapStatus.COUNTER_OFFER) {
+		return currentStatus === SwapStatus.PENDING && userId === ownerId;
+	}
+	return true;
 }
