@@ -314,35 +314,39 @@
 	}
 
 	.cta-button.primary {
-		background: white;
-		color: #4299e1;
+		background: linear-gradient(135deg, #8B2635 0%, #722F37 100%);
+		color: #F5F5DC;
+		border: 2px solid #8B2635;
 	}
 
 	.cta-button.primary:hover {
-		background: #f7fafc;
+		background: linear-gradient(135deg, #722F37 0%, #8B2635 100%);
 		transform: translateY(-2px);
-		box-shadow: 0 8px 25px rgba(0,0,0,0.2);
+		box-shadow: 0 8px 25px rgba(139, 38, 53, 0.4);
 	}
 
 	.cta-button.secondary {
-		background: transparent;
-		color: white;
+		background: linear-gradient(135deg, #D4AF37 0%, #B8941F 100%);
+		color: #8B2635;
+		border: 2px solid #D4AF37;
 	}
 
 	.cta-button.secondary:hover {
-		background: rgba(255,255,255,0.1);
+		background: linear-gradient(135deg, #B8941F 0%, #D4AF37 100%);
 		transform: translateY(-2px);
+		box-shadow: 0 8px 25px rgba(212, 175, 55, 0.4);
 	}
 
 	.cta-button:not(.primary):not(.secondary) {
-		background: white;
-		color: #4299e1;
+		background: linear-gradient(135deg, #8B2635 0%, #722F37 100%);
+		color: #F5F5DC;
+		border: 2px solid #8B2635;
 	}
 
 	.cta-button:not(.primary):not(.secondary):hover {
-		background: #f7fafc;
+		background: linear-gradient(135deg, #722F37 0%, #8B2635 100%);
 		transform: translateY(-2px);
-		box-shadow: 0 8px 25px rgba(0,0,0,0.2);
+		box-shadow: 0 8px 25px rgba(139, 38, 53, 0.4);
 	}
 
 	@media (max-width: 768px) {
