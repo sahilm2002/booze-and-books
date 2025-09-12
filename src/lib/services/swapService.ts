@@ -71,20 +71,20 @@ export class SwapService {
 		}
 
 		// Check if there's already a pending request for this book by this user
-		const { data: existingRequest, error: checkError } = await supabase
+		const { data: existingRequests, error: checkError } = await supabase
 			.from('swap_requests')
 			.select('id, status, offered_book_id')
 			.eq('book_id', input.book_id)
 			.eq('requester_id', requesterId)
-			.eq('status', SwapStatus.PENDING)
-			.single();
+			.eq('status', SwapStatus.PENDING);
 
-		if (checkError && checkError.code !== 'PGRST116') { // PGRST116 = no rows returned
+		if (checkError) {
 			throw new Error(`Failed to check existing requests: ${checkError.message}`);
 		}
 
 		// If there's already a pending request, update it instead of creating a new one
-		if (existingRequest) {
+		if (existingRequests && existingRequests.length > 0) {
+			const existingRequest = existingRequests[0];
 			const { data, error } = await supabase
 				.from('swap_requests')
 				.update({
