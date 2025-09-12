@@ -2,12 +2,12 @@
 	import { onMount } from 'svelte';
 	import { page } from '$app/stores';
 	import SwapRequestCard from '../../../components/swaps/SwapRequestCard.svelte';
-	import { swapStore } from '$lib/stores/swaps';
+	import { swapStore, incomingSwapRequests, outgoingSwapRequests, completedSwapRequests, swapRequestsLoading, swapRequestsError } from '$lib/stores/swaps';
 	import { auth } from '$lib/stores/auth';
 	import type { PageData } from './$types';
 	import type { SwapRequestWithDetails } from '$lib/types/swap';
 
-	export let data: PageData;
+	export const data: PageData = undefined;
 
 	let statusFilter: 'all' | 'pending' | 'accepted' | 'counter_offer' | 'cancelled' | 'completed' = 'all';
 	let typeFilter: 'all' | 'incoming' | 'outgoing' = 'all';
@@ -19,33 +19,36 @@
 			document.title = 'Swap Requests - Booze & Books';
 		}
 		
+		// Check for tab parameter in URL
+		const tabParam = $page.url.searchParams.get('tab');
+		if (tabParam === 'outgoing') {
+			activeTab = 'outgoing';
+		} else if (tabParam === 'incoming') {
+			activeTab = 'incoming';
+		}
+		
 		// Load swap requests using the store
 		await swapStore.loadSwapRequests();
 	});
 
-	// Get all swap requests from store, sorted by date (newest first)
-	$: allSwapRequests = [...$swapStore.incoming, ...$swapStore.outgoing]
-		.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+	// Filter requests based on status
+	$: filteredIncoming = statusFilter === 'completed' ? [] : $incomingSwapRequests.filter(request => 
+		statusFilter === 'all' || request.status === statusFilter.toUpperCase()
+	);
 
-	// Filter requests based on type and status
-	$: filteredRequests = allSwapRequests.filter(request => {
-		// Filter by type (incoming/outgoing)
-		if (typeFilter !== 'all') {
-			const isIncoming = request.owner_id === $auth.user?.id;
-			const isOutgoing = request.requester_id === $auth.user?.id;
-			
-			if (typeFilter === 'incoming' && !isIncoming) return false;
-			if (typeFilter === 'outgoing' && !isOutgoing) return false;
-		}
-		
-		// Filter by status
-		if (statusFilter === 'all') return true;
-		return request.status === statusFilter.toUpperCase();
-	});
+	$: filteredOutgoing = statusFilter === 'completed' ? [] : $outgoingSwapRequests.filter(request => 
+		statusFilter === 'all' || request.status === statusFilter.toUpperCase()
+	);
 
-	async function handleRequestUpdated(event: CustomEvent<SwapRequestWithDetails>) {
-		// Reload swap requests from the store to get the latest data
-		await swapStore.loadSwapRequests();
+	// For completed swaps, show all completed swaps regardless of tab
+	$: filteredCompleted = statusFilter === 'completed' ? $completedSwapRequests : [];
+
+	$: currentRequests = statusFilter === 'completed' ? filteredCompleted : 
+		(activeTab === 'incoming' ? filteredIncoming : filteredOutgoing);
+
+	async function handleRequestUpdated() {
+		// Refresh swap requests from the server
+		await swapStore.refresh();
 	}
 
 	function handleRequestError(event: CustomEvent<string>) {
@@ -66,14 +69,15 @@
 		};
 	}
 
-	$: incomingCounts = getStatusCounts(allSwapRequests, true);
-	$: outgoingCounts = getStatusCounts(allSwapRequests, false);
-	$: allCounts = {
-		pending: incomingCounts.pending + outgoingCounts.pending,
-		accepted: incomingCounts.accepted + outgoingCounts.accepted,
-		cancelled: incomingCounts.cancelled + outgoingCounts.cancelled,
-		completed: incomingCounts.completed + outgoingCounts.completed
-	};
+	$: incomingCounts = getStatusCounts($incomingSwapRequests);
+	$: outgoingCounts = getStatusCounts($outgoingSwapRequests);
+	
+	// For completed count, always show total completed swaps
+	$: completedCount = $completedSwapRequests.length;
+	
+	$: currentCounts = statusFilter === 'completed' ? 
+		{ ...incomingCounts, completed: completedCount } :
+		(activeTab === 'incoming' ? incomingCounts : outgoingCounts);
 </script>
 
 <style>
@@ -449,49 +453,24 @@
 		<div class="filters-header">
 			<h3 class="filters-title">Filters</h3>
 		</div>
-		
-		<!-- Type Filter -->
-		<div style="margin-bottom: 1.5rem;">
-			<h4 style="margin: 0 0 0.75rem 0; font-size: 0.95rem; font-weight: 600; color: #4b5563;">Request Type</h4>
-			<div class="filter-tags">
-				{#each [
-					{ value: 'all', label: `All Requests (${allSwapRequests.length})` },
-					{ value: 'incoming', label: `Incoming (${incomingCounts.pending + incomingCounts.accepted + incomingCounts.cancelled + incomingCounts.completed})` },
-					{ value: 'outgoing', label: `My Requests (${outgoingCounts.pending + outgoingCounts.accepted + outgoingCounts.cancelled + outgoingCounts.completed})` }
-				] as filterOption}
-					<button
-						type="button"
-						class="filter-tag"
-						class:active={typeFilter === filterOption.value}
-						on:click={() => typeFilter = filterOption.value as typeof typeFilter}
-					>
-						{filterOption.label}
-					</button>
-				{/each}
-			</div>
-		</div>
-		
-		<!-- Status Filter -->
-		<div>
-			<h4 style="margin: 0 0 0.75rem 0; font-size: 0.95rem; font-weight: 600; color: #4b5563;">Status</h4>
-			<div class="filter-tags">
-				{#each [
-					{ value: 'all', label: `All (${filteredRequests.length})` },
-					{ value: 'pending', label: `Pending (${allCounts.pending})` },
-					{ value: 'accepted', label: `Accepted (${allCounts.accepted})` },
-					{ value: 'cancelled', label: `Cancelled (${allCounts.cancelled})` },
-					{ value: 'completed', label: `Completed (${allCounts.completed})` }
-				] as filterOption}
-					<button
-						type="button"
-						class="filter-tag"
-						class:active={statusFilter === filterOption.value}
-						on:click={() => statusFilter = filterOption.value as typeof statusFilter}
-					>
-						{filterOption.label}
-					</button>
-				{/each}
-			</div>
+		<div class="filter-tags">
+			{#each [
+				{ value: 'all', label: `All (${currentRequests.length})` },
+				{ value: 'pending', label: `Pending (${currentCounts.pending})` },
+				{ value: 'accepted', label: `Accepted (${currentCounts.accepted})` },
+				{ value: 'counter_offer', label: `Counter Offer (${currentCounts.counter_offer})` },
+				{ value: 'cancelled', label: `Cancelled (${currentCounts.cancelled})` },
+				{ value: 'completed', label: `Completed (${completedCount})` }
+			] as filterOption}
+				<button
+					type="button"
+					class="filter-tag"
+					class:active={statusFilter === filterOption.value}
+					on:click={() => statusFilter = filterOption.value}
+				>
+					{filterOption.label}
+				</button>
+			{/each}
 		</div>
 	</div>
 
@@ -551,12 +530,14 @@
 			</div>
 		{:else}
 			<div class="requests-grid">
-				{#each filteredRequests as request (request.id)}
-					{@const isIncoming = request.owner_id === $auth.user?.id}
-					
+				{#each currentRequests as request (request.id)}
+					{@const currentUser = $auth.user}
+					{@const requestType = statusFilter === 'completed' ? 
+						(currentUser?.id === request.requester_id ? 'outgoing' : 'incoming') : 
+						activeTab}
 					<SwapRequestCard
-						swapRequest={request}
-						{isIncoming}
+						{request}
+						type={requestType}
 						on:updated={handleRequestUpdated}
 						on:error={handleRequestError}
 					/>
