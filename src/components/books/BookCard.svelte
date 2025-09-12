@@ -1,15 +1,14 @@
 <script lang="ts">
 	import { createEventDispatcher } from 'svelte';
 	import type { Book, BookWithOwner } from '$lib/types/book';
-	import type { SwapRequestWithDetails } from '$lib/types/swap';
-	import { SwapStatus } from '$lib/types/swap';
+	import type { SwapRequestWithBook } from '$lib/types/swap';
+import { SwapStatus } from '$lib/types/swap';
 	import { getConditionDisplayName } from '$lib/validation/book';
 	import { user } from '$lib/stores/auth';
 	import { bookStore } from '$lib/stores/books';
 	import { SwapService } from '$lib/services/swapService';
 	import ConditionIndicator from './ConditionIndicator.svelte';
-	import SwapRequestDialog from '../swaps/SwapRequestDialog.svelte';
-	import CocktailGenerator from '../cocktails/CocktailGenerator.svelte';
+	import BookSelectionModal from './BookSelectionModal.svelte';
 
 	export let book: Book | BookWithOwner;
 	export let showActions = true;
@@ -39,11 +38,10 @@
 	$: canRequestSwap = enableSwapRequests && !isOwner && isAvailable && $user?.id;
 
 	let isToggling = false;
-	let showSwapRequestDialog = false;
+	let showBookSelectionModal = false;
 	let isCreatingSwapRequest = false;
-	let existingSwapRequest: SwapRequestWithDetails | null = null;
+	let existingSwapRequest: SwapRequestWithBook | null = null;
 	let checkingExistingRequest = false;
-	let showCocktailGenerator = false;
 
 	// Check for existing swap request when user changes
 	$: if ($user?.id && enableSwapRequests && !isOwner) {
@@ -92,28 +90,9 @@
 		event.preventDefault();
 		
 		isToggling = true;
+		const newAvailability = !isAvailable;
 		
 		try {
-			// Check for any pending swap requests for this book (both incoming and outgoing)
-			if (!$user?.id) return;
-			const swapData = await SwapService.getSwapRequestsForUser($user.id);
-			const hasPendingRequests = [
-				...(swapData?.incoming || []),
-				...(swapData?.outgoing || [])
-			].some(req => 
-				req.book?.id === book.id && 
-				['PENDING', 'ACCEPTED'].includes(req.status)
-			);
-			
-			if (hasPendingRequests) {
-				dispatch('notification', {
-					type: 'error',
-					message: 'Cannot change availability while there are ongoing swap requests for this book.'
-				});
-				return;
-			}
-			
-			const newAvailability = !isAvailable;
 			const success = await bookStore.toggleAvailability(book.id, newAvailability);
 			if (success) {
 				// Update the local book object
@@ -121,10 +100,6 @@
 			}
 		} catch (error) {
 			console.error('Failed to toggle availability:', error);
-			dispatch('notification', {
-				type: 'error',
-				message: 'Failed to update availability. Please try again.'
-			});
 		} finally {
 			isToggling = false;
 		}
@@ -140,7 +115,7 @@
 		});
 		
 		if (canRequestSwap && !existingSwapRequest) {
-			showSwapRequestDialog = true;
+			showBookSelectionModal = true;
 		} else {
 			console.log('Swap request blocked:', {
 				canRequestSwap,
@@ -154,9 +129,7 @@
 		if (!existingSwapRequest?.id || !$user?.id) return;
 
 		try {
-			// Use the swapStore to cancel the request for consistency
-			const { swapStore } = await import('$lib/stores/swaps');
-			await swapStore.cancelSwapRequest(existingSwapRequest.id);
+			await SwapService.updateSwapRequestStatus(existingSwapRequest.id, SwapStatus.CANCELLED, $user.id);
 			existingSwapRequest = null;
 			
 			dispatch('notification', {
@@ -172,40 +145,57 @@
 		}
 	}
 
-	function handleSwapRequestSuccess() {
-		// Refresh existing request status after successful creation
-		checkForExistingRequest();
+	async function handleBookSelection(event: CustomEvent<{ book: Book }>) {
+		const offeredBook = event.detail.book;
 		
-		dispatch('notification', {
-			type: 'success',
-			message: `Swap request sent for "${book.title}"`
-		});
+		if (!$user?.id) {
+			dispatch('notification', {
+				type: 'error',
+				message: 'You must be logged in to create swap requests'
+			});
+			return;
+		}
 
-		dispatch('swapRequested', {
-			requestedBook: book,
-			message: `Swap request created for "${book.title}"`
-		});
-	}
+		isCreatingSwapRequest = true;
+		
+		try {
+			const swapRequest = await SwapService.createSwapRequest(
+				{
+					book_id: book.id,
+					offered_book_id: offeredBook.id,
+					message: `I'd like to swap "${offeredBook.title}" for "${book.title}"`
+				},
+				$user.id
+			);
 
-	function handleSwapRequestError(event: CustomEvent<string>) {
-		dispatch('notification', {
-			type: 'error',
-			message: event.detail
-		});
-	}
+			dispatch('notification', {
+				type: 'success',
+				message: `Swap request sent! You offered "${offeredBook.title}" for "${book.title}"`
+			});
 
-	function handleSwapRequestClose() {
-		showSwapRequestDialog = false;
-	}
+			// Refresh existing request status after successful creation
+			await checkForExistingRequest();
 
-	function handleCocktailGenerator() {
-		if ($user?.id) {
-			showCocktailGenerator = true;
+			dispatch('swapRequested', {
+				requestedBook: book,
+				offeredBook: offeredBook,
+				message: `Swap request created for "${book.title}"`
+			});
+
+		} catch (error) {
+			console.error('Failed to create swap request:', error);
+			dispatch('notification', {
+				type: 'error',
+				message: error instanceof Error ? error.message : 'Failed to create swap request'
+			});
+		} finally {
+			isCreatingSwapRequest = false;
+			showBookSelectionModal = false;
 		}
 	}
 
-	function handleCocktailClose() {
-		showCocktailGenerator = false;
+	function handleModalClose() {
+		showBookSelectionModal = false;
 	}
 
 	function getConditionBadgeClass(condition: string): string {
@@ -250,7 +240,7 @@
 			{/if}
 
 			<div class="condition-section">
-				<ConditionIndicator condition={book.condition} />
+				<ConditionIndicator condition={book.condition} size="small" />
 			</div>
 
 			{#if book.description}
@@ -296,15 +286,6 @@
 		</div>
 	{/if}
 
-	<!-- Cocktail Ideas Button - Top Right -->
-	{#if $user?.id}
-		<div class="cocktail-button-container">
-			<button on:click={handleCocktailGenerator} class="btn-cocktail-top">
-				🍸 Cocktail Ideas
-			</button>
-		</div>
-	{/if}
-
 	<!-- Actions -->
 	{#if showActions}
 		<div class="actions-section">
@@ -336,20 +317,14 @@
 	{/if}
 </div>
 
-<!-- Swap Request Dialog -->
-<SwapRequestDialog 
-	targetBook={book}
-	bind:show={showSwapRequestDialog}
-	on:success={handleSwapRequestSuccess}
-	on:error={handleSwapRequestError}
-	on:close={handleSwapRequestClose}
-/>
-
-<!-- Cocktail Generator Modal -->
-<CocktailGenerator 
-	{book}
-	bind:isOpen={showCocktailGenerator}
-	on:close={handleCocktailClose}
+<!-- Book Selection Modal -->
+<BookSelectionModal 
+	bind:isOpen={showBookSelectionModal}
+	title="Select a Book to Offer"
+	confirmText="Create Swap Request"
+	excludeBookIds={[book.id]}
+	on:select={handleBookSelection}
+	on:close={handleModalClose}
 />
 
 
@@ -362,38 +337,6 @@
 		padding: 1.5rem;
 		margin-bottom: 1rem;
 		transition: all 0.2s;
-		position: relative;
-	}
-
-	.cocktail-button-container {
-		position: absolute;
-		top: 1rem;
-		right: 1rem;
-		z-index: 10;
-	}
-
-	.btn-cocktail-top {
-		background: #fef5e7;
-		color: #d69e2e;
-		border: 1px solid #f6e05e;
-		padding: 0.4rem 0.8rem;
-		border-radius: 6px;
-		font-size: 0.8rem;
-		font-weight: 500;
-		cursor: pointer;
-		transition: all 0.2s;
-		display: flex;
-		align-items: center;
-		gap: 0.25rem;
-		box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-	}
-
-	.btn-cocktail-top:hover {
-		background: #ed8936;
-		color: white;
-		border-color: #ed8936;
-		transform: translateY(-1px);
-		box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
 	}
 
 	.book-card:hover {
@@ -687,26 +630,6 @@
 		color: white;
 	}
 
-	.btn-cocktail {
-		background: #fef5e7;
-		color: #d69e2e;
-		border: 1px solid #f6e05e;
-		padding: 0.5rem 1rem;
-		border-radius: 6px;
-		font-size: 0.85rem;
-		font-weight: 500;
-		cursor: pointer;
-		transition: all 0.2s;
-		display: flex;
-		align-items: center;
-		gap: 0.25rem;
-	}
-
-	.btn-cocktail:hover {
-		background: #ed8936;
-		color: white;
-		border-color: #ed8936;
-	}
 
 	.btn-spinner {
 		width: 16px;
