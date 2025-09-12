@@ -1,1471 +1,380 @@
 <script lang="ts">
+	// Force hot reload - changes applied
 	import { createEventDispatcher } from 'svelte';
-	import { goto } from '$app/navigation';
-	import { auth } from '$lib/stores/auth';
-	import { profile } from '$lib/stores/profile';
-	import { swapStore } from '$lib/stores/swaps';
-	import ConditionIndicator from '../books/ConditionIndicator.svelte';
-	import SwapBookCard from './SwapBookCard.svelte';
-	import type { SwapRequestWithDetails } from '$lib/types/swap';
 	import { 
-		SwapStatus,
-		getSwapStatusDisplayName, 
-		getSwapStatusColor,
-		canUserCancelSwap,
-		canUserAcceptSwap,
-		canUserCreateCounterOffer,
-		canUserAcceptCounterOffer,
-		canUserCompleteSwap,
-		getCompletionStatusMessage,
-		getDetailedCompletionStatus,
-		getExchangedBooks
-	} from '$lib/types/swap';
+		getStatusDisplayName, 
+		getStatusColor, 
+		formatRating, 
+		canCompleteSwap,
+		canMakeCounterOffer,
+		canAcceptCounterOffer,
+		canCancelSwap
+	} from '$lib/validation/swap';
+	import { SwapStatus } from '$lib/types/swap';
+	import { swapStore } from '$lib/stores/swaps';
+	import { auth } from '$lib/stores/auth';
+	import SwapCompletionDialog from './SwapCompletionDialog.svelte';
+	import BookSelectionModal from '../books/BookSelectionModal.svelte';
+	import ConditionIndicator from '../books/ConditionIndicator.svelte';
+	import type { SwapRequestWithBook, SwapCompletion } from '$lib/types/swap';
+	import type { Book } from '$lib/types/book';
 
-	export let swapRequest: SwapRequestWithDetails;
-	export let isIncoming: boolean = false; // true if this user is receiving the request
+	export let request: SwapRequestWithBook;
+	export let type: 'incoming' | 'outgoing' = 'incoming';
+	
+	
 
 	const dispatch = createEventDispatcher<{
-		updated: SwapRequestWithDetails;
-		error: string;
+		updated: void;
 	}>();
 
-	let loading = false;
-	let showCounterOfferDialog = false;
-	let showCompletionDialog = false;
-	let counterOfferBookId = '';
-	let counterOfferMessage = '';
-	let userBooks: any[] = [];
-	let loadingUserBooks = false;
-	let completionFeedback = '';
-
 	$: currentUser = $auth.user;
-	$: canAccept = currentUser && canUserAcceptSwap(swapRequest, currentUser.id);
-	$: canAcceptCounterOffer = currentUser && canUserAcceptCounterOffer(swapRequest, currentUser.id);
-	$: canCreateCounterOffer = currentUser && canUserCreateCounterOffer(swapRequest, currentUser.id);
-	$: canCancel = currentUser && canUserCancelSwap(swapRequest, currentUser.id);
-	$: canComplete = currentUser && canUserCompleteSwap(swapRequest, currentUser.id);
-	$: statusColor = getSwapStatusColor(swapRequest.status);
-	$: statusDisplay = getSwapStatusDisplayName(swapRequest.status);
-	$: completionMessage = currentUser ? getCompletionStatusMessage(swapRequest, currentUser.id) : null;
-	$: exchangedBooks = getExchangedBooks(swapRequest);
-	$: otherUser = getOtherUserProfile();
+	$: isRequester = currentUser?.id === request.requester_id;
+	$: isOwner = currentUser?.id === request.owner_id;
+	$: isPending = request.status === SwapStatus.PENDING;
+	$: isCounterOffer = request.status === SwapStatus.COUNTER_OFFER;
+	$: isAccepted = request.status === SwapStatus.ACCEPTED;
+	$: isCompleted = request.status === SwapStatus.COMPLETED;
+	$: isCancelled = request.status === SwapStatus.CANCELLED;
+	$: statusDisplay = getStatusDisplayName(request.status);
+	$: statusColor = getStatusColor(request.status);
+	$: canComplete = canCompleteSwap(request.status, currentUser?.id || '', request.requester_id, request.owner_id);
+	$: canMakeCounter = canMakeCounterOffer(request.status, currentUser?.id || '', request.owner_id);
+	$: canAcceptCounter = canAcceptCounterOffer(request.status, currentUser?.id || '', request.requester_id);
+	$: canCancel = canCancelSwap(request.status, currentUser?.id || '', request.requester_id, request.owner_id);
 
-
-	// Get the books that will actually be exchanged
-	$: actualRequestedBook = swapRequest.status === SwapStatus.COUNTER_OFFER && swapRequest.counter_offered_book 
-		? swapRequest.counter_offered_book 
-		: swapRequest.book;
+	let isLoading = false;
+	let showCompletionDialog = false;
+	let showCounterOfferModal = false;
+	let imageLoadFailed = false;
 
 	async function handleAccept() {
-		if (!currentUser || loading) return;
+		if (!(isPending && isOwner) && !(isCounterOffer && isRequester)) return;
 		
-		loading = true;
+		isLoading = true;
 		try {
-			await swapStore.acceptSwapRequest(swapRequest.id);
-			dispatch('updated', swapRequest);
+			await swapStore.acceptSwapRequest(request.id);
+			dispatch('updated');
 		} catch (error) {
-			dispatch('error', error instanceof Error ? error.message : 'Failed to accept swap request');
+			console.error('Error accepting swap request:', error);
 		} finally {
-			loading = false;
+			isLoading = false;
 		}
 	}
 
 	async function handleCancel() {
-		if (!currentUser || loading) return;
+		if (!canCancel) return;
 		
-		loading = true;
+		isLoading = true;
 		try {
-			await swapStore.cancelSwapRequest(swapRequest.id);
-			dispatch('updated', swapRequest);
+			await swapStore.cancelSwapRequest(request.id);
+			dispatch('updated');
 		} catch (error) {
-			dispatch('error', error instanceof Error ? error.message : 'Failed to cancel swap request');
+			console.error('Error cancelling swap request:', error);
 		} finally {
-			loading = false;
+			isLoading = false;
 		}
 	}
 
-	async function handleCreateCounterOffer() {
-		if (!currentUser || loading || !counterOfferBookId) return;
-		
-		loading = true;
-		try {
-			await swapStore.createCounterOffer(swapRequest.id, {
-				counter_offered_book_id: counterOfferBookId,
-				counter_offer_message: counterOfferMessage || undefined
-			});
-			showCounterOfferDialog = false;
-			counterOfferBookId = '';
-			counterOfferMessage = '';
-			dispatch('updated', swapRequest);
-		} catch (error) {
-			dispatch('error', error instanceof Error ? error.message : 'Failed to create counter-offer');
-		} finally {
-			loading = false;
+	function handleCounterOffer() {
+		if (canMakeCounter) {
+			showCounterOfferModal = true;
 		}
 	}
 
-	async function handleComplete() {
-		if (!currentUser || loading) return;
+	async function handleCounterOfferSelection(event: CustomEvent<{ book: Book }>) {
+		const counterOfferedBook = event.detail.book;
 		
-		loading = true;
+		isLoading = true;
 		try {
-			await swapStore.completeSwapRequest(swapRequest.id, {
-				feedback: completionFeedback || undefined
-			});
+			await swapStore.makeCounterOffer(request.id, counterOfferedBook.id);
+			showCounterOfferModal = false;
+			dispatch('updated');
+		} catch (error) {
+			console.error('Error making counter offer:', error);
+		} finally {
+			isLoading = false;
+		}
+	}
+
+	function handleCounterOfferModalClose() {
+		showCounterOfferModal = false;
+	}
+
+	function handleCompleteSwap() {
+		if (canComplete) {
+			showCompletionDialog = true;
+		}
+	}
+
+	async function handleCompletionSubmit(event: CustomEvent<SwapCompletion>) {
+		isLoading = true;
+		try {
+			await swapStore.completeSwapRequest(request.id, event.detail);
 			showCompletionDialog = false;
-			completionFeedback = '';
-			dispatch('updated', swapRequest);
+			dispatch('updated');
 		} catch (error) {
-			dispatch('error', error instanceof Error ? error.message : 'Failed to complete swap');
+			console.error('Error completing swap request:', error);
 		} finally {
-			loading = false;
+			isLoading = false;
 		}
 	}
 
-	function formatDate(dateString: string) {
-		return new Date(dateString).toLocaleDateString('en-US', {
-			year: 'numeric',
+	function handleCompletionCancel() {
+		showCompletionDialog = false;
+	}
+
+	function handleImageError(e: Event) {
+		// Only log in development mode to keep production consoles clean
+		if (import.meta.env.DEV) {
+			console.error('Failed to load cover for:', request.book.title, e);
+		}
+		// Set state to show fallback placeholder
+		imageLoadFailed = true;
+	}
+
+	function formatDate(dateString: string): string {
+		const date = new Date(dateString);
+		return new Intl.DateTimeFormat('en-US', {
 			month: 'short',
 			day: 'numeric',
 			hour: '2-digit',
 			minute: '2-digit'
-		});
+		}).format(date);
 	}
 
-	function getOtherUserProfile() {
-		return isIncoming ? swapRequest.requester_profile : swapRequest.owner_profile;
-	}
-
-	function getUserInitials(user: any): string {
-		if (user.full_name) {
-			return user.full_name
-				.split(' ')
-				.map((name: string) => name.charAt(0).toUpperCase())
-				.slice(0, 2)
-				.join('');
-		} else if (user.username) {
-			return user.username.charAt(0).toUpperCase();
-		}
-		return '?';
-	}
-
-	// Load user's available books when counter-offer dialog opens
-	$: if (showCounterOfferDialog && currentUser) {
-		loadUserBooks();
-	}
-
-	// Auto-select the book if there's only one available
-	$: if (userBooks.length === 1 && !counterOfferBookId) {
-		counterOfferBookId = userBooks[0].id;
-	}
-
-	let swapServiceError = false;
-	let swapServiceErrorMessage = '';
-
-	async function loadUserBooks() {
-		if (!currentUser) return;
+	function getRelativeTime(dateString: string): string {
+		const date = new Date(dateString);
+		const now = new Date();
+		const diffInHours = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60));
 		
-		loadingUserBooks = true;
-		swapServiceError = false;
-		swapServiceErrorMessage = '';
+		if (diffInHours < 1) return 'Just now';
+		if (diffInHours < 24) return `${diffInHours}h ago`;
 		
-		try {
-			// Import SwapService for this specific method since it's not in the store
-			// Wrap the dynamic import in a timeout to prevent infinite loading
-			const importPromise = import('$lib/services/swapService');
-			const timeoutPromise = new Promise((_, reject) => 
-				setTimeout(() => reject(new Error('Import timeout - SwapService took too long to load')), 5000)
-			);
-			
-			const { SwapService } = await Promise.race([importPromise, timeoutPromise]) as { SwapService: any };
-			
-			// Also add timeout to the service call itself
-			const booksPromise = SwapService.getUserAvailableBooksForOffering(currentUser.id);
-			const serviceTimeoutPromise = new Promise((_, reject) => 
-				setTimeout(() => reject(new Error('Service timeout - getUserAvailableBooksForOffering took too long')), 5000)
-			);
-			
-			userBooks = await Promise.race([booksPromise, serviceTimeoutPromise]);
-		} catch (error) {
-			// Log the full error for debugging
-			console.error('Error loading SwapService or user books:', error);
-			
-			// Set local error state for UI feedback
-			swapServiceError = true;
-			
-			// Determine user-friendly error message based on error type
-			if (error instanceof Error) {
-				if (error.message.includes('Import timeout') || error.message.includes('Service timeout')) {
-					swapServiceErrorMessage = 'Loading is taking longer than expected. Please try again or refresh the page.';
-				} else if (error.message.includes('Failed to resolve module') || 
-					error.message.includes('import') || 
-					error.message.includes('module')) {
-					swapServiceErrorMessage = 'Unable to load swap functionality. Please refresh the page and try again.';
-				} else {
-					swapServiceErrorMessage = `Failed to load your available books: ${error.message}`;
-				}
-			} else {
-				swapServiceErrorMessage = 'An unexpected error occurred while loading your books. Please try again.';
-			}
-			
-			// Also dispatch error for parent component handling
-			dispatch('error', swapServiceErrorMessage);
-			
-			// Prevent further execution that depends on SwapService
-			return;
-		} finally {
-			loadingUserBooks = false;
-		}
+		const diffInDays = Math.floor(diffInHours / 24);
+		if (diffInDays < 7) return `${diffInDays}d ago`;
+		
+		return formatDate(dateString);
 	}
 </script>
 
-<div id={"swap-" + swapRequest.id} class="swap-card">
-	<div class="swap-header">
-		<div class="status-badge" style="background-color: {statusColor}">
-			{statusDisplay}
-		</div>
-		<div class="swap-date">
-			{formatDate(swapRequest.created_at)}
-		</div>
-	</div>
-
-	<div class="swap-content">
-	<!-- Other User Info -->
-	<div class="user-section">
-		<div class="user-info">
-			{#if otherUser.avatar_url}
-				<img 
-					src={otherUser.avatar_url} 
-					alt="{otherUser.username}'s avatar"
-					class="user-avatar"
-				/>
-			{:else}
-				<div class="user-avatar user-initials">
-					{getUserInitials(otherUser)}
-				</div>
-			{/if}
-			<div class="user-details">
-				<h4>
-					<button 
-						class="username-link"
-						on:click={() => goto(`/app/profile/${otherUser.username}`)}
-						disabled={!otherUser.username}
-					>
-						{otherUser.username || 'Unknown User'}
-					</button>
-				</h4>
-				<div class="user-role">
-					{isIncoming ? 'Requesting your book' : 'Book owner'}
-				</div>
-			</div>
-		</div>
-	</div>
-
-		<!-- Books Exchange -->
-		<div class="books-section">
-			{#if (swapRequest.status === SwapStatus.COUNTER_OFFER || (swapRequest.status === SwapStatus.ACCEPTED && (swapRequest.counter_offered_book || swapRequest.counter_offered_book_id))) && (swapRequest.counter_offered_book || swapRequest.counter_offered_book_id)}
-				<!-- Counter-Offer: Show 3-book flow -->
-				<div class="counter-offer-flow">
-					<!-- Book 1: What they want -->
-					<SwapBookCard 
-						book={swapRequest.book}
-						label={isIncoming ? 'Your book' : 'Their book'}
-						{isIncoming}
-					/>
-
-					<div class="exchange-arrow">
-						<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-							<path d="M7 17L17 7M17 7H7M17 7V17"/>
-						</svg>
-					</div>
-
-					<!-- Book 2: What they originally offered (declined) -->
-					{#if swapRequest.offered_book}
-					<SwapBookCard 
-						book={swapRequest.offered_book}
-						label={isIncoming ? 'Their book (you declined)' : 'Your book (they declined)'}
-						isDeclined={true}
-						{isIncoming}
-					/>
-
-					<div class="exchange-arrow">
-						<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-							<path d="M7 17L17 7M17 7H7M17 7V17"/>
-						</svg>
-					</div>
-					{/if}
-
-					<!-- Book 3: Counter-offered book (new offer) -->
-					{#if swapRequest.counter_offered_book}
-					<SwapBookCard 
-						book={swapRequest.counter_offered_book}
-						label={isIncoming ? 'Your counter-offer' : 'Their counter-offer'}
-						isCounterOffer={true}
-						{isIncoming}
-					/>
-					{:else}
-					<div class="book-item counter-offer-book">
-						<h5>{isIncoming ? 'Your counter-offer' : 'Their counter-offer'} <span class="counter-offer-label">(new)</span></h5>
-						<div class="book-card counter-offer">
-							<div class="book-info">
-								<h6>Counter-offer book details loading...</h6>
-								<p class="book-author">Book ID: {swapRequest.counter_offered_book_id}</p>
-							</div>
-						</div>
-					</div>
-					{/if}
-				</div>
-			{:else}
-				<!-- Regular swap: Show 2-book flow -->
-				<div class="book-exchange">
-					<!-- Requested Book (what they want) -->
-					<SwapBookCard 
-						book={actualRequestedBook}
-						label={isIncoming ? 'Your book' : 'Their book'}
-						{isIncoming}
-					/>
-
-					<div class="exchange-arrow">
-						<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-							<path d="M7 17L17 7M17 7H7M17 7V17"/>
-						</svg>
-					</div>
-
-					<!-- Offered Book (what they're giving) - Only show if exists -->
-					{#if swapRequest.offered_book}
-					<SwapBookCard 
-						book={swapRequest.offered_book}
-						label={isIncoming ? 'Their book' : 'Your book'}
-						{isIncoming}
-					/>
-					{:else}
-					<!-- Simple swap request - no offered book in current schema -->
-					<div class="book-item">
-						<h5>Simple Request</h5>
-						<div class="simple-request-note">
-							<p>This is a simple swap request. The requester is interested in your book.</p>
-						</div>
-					</div>
-					{/if}
-				</div>
-			{/if}
-		</div>
-
-		<!-- Messages -->
-		{#if swapRequest.message}
-			<div class="message-section">
-				<h5>Request Message</h5>
-				<p class="message-text">{swapRequest.message}</p>
-			</div>
-		{/if}
-
-		{#if swapRequest.status === SwapStatus.COUNTER_OFFER && swapRequest.counter_offer_message}
-			<div class="message-section counter-offer">
-				<h5>Counter-Offer Message</h5>
-				<p class="message-text">{swapRequest.counter_offer_message}</p>
-			</div>
-		{/if}
-
-		<!-- Completion Status -->
-		{#if swapRequest.status === SwapStatus.ACCEPTED}
-			{@const detailedStatus = getDetailedCompletionStatus(swapRequest, swapRequest.requester_profile, swapRequest.owner_profile)}
-			<div class="completion-section">
-				<h5>Completion Status</h5>
-				<p class="completion-message">{detailedStatus.message}</p>
-				
-				<div class="completion-checklist">
-					<div class="completion-item" class:completed={detailedStatus.requesterCompleted}>
-						<div class="completion-checkbox">
-							{#if detailedStatus.requesterCompleted}
-								<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-									<polyline points="20,6 9,17 4,12"/>
-								</svg>
-							{:else}
-								<div class="empty-checkbox"></div>
-							{/if}
-						</div>
-						<span class="completion-label">
-							{detailedStatus.requesterName} 
-							{detailedStatus.requesterCompleted ? 'has completed' : 'needs to complete'}
-						</span>
-					</div>
-					
-					<div class="completion-item" class:completed={detailedStatus.ownerCompleted}>
-						<div class="completion-checkbox">
-							{#if detailedStatus.ownerCompleted}
-								<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-									<polyline points="20,6 9,17 4,12"/>
-								</svg>
-							{:else}
-								<div class="empty-checkbox"></div>
-							{/if}
-						</div>
-						<span class="completion-label">
-							{detailedStatus.ownerName} 
-							{detailedStatus.ownerCompleted ? 'has completed' : 'needs to complete'}
-						</span>
-					</div>
-				</div>
-			</div>
-		{/if}
-
-		<!-- Contact Info (for accepted swaps only, not completed) -->
-		{#if swapRequest.status === SwapStatus.ACCEPTED}
-			<div class="contact-section">
-				<h5>Contact Information</h5>
-				<div class="contact-details">
-					<div class="contact-user">
-						<h6>{isIncoming ? 'Requester' : 'Book Owner'}: {otherUser.username}</h6>
-						{#if otherUser.full_name && otherUser.full_name !== otherUser.username}
-							<p><strong>Name:</strong> {otherUser.full_name}</p>
-						{/if}
-						{#if otherUser.location}
-							<p><strong>Location:</strong> {otherUser.location}</p>
-						{/if}
-						<p class="contact-note-small">
-							<strong>Email:</strong> Contact {otherUser.username} directly to exchange email addresses
-						</p>
-					</div>
-					
-					<div class="contact-user">
-						<h6>Your Information</h6>
-						{#if $profile?.email || $auth.user?.email}
-							<p><strong>Email:</strong> {$profile?.email || $auth.user?.email}</p>
-						{/if}
-						{#if $profile?.full_name}
-							<p><strong>Name:</strong> {$profile.full_name}</p>
-						{:else if $auth.user?.user_metadata?.full_name}
-							<p><strong>Name:</strong> {$auth.user.user_metadata.full_name}</p>
-						{/if}
-						{#if $profile?.location}
-							<p><strong>Location:</strong> {$profile.location}</p>
-						{/if}
-					</div>
-				</div>
-				<div class="contact-instructions">
-					<p class="contact-note">
-						<strong>Next Steps:</strong> Contact {otherUser.username} via email to coordinate the physical book exchange. 
-						Exchange phone numbers or arrange a meetup location and time.
-					</p>
-					<p class="safety-note">
-						<strong>Safety Tip:</strong> Meet in a public place for the book exchange.
-					</p>
-				</div>
-			</div>
-		{/if}
-
-		<!-- Feedback (for completed swaps) -->
-		{#if swapRequest.status === SwapStatus.COMPLETED && (swapRequest.requester_feedback || swapRequest.owner_feedback)}
-			<div class="feedback-section">
-				<h5>Swap Feedback</h5>
-				{#if swapRequest.requester_feedback}
-					<p><strong>Requester:</strong> {swapRequest.requester_feedback}</p>
-				{/if}
-				{#if swapRequest.owner_feedback}
-					<p><strong>Owner:</strong> {swapRequest.owner_feedback}</p>
-				{/if}
-			</div>
-		{/if}
-	</div>
-
-	<!-- Action Buttons -->
-	<div class="swap-actions">
-		{#if canAccept}
-			<button 
-				class="btn btn-primary" 
-				on:click={handleAccept}
-				disabled={loading}
-			>
-				{loading ? 'Accepting...' : 'Accept Swap'}
-			</button>
-		{/if}
-
-		{#if canAcceptCounterOffer}
-			<button 
-				class="btn btn-primary" 
-				on:click={handleAccept}
-				disabled={loading}
-			>
-				{loading ? 'Accepting...' : 'Accept Counter-Offer'}
-			</button>
-		{/if}
-
-		{#if canCreateCounterOffer}
-			<button 
-				class="btn btn-secondary" 
-				on:click={() => showCounterOfferDialog = true}
-				disabled={loading}
-			>
-				Counter-Offer
-			</button>
-		{/if}
-
-		{#if canCancel}
-			<button 
-				class="btn btn-outline" 
-				on:click={handleCancel}
-				disabled={loading}
-			>
-				{loading ? 'Cancelling...' : 'Cancel'}
-			</button>
-		{/if}
-
-		{#if canComplete}
-			<button 
-				class="btn btn-success" 
-				on:click={() => showCompletionDialog = true}
-				disabled={loading}
-			>
-				Mark as Completed
-			</button>
-		{/if}
-	</div>
-</div>
-
-<!-- Counter-Offer Dialog -->
-{#if showCounterOfferDialog}
-	<div class="modal-overlay" on:click={() => showCounterOfferDialog = false}>
-		<div class="counter-offer-modal" on:click|stopPropagation>
-			<div class="modal-header">
-				<h2>Create Counter-Offer</h2>
-				<button class="close-btn" on:click={() => showCounterOfferDialog = false} aria-label="Close">
-					<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-						<path d="M18 6L6 18M6 6l12 12"/>
-					</svg>
-				</button>
-			</div>
-
-			<div class="modal-body">
-				<!-- Target Book -->
-				<div class="section">
-					<h3>They Want</h3>
-					<div class="book-card target-book">
-						<div class="book-image">
-							{#if swapRequest.book.google_volume_id}
-								<img 
-									src="https://books.google.com/books/content?id={swapRequest.book.google_volume_id}&printsec=frontcover&img=1&zoom=1&source=gbs_api" 
-									alt="{swapRequest.book.title} cover"
-									class="book-cover"
-									loading="lazy"
-								/>
-							{:else}
-								<div class="cover-placeholder">
-									<svg class="placeholder-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-										<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.746 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/>
-									</svg>
-								</div>
-							{/if}
-						</div>
-						<div class="book-info">
-							<h4>{swapRequest.book.title}</h4>
-							<p class="book-author">{Array.isArray(swapRequest.book.authors) ? swapRequest.book.authors.join(', ') : swapRequest.book.authors}</p>
-							<ConditionIndicator condition={swapRequest.book.condition} />
-						</div>
-					</div>
-				</div>
-
-				<!-- Book Selection -->
-				<div class="section">
-					<h3>Your Counter-Offer</h3>
-					<p class="section-description">Instead of the book they offered, select one of your books to counter-offer:</p>
-					
-					{#if loadingUserBooks}
-						<div class="loading-state">
-							<div class="loading-spinner">
-								<svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-									<circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2" opacity="0.25"/>
-									<path fill="currentColor" opacity="0.75" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"/>
-								</svg>
-							</div>
-							<p>Loading your available books...</p>
-						</div>
-					{:else if swapServiceError}
-						<div class="error-state">
-							<div class="error-icon">
-								<svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-									<circle cx="12" cy="12" r="10"/>
-									<line x1="15" y1="9" x2="9" y2="15"/>
-									<line x1="9" y1="9" x2="15" y2="15"/>
-								</svg>
-							</div>
-							<h4>Unable to Load Books</h4>
-							<p class="error-message">{swapServiceErrorMessage}</p>
-							<button 
-								type="button" 
-								class="btn btn-secondary retry-btn" 
-								on:click={loadUserBooks}
-								disabled={loadingUserBooks}
-							>
-								{loadingUserBooks ? 'Retrying...' : 'Try Again'}
-							</button>
-						</div>
-					{:else if userBooks.length === 0}
-						<div class="empty-state">
-							<div class="empty-icon">
-								<svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-									<path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
-									<path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
-								</svg>
-							</div>
-							<h4>No Available Books</h4>
-							<p>You don't have any available books to offer as counter-offers.</p>
-							<p class="empty-note">Add some books to your collection first, then come back to make counter-offers.</p>
-						</div>
-					{:else}
-						<div class="books-grid">
-							{#each userBooks as book (book.id)}
-								<div 
-									class="book-option" 
-									class:selected={counterOfferBookId === book.id}
-									on:click={() => {
-										if (counterOfferBookId === book.id) {
-											counterOfferBookId = '';
-										} else {
-											counterOfferBookId = book.id;
-										}
-									}}
-									role="button"
-									tabindex="0"
-									on:keydown={(e) => {
-										if (e.key === 'Enter' || e.key === ' ') {
-											e.preventDefault();
-											if (counterOfferBookId === book.id) {
-												counterOfferBookId = '';
-											} else {
-												counterOfferBookId = book.id;
-											}
-										}
-									}}
-								>
-									<div class="book-card">
-										<div class="book-image">
-											{#if book.google_volume_id}
-												<img 
-													src="https://books.google.com/books/content?id={book.google_volume_id}&printsec=frontcover&img=1&zoom=1&source=gbs_api" 
-													alt="{book.title} cover"
-													class="book-cover"
-													loading="lazy"
-												/>
-											{:else}
-												<div class="cover-placeholder">
-													<svg class="placeholder-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-														<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.746 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/>
-													</svg>
-												</div>
-											{/if}
-										</div>
-										<div class="book-info">
-											<h5>{book.title}</h5>
-											<p class="book-author">{Array.isArray(book.authors) ? book.authors.join(', ') : book.authors}</p>
-											<ConditionIndicator condition={book.condition} />
-											{#if book.description}
-												<div class="book-description-container">
-													<p class="book-description">{book.description}</p>
-												</div>
-											{/if}
-										</div>
-									</div>
-									<div class="selection-indicator">
-										<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-											<polyline points="20,6 9,17 4,12"/>
-										</svg>
-									</div>
-								</div>
-							{/each}
-						</div>
-					{/if}
-				</div>
-
-				<!-- Message -->
-				<div class="section">
-					<h3>Counter-Offer Message <span class="optional">(Optional)</span></h3>
-					<textarea 
-						bind:value={counterOfferMessage}
-						placeholder="Explain why you're offering this book instead... What makes it a great alternative?"
-						rows="4"
-						maxlength="500"
-					></textarea>
-					<div class="char-count">{counterOfferMessage.length}/500</div>
-				</div>
-			</div>
-
-			<div class="modal-footer">
-				<button 
-					type="button" 
-					class="btn btn-secondary" 
-					on:click={() => showCounterOfferDialog = false}
-					disabled={loading}
-				>
-					Cancel
-				</button>
-				<button 
-					type="button" 
-					class="btn btn-primary" 
-					on:click={handleCreateCounterOffer}
-					disabled={loading || !counterOfferBookId || userBooks.length === 0}
-				>
-					{#if loading}
-						<svg class="btn-spinner" width="16" height="16" viewBox="0 0 24 24" fill="none">
-							<circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2" opacity="0.25"/>
-							<path fill="currentColor" opacity="0.75" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"/>
-						</svg>
-						Creating Counter-Offer...
-					{:else}
-						Create Counter-Offer
-					{/if}
-				</button>
-			</div>
-		</div>
-	</div>
-{/if}
-
-<!-- Completion Dialog -->
-{#if showCompletionDialog}
-	<div class="modal-overlay" on:click={() => showCompletionDialog = false}>
-		<div class="modal-content" on:click|stopPropagation>
-			<h3>Complete Swap</h3>
-			<p>Confirm that you've received your book from {otherUser.username} and rate your experience.</p>
-			
-			<form on:submit|preventDefault={handleComplete}>
-				<div class="form-group">
-					<label for="feedback">Message for {otherUser.username} (optional):</label>
-					<textarea 
-						bind:value={completionFeedback}
-						rows="3" 
-						placeholder="Leave a message about the swap experience, book condition, or just say thanks!"
-					></textarea>
-				</div>
-
-				<div class="completion-note">
-					<p><strong>Note:</strong> Once both parties mark the swap as completed, book ownership will be transferred and the swap will be finalized.</p>
-				</div>
-
-				<div class="modal-actions">
-					<button type="button" class="btn btn-secondary" on:click={() => showCompletionDialog = false}>
-						Cancel
-					</button>
-					<button type="submit" class="btn btn-primary" disabled={loading}>
-						{loading ? 'Completing...' : 'Mark as Completed'}
-					</button>
-				</div>
-			</form>
-		</div>
-	</div>
-{/if}
-
 <style>
-	.swap-card {
+	.card {
+		background: white;
 		border: 1px solid #e2e8f0;
 		border-radius: 12px;
-		padding: 1.5rem;
-		background: white;
-		box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-		margin-bottom: 1rem;
+		padding: 0;
+		box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+		transition: all 0.2s ease;
 	}
 
-	.swap-header {
+	.card:hover {
+		box-shadow: 0 6px 12px -2px rgba(0, 0, 0, 0.15);
+		transform: translateY(-1px);
+	}
+
+	.card-header {
+		padding: 1.5rem;
+		border-bottom: 1px solid #f1f5f9;
+	}
+
+	.card-section {
+		padding: 1.5rem;
+		border-bottom: 1px solid #f1f5f9;
+	}
+
+	.card-actions {
+		padding: 1.5rem;
+	}
+
+	.book-thumbnail {
+		width: 48px;
+		height: 72px;
+		object-fit: cover;
+		border-radius: 8px;
+		box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+	}
+
+	.book-placeholder {
+		width: 48px;
+		height: 72px;
+		background: #f3f4f6;
+		border-radius: 8px;
 		display: flex;
-		justify-content: space-between;
 		align-items: center;
-		margin-bottom: 1rem;
+		justify-content: center;
+		box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+	}
+
+	.book-icon {
+		width: 24px;
+		height: 24px;
+		color: #9ca3af;
 	}
 
 	.status-badge {
 		padding: 0.25rem 0.75rem;
-		border-radius: 20px;
-		color: white;
-		font-size: 0.875rem;
-		font-weight: 500;
-	}
-
-	.swap-date {
-		color: #64748b;
-		font-size: 0.875rem;
-	}
-
-	.user-section {
-		margin-bottom: 1.5rem;
-	}
-
-	.user-info {
-		display: flex;
-		align-items: center;
-		gap: 1rem;
-	}
-
-	.user-avatar {
-		width: 48px;
-		height: 48px;
-		border-radius: 50%;
-		object-fit: cover;
-	}
-
-	.user-initials {
-		background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%);
-		color: white;
-		display: flex;
-		align-items: center;
-		justify-content: center;
+		border-radius: 12px;
+		font-size: 0.75rem;
 		font-weight: 600;
-		font-size: 1.125rem;
-		text-transform: uppercase;
-		letter-spacing: 0.5px;
-	}
-
-	.user-details h4 {
-		margin: 0 0 0.25rem 0;
-		font-size: 1.125rem;
-		font-weight: 600;
-	}
-
-	.username-link {
-		background: none;
-		border: none;
-		color: #3b82f6;
-		font-size: inherit;
-		font-weight: inherit;
-		cursor: pointer;
-		padding: 0;
-		text-decoration: none;
-		transition: color 0.2s ease;
-	}
-
-	.username-link:hover:not(:disabled) {
-		color: #2563eb;
-		text-decoration: underline;
-	}
-
-	.username-link:disabled {
-		color: inherit;
-		cursor: default;
-	}
-
-	.user-role {
-		font-size: 0.875rem;
-		color: #64748b;
-	}
-
-	.books-section {
-		margin-bottom: 1.5rem;
-	}
-
-	.book-exchange {
-		display: grid;
-		grid-template-columns: 1fr auto 1fr;
-		gap: 1rem;
-		align-items: center;
-	}
-
-	.counter-offer-flow {
-		display: grid;
-		grid-template-columns: 1fr auto 1fr auto 1fr;
-		gap: 1rem;
-		align-items: center;
-	}
-
-	.book-item h5 {
-		margin: 0 0 0.75rem 0;
-		font-size: 0.875rem;
-		font-weight: 600;
-		color: #64748b;
 		text-transform: uppercase;
 		letter-spacing: 0.05em;
 	}
 
-	.counter-offer-label {
-		color: #059669;
-		font-weight: 500;
-		font-size: 0.75rem;
+	.status-badge.pending {
+		background: #fef5e7;
+		color: #d69e2e;
+		border: 1px solid #f6e05e;
 	}
 
-	.book-card {
-		display: flex;
-		gap: 0.75rem;
-		padding: 1rem;
-		border: 1px solid #e2e8f0;
+	.swap-request-status {
+		background: #e6fffa;
+		border: 1px solid #81e6d9;
 		border-radius: 8px;
-		background: #f8fafc;
-	}
-
-	.book-card.counter-offer {
-		background: #f0fdf4;
-		border-color: #bbf7d0;
-		box-shadow: 0 0 0 1px #10b981;
-	}
-
-	.book-cover {
-		width: 60px;
-		height: 80px;
-		object-fit: cover;
-		border-radius: 4px;
-		flex-shrink: 0;
-	}
-
-	.book-info {
-		flex: 1;
-		min-width: 0;
-	}
-
-	.book-info h6 {
-		margin: 0 0 0.25rem 0;
-		font-size: 0.875rem;
-		font-weight: 600;
-		line-height: 1.2;
-	}
-
-	.book-author {
-		margin: 0 0 0.5rem 0;
-		font-size: 0.75rem;
-		color: #64748b;
-	}
-
-	.exchange-arrow {
-		display: flex;
-		justify-content: center;
-		color: #64748b;
-	}
-
-	.message-section, .completion-section, .contact-section, .ratings-section {
-		margin-bottom: 1.5rem;
 		padding: 1rem;
-		background: #f1f5f9;
-		border-radius: 8px;
+		margin: 1rem 1.5rem;
 	}
 
-	.message-section.counter-offer {
-		background: #fef3c7;
-		border-left: 4px solid #f59e0b;
-	}
-
-	.message-section h5, .completion-section h5, .contact-section h5, .ratings-section h5 {
-		margin: 0 0 0.75rem 0;
-		font-size: 1rem;
-		font-weight: 600;
-	}
-
-	.message-text, .completion-message {
-		margin: 0;
-		font-size: 0.875rem;
-		line-height: 1.4;
-	}
-
-	.contact-details {
-		display: grid;
-		grid-template-columns: 1fr 1fr;
-		gap: 1rem;
-		margin-bottom: 1rem;
-	}
-
-	.contact-user {
-		padding: 0.75rem;
-		background: white;
-		border: 1px solid #e2e8f0;
-		border-radius: 6px;
-	}
-
-	.contact-user h6 {
-		margin: 0 0 0.5rem 0;
-		font-size: 0.875rem;
-		font-weight: 600;
-		color: #374151;
-	}
-
-	.contact-user p {
-		margin: 0.25rem 0;
-		font-size: 0.75rem;
-		color: #6b7280;
-	}
-
-	.contact-instructions {
-		padding: 0.75rem;
-		background: #fef3c7;
-		border: 1px solid #f59e0b;
-		border-radius: 6px;
-	}
-
-	.contact-note {
-		margin: 0 0 0.5rem 0;
-		font-size: 0.875rem;
-		color: #92400e;
-		line-height: 1.4;
-	}
-
-	.safety-note {
-		margin: 0;
-		font-size: 0.75rem;
-		color: #b45309;
-		font-style: italic;
-	}
-
-	.ratings-grid {
-		display: grid;
-		grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-		gap: 0.75rem;
-		margin-bottom: 1rem;
-	}
-
-	.rating-item {
+	.status-info {
 		display: flex;
 		align-items: center;
-		gap: 0.5rem;
-		font-size: 0.875rem;
+		justify-content: space-between;
+		margin-bottom: 0.5rem;
 	}
 
-	.feedback-section p {
-		margin: 0.5rem 0;
-		font-size: 0.875rem;
-		line-height: 1.4;
-	}
-
-	.swap-actions {
-		display: flex;
-		gap: 0.75rem;
-		flex-wrap: wrap;
-	}
-
-	.btn {
-		padding: 0.5rem 1rem;
-		border: none;
-		border-radius: 6px;
-		font-size: 0.875rem;
+	.status-label {
+		color: #2d3748;
+		font-size: 0.9rem;
 		font-weight: 500;
-		cursor: pointer;
-		transition: all 0.2s;
 	}
 
-	.btn:disabled {
-		opacity: 0.6;
-		cursor: not-allowed;
+	.offered-book-info {
+		color: #4a5568;
+		font-size: 0.85rem;
+		line-height: 1.4;
 	}
 
 	.btn-primary {
-		background: #3b82f6;
-		color: white;
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		gap: 0.5rem;
+		padding: 0.75rem 1.5rem;
+		background: linear-gradient(135deg, #8B2635 0%, #722F37 100%);
+		color: #F5F5DC;
+		border: none;
+		border-radius: 8px;
+		font-weight: 600;
+		font-size: 0.875rem;
+		box-shadow: 0 4px 12px rgba(139, 38, 53, 0.3);
+		transition: all 0.2s ease;
+		cursor: pointer;
+		white-space: nowrap;
 	}
 
-	.btn-primary:hover:not(:disabled) {
-		background: #2563eb;
+	.btn-primary:hover {
+		background: linear-gradient(135deg, #722F37 0%, #8B2635 100%);
+		transform: translateY(-2px);
+		box-shadow: 0 6px 20px rgba(139, 38, 53, 0.4);
+	}
+
+	.btn-primary:disabled {
+		opacity: 0.6;
+		transform: none;
+		box-shadow: 0 4px 12px rgba(139, 38, 53, 0.3);
+		cursor: not-allowed;
 	}
 
 	.btn-secondary {
-		background: #8b5cf6;
-		color: white;
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		gap: 0.5rem;
+		padding: 0.75rem 1.5rem;
+		background: #f8f9fa;
+		color: #8B2635;
+		border: 1px solid #e2e8f0;
+		border-radius: 8px;
+		font-weight: 600;
+		font-size: 0.875rem;
+		transition: all 0.2s ease;
+		cursor: pointer;
+		white-space: nowrap;
 	}
 
-	.btn-secondary:hover:not(:disabled) {
-		background: #7c3aed;
+	.btn-secondary:hover {
+		background: #F5F5DC;
+		border-color: #8B2635;
+		color: #722F37;
+	}
+
+	.btn-danger {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		gap: 0.5rem;
+		padding: 0.75rem 1.5rem;
+		background: #fef2f2;
+		color: #dc2626;
+		border: 1px solid #fecaca;
+		border-radius: 8px;
+		font-weight: 600;
+		font-size: 0.875rem;
+		transition: all 0.2s ease;
+		cursor: pointer;
+		white-space: nowrap;
+	}
+
+	.btn-danger:hover {
+		background: #fee2e2;
+		border-color: #f87171;
+		color: #b91c1c;
 	}
 
 	.btn-success {
-		background: #10b981;
-		color: white;
-	}
-
-	.btn-success:hover:not(:disabled) {
-		background: #059669;
-	}
-
-	.btn-outline {
-		background: transparent;
-		color: #6b7280;
-		border: 1px solid #d1d5db;
-	}
-
-	.btn-outline:hover:not(:disabled) {
-		background: #f9fafb;
-		border-color: #9ca3af;
-	}
-
-	.modal-overlay {
-		position: fixed;
-		top: 0;
-		left: 0;
-		right: 0;
-		bottom: 0;
-		background: rgba(0, 0, 0, 0.5);
-		display: flex;
+		display: inline-flex;
 		align-items: center;
 		justify-content: center;
-		z-index: 1000;
-	}
-
-	.modal-content {
-		background: white;
-		padding: 2rem;
-		border-radius: 12px;
-		width: 90%;
-		max-width: 500px;
-		max-height: 90vh;
-		overflow-y: auto;
-	}
-
-	.modal-content h3 {
-		margin: 0 0 1rem 0;
-		font-size: 1.25rem;
-		font-weight: 600;
-	}
-
-	.form-group {
-		margin-bottom: 1rem;
-	}
-
-	.form-group label {
-		display: block;
-		margin-bottom: 0.5rem;
-		font-weight: 500;
-		font-size: 0.875rem;
-	}
-
-	.form-group select,
-	.form-group textarea {
-		width: 100%;
-		padding: 0.5rem;
-		border: 1px solid #d1d5db;
-		border-radius: 6px;
-		font-size: 0.875rem;
-	}
-
-	.form-group textarea {
-		resize: vertical;
-		min-height: 80px;
-	}
-
-	.completion-note {
-		padding: 0.75rem;
-		background: #dbeafe;
-		border: 1px solid #3b82f6;
-		border-radius: 6px;
-		margin-bottom: 1rem;
-	}
-
-	.completion-note p {
-		margin: 0;
-		font-size: 0.75rem;
-		color: #1e40af;
-		line-height: 1.4;
-	}
-
-	.completion-checklist {
-		margin-top: 1rem;
-		display: flex;
-		flex-direction: column;
-		gap: 0.75rem;
-	}
-
-	.completion-item {
-		display: flex;
-		align-items: center;
-		gap: 0.75rem;
-		padding: 0.5rem;
-		border-radius: 6px;
-		transition: all 0.2s;
-	}
-
-	.completion-item.completed {
+		gap: 0.5rem;
+		padding: 0.75rem 1.5rem;
 		background: #dcfce7;
-		border: 1px solid #16a34a;
-	}
-
-	.completion-item:not(.completed) {
-		background: #fef3c7;
-		border: 1px solid #f59e0b;
-	}
-
-	.completion-checkbox {
-		width: 20px;
-		height: 20px;
-		border-radius: 4px;
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		flex-shrink: 0;
-	}
-
-	.completion-item.completed .completion-checkbox {
-		background: #16a34a;
-		color: white;
-	}
-
-	.completion-item:not(.completed) .completion-checkbox {
-		background: #f3f4f6;
-		border: 2px solid #d1d5db;
-	}
-
-	.empty-checkbox {
-		width: 12px;
-		height: 12px;
-		border-radius: 2px;
-		background: #e5e7eb;
-	}
-
-	.completion-label {
+		color: #16a34a;
+		border: 1px solid #bbf7d0;
+		border-radius: 8px;
+		font-weight: 600;
 		font-size: 0.875rem;
-		font-weight: 500;
+		transition: all 0.2s ease;
+		cursor: pointer;
+		white-space: nowrap;
 	}
 
-	.completion-item.completed .completion-label {
+	.btn-success:hover {
+		background: #bbf7d0;
+		border-color: #4ade80;
 		color: #15803d;
 	}
 
-	.completion-item:not(.completed) .completion-label {
-		color: #92400e;
+	.action-buttons {
+		display: flex;
+		flex-direction: row;
+		flex-wrap: wrap;
+		gap: 0.75rem;
+		align-items: center;
 	}
 
-	.modal-actions {
+	.button-row {
 		display: flex;
 		gap: 0.75rem;
-		justify-content: flex-end;
-		margin-top: 1.5rem;
 	}
 
-	/* Counter-Offer Modal Styles - matching SwapRequestDialog */
-	.counter-offer-modal {
-		background: white;
-		border-radius: 16px;
-		width: 100%;
-		max-width: 1000px;
-		max-height: 90vh;
-		overflow-y: auto;
-		box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
-		animation: modalSlideIn 0.3s ease-out;
-	}
-
-	@keyframes modalSlideIn {
-		from {
-			opacity: 0;
-			transform: translateY(-20px) scale(0.95);
-		}
-		to {
-			opacity: 1;
-			transform: translateY(0) scale(1);
-		}
-	}
-
-	.modal-header {
-		display: flex;
-		justify-content: space-between;
+	.button-row {
+		justify-content: flex-start;
 		align-items: center;
-		padding: 2rem 2rem 1rem 2rem;
-		border-bottom: 1px solid #e2e8f0;
-	}
-
-	.modal-header h2 {
-		margin: 0;
-		font-size: 1.75rem;
-		font-weight: 700;
-		color: #1f2937;
-	}
-
-	.close-btn {
-		background: none;
-		border: none;
-		cursor: pointer;
-		padding: 0.75rem;
-		border-radius: 8px;
-		color: #6b7280;
-		transition: all 0.2s;
-		display: flex;
-		align-items: center;
-		justify-content: center;
-	}
-
-	.close-btn:hover {
-		background: #f3f4f6;
-		color: #374151;
-	}
-
-	.modal-body {
-		padding: 2rem;
-	}
-
-	.section {
-		margin-bottom: 2.5rem;
-	}
-
-	.section:last-child {
-		margin-bottom: 0;
-	}
-
-	.section h3 {
-		margin: 0 0 1rem 0;
-		font-size: 1.25rem;
-		font-weight: 600;
-		color: #1f2937;
-		display: flex;
-		align-items: center;
-		gap: 0.5rem;
-	}
-
-	.optional {
-		font-size: 0.875rem;
-		font-weight: 400;
-		color: #6b7280;
-	}
-
-	.section-description {
-		margin: 0 0 1.5rem 0;
-		color: #6b7280;
-		font-size: 0.95rem;
-		line-height: 1.5;
-	}
-
-	.target-book {
-		background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
-		border-color: #bfdbfe;
-		border: 2px solid #bfdbfe;
-		padding: 1.5rem;
-	}
-
-	.target-book .book-cover {
-		width: 80px;
-		height: 120px;
-		box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-	}
-
-	.target-book .book-info h4 {
-		font-size: 1.125rem;
-		margin: 0 0 0.5rem 0;
-		font-weight: 600;
-		color: #1f2937;
-	}
-
-	.books-grid {
-		display: grid;
-		grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
-		gap: 1.5rem;
-	}
-
-	.book-option {
-		display: block;
-		position: relative;
-		transition: all 0.2s;
-		cursor: pointer;
-	}
-
-	.book-option .book-card {
-		transition: all 0.2s;
-		border: 2px solid #e2e8f0;
-		position: relative;
-		padding: 1.5rem;
-		gap: 1.5rem;
-	}
-
-	.book-option:hover .book-card {
-		border-color: #bfdbfe;
-		background: #f0f9ff;
-		transform: translateY(-2px);
-		box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
-	}
-
-	.book-option.selected .book-card {
-		border-color: #3b82f6;
-		background: #eff6ff;
-		box-shadow: 0 0 0 1px #3b82f6, 0 8px 25px rgba(59, 130, 246, 0.15);
-	}
-
-	.book-option .book-cover {
-		width: 80px;
-		height: 120px;
-		box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-	}
-
-	.book-option .book-info h5 {
-		margin: 0 0 0.5rem 0;
-		font-size: 1rem;
-		font-weight: 600;
-		color: #1f2937;
-	}
-
-	.cover-placeholder {
-		width: 80px;
-		height: 120px;
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		background: linear-gradient(135deg, #f8f9fa 0%, #f1f3f4 100%);
-		border-radius: 8px;
-		box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-	}
-
-	.placeholder-icon {
-		width: 32px;
-		height: 32px;
-		color: #9ca3af;
-	}
-
-	.book-description-container {
-		margin-top: 0.75rem;
-		max-height: 80px;
-		overflow-y: auto;
-		border-radius: 6px;
-		padding: 0.5rem;
-		background: rgba(255, 255, 255, 0.5);
-		border: 1px solid rgba(0, 0, 0, 0.05);
-	}
-
-	.book-description-container::-webkit-scrollbar {
-		width: 4px;
-	}
-
-	.book-description-container::-webkit-scrollbar-track {
-		background: rgba(0, 0, 0, 0.05);
-		border-radius: 2px;
-	}
-
-	.book-description-container::-webkit-scrollbar-thumb {
-		background: rgba(0, 0, 0, 0.2);
-		border-radius: 2px;
-	}
-
-	.book-description-container::-webkit-scrollbar-thumb:hover {
-		background: rgba(0, 0, 0, 0.3);
-	}
-
-	.book-description {
-		margin: 0;
-		font-size: 0.875rem;
-		color: #4b5563;
-		line-height: 1.5;
-	}
-
-	.selection-indicator {
-		position: absolute;
-		top: 1rem;
-		right: 1rem;
-		width: 32px;
-		height: 32px;
-		background: #3b82f6;
-		border-radius: 50%;
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		color: white;
-		opacity: 0;
-		transform: scale(0.8);
-		transition: all 0.2s;
-	}
-
-	.book-option.selected .selection-indicator {
-		opacity: 1;
-		transform: scale(1);
-	}
-
-	.loading-state,
-	.empty-state,
-	.error-state {
-		text-align: center;
-		padding: 3rem 2rem;
-		color: #6b7280;
-	}
-
-	.loading-state {
-		display: flex;
-		flex-direction: column;
-		align-items: center;
-		gap: 1rem;
 	}
 
 	.loading-spinner {
+		width: 1rem;
+		height: 1rem;
 		animation: spin 1s linear infinite;
 	}
 
@@ -1478,229 +387,678 @@
 		}
 	}
 
-	.error-state {
-		background: #fef2f2;
-		border: 2px dashed #fca5a5;
+	/* Modern Contact Information Styles */
+	.contact-information-section {
+		background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+		border: 1px solid #0ea5e9;
 		border-radius: 12px;
+		padding: 1.5rem;
+		margin: 1rem 1.5rem;
+		box-shadow: 0 4px 12px rgba(14, 165, 233, 0.1);
 	}
 
-	.error-state h4 {
-		margin: 0 0 0.5rem 0;
-		font-size: 1.125rem;
-		font-weight: 600;
-		color: #dc2626;
-	}
-
-	.error-message {
-		margin: 0.5rem 0 1.5rem 0;
-		font-size: 0.95rem;
-		line-height: 1.5;
-		color: #991b1b;
-	}
-
-	.error-icon {
-		margin: 0 auto 1rem;
-		color: #dc2626;
-	}
-
-	.retry-btn {
-		margin-top: 1rem;
-	}
-
-	.empty-state {
-		background: #f9fafb;
-		border: 2px dashed #d1d5db;
-		border-radius: 12px;
-	}
-
-	.empty-icon {
-		margin: 0 auto 1rem;
-		color: #9ca3af;
-	}
-
-	.empty-state h4 {
-		margin: 0 0 0.5rem 0;
-		font-size: 1.125rem;
-		font-weight: 600;
-		color: #374151;
-	}
-
-	.empty-state p {
-		margin: 0.5rem 0;
-		font-size: 0.95rem;
-		line-height: 1.5;
-	}
-
-	.empty-note {
-		font-size: 0.875rem;
-		color: #9ca3af;
-		font-style: italic;
-	}
-
-	.counter-offer-modal textarea {
-		width: 100%;
-		padding: 1rem;
-		border: 2px solid #e2e8f0;
-		border-radius: 8px;
-		font-size: 0.95rem;
-		font-family: inherit;
-		resize: vertical;
-		min-height: 100px;
-		transition: all 0.2s;
-		line-height: 1.5;
-	}
-
-	.counter-offer-modal textarea:focus {
-		outline: none;
-		border-color: #3b82f6;
-		box-shadow: 0 0 0 1px #3b82f6;
-	}
-
-	.counter-offer-modal textarea::placeholder {
-		color: #9ca3af;
-	}
-
-	.char-count {
-		text-align: right;
-		font-size: 0.75rem;
-		color: #6b7280;
-		margin-top: 0.5rem;
-	}
-
-	.modal-footer {
-		display: flex;
-		gap: 1rem;
-		justify-content: flex-end;
-		padding: 1.5rem 2rem 2rem 2rem;
-		border-top: 1px solid #e2e8f0;
-		background: #f8fafc;
-		border-radius: 0 0 16px 16px;
-	}
-
-	.modal-footer .btn {
+	.contact-header {
 		display: flex;
 		align-items: center;
-		gap: 0.5rem;
-		padding: 0.75rem 1.5rem;
+		gap: 1rem;
+		margin-bottom: 1.5rem;
+		padding-bottom: 1rem;
+		border-bottom: 1px solid rgba(14, 165, 233, 0.2);
+	}
+
+	.contact-icon {
+		width: 48px;
+		height: 48px;
+		background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+		border-radius: 12px;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		color: white;
+		flex-shrink: 0;
+		box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+	}
+
+	.contact-header-content {
+		flex: 1;
+	}
+
+	.contact-title {
+		font-size: 1.25rem;
+		font-weight: 700;
+		color: #0c4a6e;
+		margin: 0 0 0.25rem 0;
+	}
+
+	.contact-subtitle {
+		color: #0369a1;
+		font-size: 0.95rem;
+		margin: 0;
+	}
+
+	.contact-details {
+		margin-bottom: 1.5rem;
+	}
+
+	.contact-card {
+		background: white;
+		border: 1px solid rgba(14, 165, 233, 0.2);
+		border-radius: 12px;
+		padding: 1.25rem;
+		box-shadow: 0 2px 8px rgba(14, 165, 233, 0.1);
+	}
+
+	.contact-person-header {
+		display: flex;
+		align-items: center;
+		gap: 1rem;
+		margin-bottom: 1rem;
+	}
+
+	.contact-avatar {
+		width: 48px;
+		height: 48px;
+		border-radius: 12px;
+		overflow: hidden;
+		flex-shrink: 0;
+		border: 2px solid #e0f2fe;
+	}
+
+	.contact-avatar-img {
+		width: 100%;
+		height: 100%;
+		object-fit: cover;
+	}
+
+	.contact-avatar-placeholder {
+		width: 100%;
+		height: 100%;
+		background: linear-gradient(135deg, #64748b 0%, #475569 100%);
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		color: white;
+	}
+
+	.contact-person-info {
+		flex: 1;
+	}
+
+	.contact-person-name {
+		font-size: 1.1rem;
+		font-weight: 600;
+		color: #0c4a6e;
+		margin: 0 0 0.25rem 0;
+	}
+
+	.contact-person-role {
+		font-size: 0.875rem;
+		color: #0369a1;
+		margin: 0;
+		font-weight: 500;
+	}
+
+	.contact-email-button {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.75rem;
+		padding: 0.75rem 1.25rem;
+		background: linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%);
+		color: white;
 		border: none;
 		border-radius: 8px;
-		font-size: 0.95rem;
 		font-weight: 600;
-		cursor: pointer;
-		transition: all 0.2s;
+		font-size: 0.9rem;
 		text-decoration: none;
-		white-space: nowrap;
+		transition: all 0.2s ease;
+		box-shadow: 0 2px 8px rgba(14, 165, 233, 0.3);
 	}
 
-	.modal-footer .btn:disabled {
-		opacity: 0.6;
-		cursor: not-allowed;
-		transform: none !important;
-	}
-
-	.modal-footer .btn-primary {
-		background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
-		color: white;
-		box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
-	}
-
-	.modal-footer .btn-primary:hover:not(:disabled) {
-		background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
-		transform: translateY(-2px);
-		box-shadow: 0 6px 20px rgba(59, 130, 246, 0.4);
-	}
-
-	.modal-footer .btn-secondary {
-		background: #6b7280;
-		color: white;
-		box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-	}
-
-	.modal-footer .btn-secondary:hover:not(:disabled) {
-		background: #4b5563;
+	.contact-email-button:hover {
+		background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%);
 		transform: translateY(-1px);
-		box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+		box-shadow: 0 4px 12px rgba(14, 165, 233, 0.4);
+		text-decoration: none;
+		color: white;
 	}
 
-	.btn-spinner {
-		animation: spin 1s linear infinite;
+	.contact-email-address {
+		font-weight: 500;
+		opacity: 0.9;
 	}
 
-	@media (max-width: 768px) {
-		.book-exchange {
-			grid-template-columns: 1fr;
-			gap: 1rem;
-		}
-
-		.exchange-arrow {
-			transform: rotate(90deg);
-		}
-
-		.swap-actions {
-			flex-direction: column;
-		}
-
-		.btn {
-			width: 100%;
-		}
-
-		.counter-offer-modal {
-			margin: 0;
-			border-radius: 0;
-			height: 100vh;
-			max-height: none;
-		}
-
-		.modal-header,
-		.modal-body,
-		.modal-footer {
-			padding-left: 1.5rem;
-			padding-right: 1.5rem;
-		}
-
-		.modal-header h2 {
-			font-size: 1.5rem;
-		}
-
-		.books-grid {
-			grid-template-columns: 1fr;
-			gap: 1rem;
-		}
-
-		.book-card {
-			gap: 1rem;
-			padding: 1rem;
-		}
-
-		.book-cover,
-		.cover-placeholder {
-			width: 60px;
-			height: 90px;
-		}
-
-		.modal-footer {
-			flex-direction: column;
-		}
-
-		.modal-footer .btn {
-			width: 100%;
-			justify-content: center;
-		}
+	.next-steps-card {
+		background: rgba(255, 255, 255, 0.8);
+		border: 1px solid rgba(14, 165, 233, 0.2);
+		border-radius: 12px;
+		padding: 1.25rem;
+		display: flex;
+		gap: 1rem;
+		align-items: flex-start;
 	}
 
-	@media (max-width: 480px) {
-		.modal-overlay {
-			padding: 0;
-		}
+	.next-steps-icon {
+		width: 40px;
+		height: 40px;
+		background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+		border-radius: 10px;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		color: white;
+		flex-shrink: 0;
+		box-shadow: 0 2px 8px rgba(245, 158, 11, 0.3);
+	}
 
-		.book-card {
-			flex-direction: column;
-			align-items: center;
-			text-align: center;
-		}
+	.next-steps-content {
+		flex: 1;
+	}
 
-		.book-image {
-			align-self: center;
-		}
+	.next-steps-title {
+		font-size: 1rem;
+		font-weight: 600;
+		color: #0c4a6e;
+		margin: 0 0 0.75rem 0;
+	}
+
+	.next-steps-list {
+		list-style: none;
+		padding: 0;
+		margin: 0;
+		display: flex;
+		flex-direction: column;
+		gap: 0.5rem;
+	}
+
+	.next-steps-list li {
+		color: #0369a1;
+		font-size: 0.9rem;
+		line-height: 1.4;
+	}
+
+	.offered-book-card {
+		background: white;
+		border: 1px solid #e5e7eb;
+		border-radius: 8px;
+		padding: 1rem;
+	}
+
+	.counter-offer-card {
+		background: #faf5ff;
+		border: 1px solid #d8b4fe;
+		border-radius: 8px;
+		padding: 1rem;
+	}
+
+	.contact-section {
+		background: #f0fdf4;
+		border-radius: 8px;
+		padding: 1rem;
+		border: 1px solid #bbf7d0;
+	}
+
+	.completion-section {
+		background: #eff6ff;
+		border-radius: 8px;
+		padding: 1rem;
+		border: 1px solid #bfdbfe;
+	}
+
+	.meta-text {
+		color: #6b7280;
+		font-size: 0.875rem;
+		margin: 0;
+	}
+
+	.title-text {
+		color: #1f2937;
+		font-size: 1rem;
+		font-weight: 600;
+		margin: 0;
+		line-height: 1.4;
+	}
+
+	.author-text {
+		color: #6b7280;
+		font-size: 0.875rem;
+		margin: 0;
+		line-height: 1.4;
+	}
+
+	.message-text {
+		color: #374151;
+		font-size: 0.875rem;
+		line-height: 1.6;
+		margin: 0;
+		font-style: italic;
 	}
 </style>
+
+<div class="card">
+	<!-- Header -->
+	<div class="card-header">
+		
+		<div class="flex items-start gap-4">
+			{#if request.book.google_volume_id && !imageLoadFailed}
+				<img
+					src="https://books.google.com/books/content?id={request.book.google_volume_id}&printsec=frontcover&img=1&zoom=1&source=gbs_api"
+					alt="{request.book.title} cover"
+					class="book-thumbnail"
+					loading="lazy"
+					on:error={handleImageError}
+				/>
+			{:else}
+				<div class="book-placeholder">
+					<svg class="book-icon" fill="currentColor" viewBox="0 0 20 20">
+						<path d="M9 4.804A7.968 7.968 0 005.5 4c-1.255 0-2.443.29-3.5.804v10A7.969 7.969 0 715.5 14c1.669 0 3.218.51 4.5 1.385A7.962 7.962 0 0114.5 14c1.255 0 2.443.29 3.5.804v-10A7.968 7.968 0 0014.5 4c-1.255 0-2.443.29-3.5.804V12a1 1 0 11-2 0V4.804z" />
+					</svg>
+				</div>
+			{/if}
+			<div class="flex-1 min-w-0">
+				<h3 class="title-text">{request.book.title}</h3>
+				<p class="author-text">by {request.book.authors.join(', ')}</p>
+				<div class="mt-3 flex items-center text-xs text-gray-500">
+					{#if type === 'incoming'}
+						<span>From: {request.requester_profile?.username || request.requester_profile?.full_name || 'Unknown User'}</span>
+					{:else}
+						<span>To: {request.owner_profile?.username || request.owner_profile?.full_name || 'Unknown User'}</span>
+					{/if}
+					<span class="mx-2">•</span>
+					<span>{getRelativeTime(request.created_at)}</span>
+				</div>
+			</div>
+		</div>
+	</div>
+
+	<!-- Status Section -->
+	<div class="swap-request-status">
+		<div class="status-info">
+			<span class="status-label">Swap Request:</span>
+			<span class="status-badge pending">{statusDisplay}</span>
+		</div>
+		{#if request.offered_book}
+			<div class="offered-book-info">
+				{#if type === 'incoming'}
+					They offered: <strong>{request.offered_book.title}</strong>
+				{:else}
+					You offered: <strong>{request.offered_book.title}</strong>
+				{/if}
+			</div>
+		{/if}
+	</div>
+
+	<!-- Message -->
+	{#if request.message}
+		<div class="card-section">
+			<p class="message-text">"{request.message}"</p>
+		</div>
+	{/if}
+
+	<!-- Offered Books Section -->
+	{#if request.offered_book || request.counter_offered_book}
+		<div class="card-section" style="background: #f8fafc;">
+			<div class="space-y-3">
+				<!-- Original offered book (from requester) -->
+				{#if request.offered_book}
+					<div class="offered-book-card">
+						<div class="text-xs font-medium text-gray-500 uppercase tracking-wide" style="margin-bottom: 24px;">
+							{type === 'incoming' ? 'They are offering:' : 'You are offering:'}
+						</div>
+						<div class="flex items-start gap-4">
+							{#if request.offered_book.google_volume_id}
+								<div class="w-10 h-14 flex-shrink-0">
+									<img
+										src="https://books.google.com/books/content?id={request.offered_book.google_volume_id}&printsec=frontcover&img=1&zoom=1&source=gbs_api"
+										alt="{request.offered_book.title} cover"
+										class="w-full h-full object-cover rounded shadow-sm"
+									/>
+								</div>
+							{:else}
+								<div class="w-10 h-14 bg-gray-200 rounded flex items-center justify-center flex-shrink-0">
+									<svg class="w-4 h-4 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
+										<path d="M9 4.804A7.968 7.968 0 005.5 4c-1.255 0-2.443.29-3.5.804v10A7.969 7.969 0 015.5 14c1.669 0 3.218.51 4.5 1.385A7.962 7.962 0 0114.5 14c1.255 0 2.443.29 3.5.804v-10A7.968 7.968 0 0014.5 4c-1.255 0-2.443.29-3.5.804V12a1 1 0 11-2 0V4.804z" />
+									</svg>
+								</div>
+							{/if}
+							<div class="flex-1 min-w-0">
+								<h4 class="font-medium text-sm text-gray-900 truncate">{request.offered_book.title}</h4>
+								<p class="text-xs text-gray-600 truncate">by {request.offered_book.authors.join(', ')}</p>
+								<div class="mt-1">
+									<ConditionIndicator condition={request.offered_book.condition} size="small" />
+								</div>
+							</div>
+						</div>
+					</div>
+				{/if}
+
+				<!-- Counter offered book (from owner) -->
+				{#if request.counter_offered_book}
+					<div class="counter-offer-card">
+						<div class="text-xs font-medium text-purple-600 uppercase tracking-wide" style="margin-bottom: 24px;">
+							Counter-offer: {type === 'outgoing' ? 'They are offering instead:' : 'You are offering instead:'}
+						</div>
+						<div class="flex items-start gap-4">
+							{#if request.counter_offered_book.google_volume_id}
+								<div class="w-10 h-14 flex-shrink-0">
+									<img
+										src="https://books.google.com/books/content?id={request.counter_offered_book.google_volume_id}&printsec=frontcover&img=1&zoom=1&source=gbs_api"
+										alt="{request.counter_offered_book.title} cover"
+										class="w-full h-full object-cover rounded shadow-sm"
+									/>
+								</div>
+							{:else}
+								<div class="w-10 h-14 bg-gray-200 rounded flex items-center justify-center flex-shrink-0">
+									<svg class="w-4 h-4 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
+										<path d="M9 4.804A7.968 7.968 0 005.5 4c-1.255 0-2.443.29-3.5.804v10A7.969 7.969 0 015.5 14c1.669 0 3.218.51 4.5 1.385A7.962 7.962 0 0114.5 14c1.255 0 2.443.29 3.5.804v-10A7.968 7.968 0 0014.5 4c-1.255 0-2.443.29-3.5.804V12a1 1 0 11-2 0V4.804z" />
+									</svg>
+								</div>
+							{/if}
+							<div class="flex-1 min-w-0">
+								<h4 class="font-medium text-sm text-purple-900 truncate">{request.counter_offered_book.title}</h4>
+								<p class="text-xs text-purple-700 truncate">by {request.counter_offered_book.authors.join(', ')}</p>
+								<div class="mt-1">
+									<ConditionIndicator condition={request.counter_offered_book.condition} size="small" />
+								</div>
+							</div>
+						</div>
+					</div>
+				{/if}
+			</div>
+		</div>
+	{/if}
+
+	<!-- Contact Information (ACCEPTED status only) -->
+	{#if isAccepted && (isOwner || isRequester)}
+		<div class="contact-information-section">
+			<div class="contact-header">
+				<div class="contact-icon">
+					<svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+					</svg>
+				</div>
+				<div class="contact-header-content">
+					<h3 class="contact-title">🎉 Swap Approved!</h3>
+					<p class="contact-subtitle">
+						Great news! You can now coordinate the book exchange directly.
+					</p>
+				</div>
+			</div>
+			
+			<div class="contact-details">
+				{#if type === 'incoming'}
+					<!-- Show requester's contact info to owner -->
+					{#if request.requester_profile?.email || request.requester_profile?.full_name || request.requester_profile?.username}
+						<div class="contact-card">
+							<div class="contact-person-header">
+								<div class="contact-avatar">
+									{#if request.requester_profile?.avatar_url}
+										<img src="{request.requester_profile?.avatar_url}" alt="Profile" class="contact-avatar-img">
+									{:else}
+										<div class="contact-avatar-placeholder">
+											<svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+												<path fill-rule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clip-rule="evenodd" />
+											</svg>
+										</div>
+									{/if}
+								</div>
+								<div class="contact-person-info">
+									<h4 class="contact-person-name">
+										{request.requester_profile?.full_name || request.requester_profile?.username || 'Requester'}
+									</h4>
+									<p class="contact-person-role">Book Requester</p>
+								</div>
+							</div>
+							
+							{#if request.requester_profile?.email}
+								<a href="mailto:{request.requester_profile?.email}" class="contact-email-button">
+									<svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+										<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 4.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+									</svg>
+									Send Email
+									<span class="contact-email-address">{request.requester_profile?.email}</span>
+								</a>
+							{/if}
+						</div>
+					{/if}
+				{:else}
+					<!-- Show owner's contact info to requester -->
+					{#if request.owner_profile?.email || request.owner_profile?.full_name || request.owner_profile?.username}
+						<div class="contact-card">
+							<div class="contact-person-header">
+								<div class="contact-avatar">
+									{#if request.owner_profile?.avatar_url}
+										<img src="{request.owner_profile?.avatar_url}" alt="Profile" class="contact-avatar-img">
+									{:else}
+										<div class="contact-avatar-placeholder">
+											<svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+												<path fill-rule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clip-rule="evenodd" />
+											</svg>
+										</div>
+									{/if}
+								</div>
+								<div class="contact-person-info">
+									<h4 class="contact-person-name">
+										{request.owner_profile?.full_name || request.owner_profile?.username || 'Book Owner'}
+									</h4>
+									<p class="contact-person-role">Book Owner</p>
+								</div>
+							</div>
+							
+							{#if request.owner_profile?.email}
+								<a href="mailto:{request.owner_profile?.email}" class="contact-email-button">
+									<svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+										<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 4.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+									</svg>
+									Send Email
+									<span class="contact-email-address">{request.owner_profile?.email}</span>
+								</a>
+							{/if}
+						</div>
+					{/if}
+				{/if}
+			</div>
+			
+			<div class="next-steps-card">
+				<div class="next-steps-icon">
+					<svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+					</svg>
+				</div>
+				<div class="next-steps-content">
+					<h4 class="next-steps-title">Next Steps</h4>
+					<ul class="next-steps-list">
+						<li>📧 Send an email to coordinate pickup/delivery details</li>
+						<li>📍 Agree on a meeting location and time</li>
+						<li>📚 Exchange your books safely</li>
+						<li>⭐ Return here to mark as completed and leave a rating</li>
+					</ul>
+				</div>
+			</div>
+		</div>
+	{/if}
+
+	<!-- Completion Details -->
+	{#if isCompleted}
+		<div class="px-4 py-3 bg-blue-50 border-b border-gray-100">
+			<div class="flex items-center justify-between mb-2">
+				<h4 class="text-sm font-medium text-blue-900">Swap Completed</h4>
+				{#if request.completion_date}
+					<span class="text-xs text-blue-700">{formatDate(request.completion_date)}</span>
+				{/if}
+			</div>
+			
+			<div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+				<!-- Requester Rating -->
+				{#if request.requester_rating}
+					<div class="flex items-center justify-between">
+						<span class="text-blue-700">
+							{isRequester ? 'Your rating:' : 'Their rating:'}
+						</span>
+						<span class="text-yellow-600 font-medium">
+							{formatRating(request.requester_rating)}
+						</span>
+					</div>
+				{/if}
+
+				<!-- Owner Rating -->
+				{#if request.owner_rating}
+					<div class="flex items-center justify-between">
+						<span class="text-blue-700">
+							{isOwner ? 'Your rating:' : 'Their rating:'}
+						</span>
+						<span class="text-yellow-600 font-medium">
+							{formatRating(request.owner_rating)}
+						</span>
+					</div>
+				{/if}
+			</div>
+
+			<!-- Feedback -->
+			{#if (isRequester && request.requester_feedback) || (isOwner && request.owner_feedback)}
+				<div class="mt-3 pt-3 border-t border-blue-200">
+					<p class="text-sm text-blue-800 italic">
+						"{isRequester ? request.requester_feedback : request.owner_feedback}"
+					</p>
+				</div>
+			{/if}
+		</div>
+	{/if}
+
+	<!-- Actions -->
+	{#if (isPending && (isOwner || isRequester)) || (isCounterOffer && (isOwner || isRequester)) || (isAccepted && canComplete)}
+		<div class="card-actions">
+			{#if isPending && isOwner}
+				<!-- Owner actions for PENDING: Accept/Counter-Offer/Cancel -->
+				<div class="action-buttons">
+					<div class="button-row">
+						<button
+							type="button"
+							class="btn-success"
+							on:click={handleAccept}
+							disabled={isLoading}
+						>
+							{#if isLoading}
+								<div class="flex items-center justify-center">
+									<svg class="animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
+										<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+										<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+									</svg>
+									Processing...
+								</div>
+							{:else}
+								Accept
+							{/if}
+						</button>
+						<button
+							type="button"
+							class="btn-secondary"
+							on:click={handleCounterOffer}
+							disabled={isLoading}
+						>
+							Counter-Offer
+						</button>
+					</div>
+					<button
+						type="button"
+						class="btn-danger"
+						on:click={handleCancel}
+						disabled={isLoading}
+					>
+						Cancel
+					</button>
+				</div>
+
+			{:else if isPending && isRequester}
+				<!-- Requester actions for PENDING: Cancel -->
+				<button
+					type="button"
+					class="btn-danger"
+					on:click={handleCancel}
+					disabled={isLoading}
+				>
+					Cancel Request
+				</button>
+
+			{:else if isCounterOffer && isRequester}
+				<!-- Requester actions for COUNTER_OFFER: Accept/Cancel -->
+				<div class="space-y-2">
+					<button
+						type="button"
+						class="btn-success"
+						on:click={handleAccept}
+						disabled={isLoading}
+					>
+						{#if isLoading}
+							<div class="flex items-center justify-center">
+								<svg class="animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
+									<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+									<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 8-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+								</svg>
+								Processing...
+							</div>
+						{:else}
+							Accept Counter-Offer
+						{/if}
+					</button>
+					<button
+						type="button"
+						class="btn-danger"
+						on:click={handleCancel}
+						disabled={isLoading}
+					>
+						Decline Counter-Offer
+					</button>
+				</div>
+
+			{:else if isCounterOffer && isOwner}
+				<!-- Owner actions for COUNTER_OFFER: Cancel -->
+				<button
+					type="button"
+					class="btn-danger"
+					on:click={handleCancel}
+					disabled={isLoading}
+				>
+					Cancel Counter-Offer
+				</button>
+
+			{:else if isAccepted && canComplete}
+				<!-- Complete swap action -->
+				<button
+					type="button"
+					class="btn-primary"
+					on:click={handleCompleteSwap}
+					disabled={isLoading}
+				>
+					<div class="flex items-center justify-center">
+						<svg class="w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+						</svg>
+						Mark as Completed
+					</div>
+				</button>
+			{/if}
+		</div>
+	{/if}
+</div>
+
+<!-- Completion Dialog -->
+{#if showCompletionDialog}
+	<SwapCompletionDialog
+		swapRequest={request}
+		isSubmitting={isLoading}
+		on:submit={handleCompletionSubmit}
+		on:cancel={handleCompletionCancel}
+	/>
+{/if}
+
+<!-- Counter Offer Modal -->
+{#if showCounterOfferModal}
+	<BookSelectionModal
+		bind:isOpen={showCounterOfferModal}
+		title="Select a Book to Counter-Offer"
+		confirmText="Make Counter-Offer"
+		excludeBookIds={[request.book.id, ...(request.offered_book ? [request.offered_book.id] : [])]}
+		on:select={handleCounterOfferSelection}
+		on:close={handleCounterOfferModalClose}
+	/>
+{/if}
