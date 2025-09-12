@@ -28,6 +28,8 @@
 - When creating database migrations or fixes, include the full SQL code in the chat
 - Do NOT just reference migration file paths - the user wants to copy SQL immediately
 - Include SQL in code blocks for easy copying to Supabase Dashboard SQL Editor
+- **ALWAYS provide full SQL file contents when user requests SQL files for manual execution**
+- User prefers complete copy-paste ready SQL blocks over file path references
 
 ## Current Issues Tracking
 - Discovery page UUID errors (resolved but still showing in logs)
