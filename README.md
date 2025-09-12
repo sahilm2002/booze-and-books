@@ -30,13 +30,10 @@ Imagine having access to a vast library of books owned by fellow readers in your
 - Include personal messages to connect with fellow readers
 - **Smart Validation**: System prevents requesting your own books or unavailable titles
 
-#### **Counter-Offer Magic** ⭐ **NEW**
-- **Professional Counter-Offer Modal**: Beautiful interface for selecting alternative books with covers and details
-- **3-Book Visual Flow**: Clear display showing "They want → They offered (declined) → Your counter-offer (new)"
-- **Smart Book Selection**: Auto-loads your available books with interactive selection grid
-- **Personalized Messages**: Add custom messages explaining why your counter-offer is perfect
-- **Automatic Book Management**: System handles book availability - original offer becomes available, counter-offer gets reserved
-- **Dual Perspective Display**: Both parties see the complete 3-book exchange flow from their perspective
+#### **Counter-Offer Magic**
+- **Didn't like the offered book?** As a book owner, you can make counter-offers
+- **Flexible Negotiations**: Suggest a different book from the requester's collection
+- **Multiple Options**: Keep negotiating until both parties find the perfect match
 
 #### **Enhanced Notifications**
 - **Visual Book Covers**: See book cover images in all swap notifications
@@ -45,9 +42,6 @@ Imagine having access to a vast library of books owned by fellow readers in your
 - **Real-Time Updates**: Instant notifications for all swap status changes
 
 #### **Seamless Communication**
-- **Real-Time Chat System**: Direct messaging between users for swap discussions
-- **Chat Notifications**: Instant notifications for new messages with conversation previews
-- **Secure File Sharing**: Share images and documents (up to 10MB) in chat conversations
 - **Contact Information Sharing**: When both parties agree to a swap, contact details are automatically shared
 - **Email Notifications**: Stay updated on swap requests, approvals, and counter-offers
 - **In-App Notifications**: Real-time updates with book covers and detailed information
@@ -100,38 +94,13 @@ Never miss an opportunity with rich, visual notifications featuring book covers,
 
 ## 🚀 Getting Started
 
-### **📱 Mobile-First Experience**
-Booze & Books is designed for mobile users - 90% of our community uses their phones! Every feature works seamlessly on your smartphone.
-
-### **🏠 Discover the Platform**
-1. **Visit the Homepage**: Learn how the platform works with our interactive 3-step guide
-2. **Explore Literary History**: Discover stories about famous literary societies like the Kit-Cat Club and Bloomsbury Group
-3. **Generate New Stories**: Click "Discover More Stories" to learn about different historical book communities
-4. **Research Further**: Use Wikipedia links to dive deeper into literary society history
-
-### **👤 Join the Community**
 1. **Sign Up**: Create your free account to join the community
-2. **Complete Your Profile**: Add your username, bio, and reading preferences
-3. **Upload an Avatar**: Personalize your profile with a photo
-
-### **📚 Build Your Library**
-1. **Add Books**: Start by adding books from your collection using our Google Books integration
-2. **Set Availability**: Mark which books you're willing to lend or trade
-3. **Add Details**: Include condition notes and personal reviews
-
-### **🔍 Start Swapping**
-1. **Explore**: Browse what other readers have available
-2. **Make Requests**: Find books you'd like to read and propose swaps
-3. **Chat**: Use our real-time messaging system to discuss exchanges
-4. **Connect**: When swaps are approved, contact details are automatically shared
-5. **Exchange**: Meet up or arrange shipping to complete your swaps
-6. **Rate**: Share your experience to build community trust
-
-### **💬 Stay Connected**
-- **Real-Time Chat**: Message other users directly about book swaps
-- **Online Status**: See when other users are available to chat
-- **Notifications**: Get instant updates about swap requests and messages
-- **Profile Navigation**: Click usernames/avatars to view other users' profiles
+2. **Add Books**: Start by adding a few books from your collection
+3. **Explore**: Browse what other readers have available
+4. **Make Requests**: Find books you'd like to read and propose swaps
+5. **Connect**: When swaps are approved, connect with other readers
+6. **Exchange**: Meet up or arrange shipping to complete your swaps
+7. **Rate**: Share your experience to build community trust
 
 ## 🌈 Success Stories
 
@@ -159,15 +128,7 @@ We take your privacy seriously:
 
 ## 🛠️ Technical Features & Improvements
 
-### **Recent Enhancements (v1.4)**
-- **Complete Counter-Offer System**: Professional modal interface with book selection grid and 3-book visual flow
-- **Smart Book Availability Management**: Automatic handling of book availability during counter-offer process
-- **Comprehensive Notification System**: Personalized notifications with user names and complete book context for all swap scenarios
-- **Enhanced Swap Card Display**: 3-book flow visualization showing complete counter-offer progression
-- **Responsive Counter-Offer UI**: Mobile-optimized interface with touch-friendly interactions
-- **Intelligent Book Selection**: Auto-loading available books with interactive selection and visual feedback
-
-### **Previous Enhancements (v1.3)**
+### **Recent Enhancements (v1.3)**
 - **Modernized Contact Interface**: Professional contact information cards with user avatars and styled email buttons
 - **Enhanced Swap UI**: Consistent button styling across all swap request interactions with proper spacing
 - **Status Badge Improvements**: Unified status indicator design matching discovery page aesthetics
@@ -205,5 +166,3 @@ Having issues or suggestions? We'd love to hear from you:
 **Join the Booze & Books community today and transform the way you discover, share, and enjoy books!**
 
 *Happy Reading & Happy Swapping! 📚✨*
-# Trigger Vercel redeploy with vercel.json fix
-# Force deployment from main branch - Mon Sep 15 17:12:12 PDT 2025

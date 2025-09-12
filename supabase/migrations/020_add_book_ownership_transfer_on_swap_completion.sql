@@ -2,7 +2,7 @@
 -- This migration fixes the critical bug where completed swaps don't transfer book ownership
 
 -- Create function to handle book ownership transfer on swap completion
-CREATE OR REPLACE FUNCTION transfer_book_ownership_on_completion_020()
+CREATE OR REPLACE FUNCTION transfer_book_ownership_on_completion()
 RETURNS TRIGGER AS $$
 BEGIN
     -- Only proceed if swap is being marked as completed for the first time
@@ -59,12 +59,12 @@ END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- Create trigger to execute ownership transfer after swap completion
-DROP TRIGGER IF EXISTS trigger_transfer_ownership_on_completion_020 ON swap_requests;
-CREATE TRIGGER trigger_transfer_ownership_on_completion_020
+DROP TRIGGER IF EXISTS trigger_transfer_ownership_on_completion ON swap_requests;
+CREATE TRIGGER trigger_transfer_ownership_on_completion
     AFTER UPDATE ON swap_requests
     FOR EACH ROW
     WHEN (NEW.status = 'COMPLETED')
-    EXECUTE FUNCTION transfer_book_ownership_on_completion_020();
+    EXECUTE FUNCTION transfer_book_ownership_on_completion();
 
 -- Create function to validate swap completion prerequisites
 CREATE OR REPLACE FUNCTION validate_swap_completion()
@@ -156,12 +156,12 @@ END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- Grant execute permissions
-GRANT EXECUTE ON FUNCTION transfer_book_ownership_on_completion_020() TO authenticated;
+GRANT EXECUTE ON FUNCTION transfer_book_ownership_on_completion() TO authenticated;
 GRANT EXECUTE ON FUNCTION validate_swap_completion() TO authenticated;
 GRANT EXECUTE ON FUNCTION rollback_swap_if_needed(UUID) TO authenticated;
 
 -- Add comments
-COMMENT ON FUNCTION transfer_book_ownership_on_completion_020() IS 'Transfers book ownership when a swap is marked as completed (migration 020 version)';
+COMMENT ON FUNCTION transfer_book_ownership_on_completion() IS 'Transfers book ownership when a swap is marked as completed';
 COMMENT ON FUNCTION validate_swap_completion() IS 'Validates that swap completion prerequisites are met';
 COMMENT ON FUNCTION rollback_swap_if_needed(UUID) IS 'Rollback function for failed swaps (admin use)';
 
