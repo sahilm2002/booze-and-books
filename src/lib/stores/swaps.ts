@@ -1,10 +1,17 @@
-// Clean, bug-free swap store
-// Built from scratch with proper state management
+// Rebuilt swaps store - clean state management for the new swap system
+// Integrates with the rebuilt SwapService and types
 
 import { writable, derived } from 'svelte/store';
 import { SwapService } from '$lib/services/swapService';
 import { auth } from './auth';
-import type { SwapRequestWithDetails, SwapRequestInput, SwapCompletion, SwapStatistics } from '$lib/types/swap';
+import { 
+	SwapStatus,
+	type SwapRequestWithDetails, 
+	type SwapRequestInput,
+	type CounterOfferInput,
+	type SwapCompletion, 
+	type SwapStatistics 
+} from '$lib/types/swap';
 
 interface SwapState {
 	incoming: SwapRequestWithDetails[];
@@ -83,6 +90,31 @@ function createSwapStore() {
 				update(state => ({
 					...state,
 					error: error instanceof Error ? error.message : 'Failed to create swap request'
+				}));
+				throw error;
+			}
+		},
+
+		async createCounterOffer(requestId: string, counterOffer: CounterOfferInput) {
+			let currentUser: any = null;
+			auth.subscribe(state => {
+				currentUser = state.user;
+			})();
+
+			if (!currentUser) {
+				throw new Error('User not authenticated');
+			}
+
+			try {
+				await SwapService.createCounterOffer(requestId, currentUser.id, counterOffer);
+				
+				// Reload swap requests to get updated data
+				await this.loadSwapRequests();
+			} catch (error) {
+				console.error('Error creating counter-offer:', error);
+				update(state => ({
+					...state,
+					error: error instanceof Error ? error.message : 'Failed to create counter-offer'
 				}));
 				throw error;
 			}
@@ -186,6 +218,20 @@ function createSwapStore() {
 			}
 		},
 
+		// Get a single swap request by ID
+		async getSwapRequestById(requestId: string) {
+			try {
+				return await SwapService.getSwapRequestById(requestId);
+			} catch (error) {
+				console.error('Error fetching swap request:', error);
+				update(state => ({
+					...state,
+					error: error instanceof Error ? error.message : 'Failed to fetch swap request'
+				}));
+				throw error;
+			}
+		},
+
 		// Clear error
 		clearError() {
 			update(state => ({ ...state, error: null }));
@@ -209,14 +255,77 @@ export const swapLoading = derived(swapStore, $swapStore => $swapStore.isLoading
 
 // Derived store for pending swap counts
 export const pendingSwapCounts = derived(swapStore, $swapStore => {
-	const incomingPending = $swapStore.incoming.filter(swap => swap.status === 'PENDING').length;
-	const outgoingPending = $swapStore.outgoing.filter(swap => swap.status === 'PENDING').length;
+	const incomingPending = $swapStore.incoming.filter(swap => 
+		swap.status === SwapStatus.PENDING || swap.status === SwapStatus.COUNTER_OFFER
+	).length;
+	
+	const outgoingPending = $swapStore.outgoing.filter(swap => 
+		swap.status === SwapStatus.PENDING || swap.status === SwapStatus.COUNTER_OFFER
+	).length;
 	
 	return {
 		incoming: incomingPending,
 		outgoing: outgoingPending,
 		total: incomingPending + outgoingPending
 	};
+});
+
+// Derived store for accepted swaps (ready for completion)
+export const acceptedSwaps = derived(swapStore, $swapStore => {
+	const allAccepted = [
+		...$swapStore.incoming.filter(swap => swap.status === SwapStatus.ACCEPTED),
+		...$swapStore.outgoing.filter(swap => swap.status === SwapStatus.ACCEPTED)
+	];
+	
+	return allAccepted;
+});
+
+// Derived store for completed swaps
+export const completedSwaps = derived(swapStore, $swapStore => {
+	const allCompleted = [
+		...$swapStore.incoming.filter(swap => swap.status === SwapStatus.COMPLETED),
+		...$swapStore.outgoing.filter(swap => swap.status === SwapStatus.COMPLETED)
+	];
+	
+	return allCompleted;
+});
+
+// Derived store for swaps needing user action
+export const swapsNeedingAction = derived([swapStore, auth], ([$swapStore, $auth]) => {
+	if (!$auth.user) return [];
+	
+	const needingAction: SwapRequestWithDetails[] = [];
+	
+	// Incoming swaps that need owner action
+	$swapStore.incoming.forEach(swap => {
+		if (swap.status === SwapStatus.PENDING) {
+			needingAction.push(swap); // Owner can accept/counter-offer/cancel
+		}
+	});
+	
+	// Outgoing swaps that need requester action
+	$swapStore.outgoing.forEach(swap => {
+		if (swap.status === SwapStatus.COUNTER_OFFER) {
+			needingAction.push(swap); // Requester can accept/cancel counter-offer
+		}
+	});
+	
+	// Accepted swaps where user hasn't completed yet
+	const allAccepted = [
+		...$swapStore.incoming.filter(swap => swap.status === SwapStatus.ACCEPTED),
+		...$swapStore.outgoing.filter(swap => swap.status === SwapStatus.ACCEPTED)
+	];
+	
+	allAccepted.forEach(swap => {
+		const isRequester = swap.requester_id === $auth.user?.id;
+		const userCompleted = isRequester ? swap.requester_completed_at : swap.owner_completed_at;
+		
+		if (!userCompleted) {
+			needingAction.push(swap); // User needs to mark as completed
+		}
+	});
+	
+	return needingAction;
 });
 
 // Auto-load swap requests when user changes

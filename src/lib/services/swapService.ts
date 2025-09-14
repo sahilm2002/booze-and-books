@@ -1,18 +1,22 @@
-// Clean, bug-free swap service
-// Built from scratch with proper error handling and validation
+// Rebuilt swap service - complete implementation with counter-offers and completion logic
+// Clean, comprehensive service layer for the new swap system
 
 import { supabase } from '$lib/supabase';
 import { 
 	SwapStatus,
 	type SwapRequest, 
-	type SwapRequestInput, 
+	type SwapRequestInput,
+	type CounterOfferInput,
 	type SwapRequestWithDetails,
 	type SwapCompletion,
 	type SwapStatistics,
 	isValidRating,
 	canUserCancelSwap,
 	canUserAcceptSwap,
-	canUserCompleteSwap
+	canUserCreateCounterOffer,
+	canUserAcceptCounterOffer,
+	canUserCompleteSwap,
+	canTransitionTo
 } from '$lib/types/swap';
 
 export class SwapService {
@@ -40,11 +44,7 @@ export class SwapService {
 				throw new Error('You cannot request a swap for your own book');
 			}
 
-			// Validate the offered book (REQUIRED)
-			if (!input.offered_book_id) {
-				throw new Error('You must offer one of your own books in exchange');
-			}
-
+			// Validate the offered book exists, is available, and owned by requester
 			const { data: offeredBook, error: offeredBookError } = await supabase
 				.from('books')
 				.select('owner_id, is_available')
@@ -63,13 +63,13 @@ export class SwapService {
 				throw new Error('The offered book is not available');
 			}
 
-			// Check for existing pending request
+			// Check for existing pending/counter-offer request for the same book by the same user
 			const { data: existingRequest } = await supabase
 				.from('swap_requests')
 				.select('id')
 				.eq('book_id', input.book_id)
 				.eq('requester_id', requesterId)
-				.eq('status', SwapStatus.PENDING)
+				.in('status', [SwapStatus.PENDING, SwapStatus.COUNTER_OFFER])
 				.single();
 
 			if (existingRequest) {
@@ -81,10 +81,10 @@ export class SwapService {
 				.from('swap_requests')
 				.insert({
 					book_id: input.book_id,
+					offered_book_id: input.offered_book_id,
 					requester_id: requesterId,
 					owner_id: requestedBook.owner_id,
 					message: input.message || null,
-					offered_book_id: input.offered_book_id || null,
 					status: SwapStatus.PENDING
 				})
 				.select()
@@ -102,75 +102,78 @@ export class SwapService {
 	}
 
 	/**
-	 * Get swap requests for a user (both incoming and outgoing)
+	 * Create a counter-offer for an existing swap request
 	 */
-	static async getSwapRequestsForUser(userId: string): Promise<{
-		incoming: SwapRequestWithDetails[];
-		outgoing: SwapRequestWithDetails[];
-	}> {
+	static async createCounterOffer(
+		requestId: string, 
+		userId: string, 
+		counterOffer: CounterOfferInput
+	): Promise<SwapRequest> {
 		try {
-			// Get incoming requests (user is the book owner)
-			const { data: incoming, error: incomingError } = await supabase
+			// Get the current request
+			const { data: request, error: fetchError } = await supabase
 				.from('swap_requests')
-				.select(`
-					*,
-					book:books!swap_requests_book_id_fkey (
-						id, title, authors, thumbnail_url, condition
-					),
-					offered_book:books!swap_requests_offered_book_id_fkey (
-						id, title, authors, thumbnail_url, condition
-					),
-					requester_profile:profiles!swap_requests_requester_id_fkey (
-						username, full_name, avatar_url
-					),
-					owner_profile:profiles!swap_requests_owner_id_fkey (
-						username, full_name, avatar_url
-					)
-				`)
-				.eq('owner_id', userId)
-				.order('created_at', { ascending: false });
+				.select('*')
+				.eq('id', requestId)
+				.single();
 
-			if (incomingError) {
-				throw new Error(`Failed to fetch incoming requests: ${incomingError.message}`);
+			if (fetchError) {
+				throw new Error(`Swap request not found: ${fetchError.message}`);
 			}
 
-			// Get outgoing requests (user is the requester)
-			const { data: outgoing, error: outgoingError } = await supabase
-				.from('swap_requests')
-				.select(`
-					*,
-					book:books!swap_requests_book_id_fkey (
-						id, title, authors, thumbnail_url, condition
-					),
-					offered_book:books!swap_requests_offered_book_id_fkey (
-						id, title, authors, thumbnail_url, condition
-					),
-					requester_profile:profiles!swap_requests_requester_id_fkey (
-						username, full_name, avatar_url
-					),
-					owner_profile:profiles!swap_requests_owner_id_fkey (
-						username, full_name, avatar_url
-					)
-				`)
-				.eq('requester_id', userId)
-				.order('created_at', { ascending: false });
-
-			if (outgoingError) {
-				throw new Error(`Failed to fetch outgoing requests: ${outgoingError.message}`);
+			if (!canUserCreateCounterOffer(request, userId)) {
+				throw new Error('You cannot create a counter-offer for this swap request');
 			}
 
-			return {
-				incoming: (incoming || []) as SwapRequestWithDetails[],
-				outgoing: (outgoing || []) as SwapRequestWithDetails[]
-			};
+			// Validate the counter-offered book
+			const { data: counterBook, error: counterBookError } = await supabase
+				.from('books')
+				.select('owner_id, is_available')
+				.eq('id', counterOffer.counter_offered_book_id)
+				.single();
+
+			if (counterBookError) {
+				throw new Error(`Counter-offered book not found: ${counterBookError.message}`);
+			}
+
+			if (counterBook.owner_id !== userId) {
+				throw new Error('You can only counter-offer with books that you own');
+			}
+
+			if (!counterBook.is_available) {
+				throw new Error('The counter-offered book is not available');
+			}
+
+			// Ensure counter-offered book is different from the originally requested book
+			if (counterOffer.counter_offered_book_id === request.book_id) {
+				throw new Error('Counter-offered book must be different from the originally requested book');
+			}
+
+			// Update the request with counter-offer
+			const { data, error } = await supabase
+				.from('swap_requests')
+				.update({
+					status: SwapStatus.COUNTER_OFFER,
+					counter_offered_book_id: counterOffer.counter_offered_book_id,
+					counter_offer_message: counterOffer.counter_offer_message || null
+				})
+				.eq('id', requestId)
+				.select()
+				.single();
+
+			if (error) {
+				throw new Error(`Failed to create counter-offer: ${error.message}`);
+			}
+
+			return data;
 		} catch (error) {
-			console.error('Error fetching swap requests:', error);
+			console.error('Error creating counter-offer:', error);
 			throw error;
 		}
 	}
 
 	/**
-	 * Accept a swap request (owner only)
+	 * Accept a swap request (original or counter-offer)
 	 */
 	static async acceptSwapRequest(requestId: string, userId: string): Promise<SwapRequest> {
 		try {
@@ -185,11 +188,19 @@ export class SwapService {
 				throw new Error(`Swap request not found: ${fetchError.message}`);
 			}
 
-			if (!canUserAcceptSwap(request, userId)) {
+			// Check permissions based on current status
+			let canAccept = false;
+			if (request.status === SwapStatus.PENDING) {
+				canAccept = canUserAcceptSwap(request, userId);
+			} else if (request.status === SwapStatus.COUNTER_OFFER) {
+				canAccept = canUserAcceptCounterOffer(request, userId);
+			}
+
+			if (!canAccept) {
 				throw new Error('You cannot accept this swap request');
 			}
 
-			// Update the status
+			// Update the status to accepted
 			const { data, error } = await supabase
 				.from('swap_requests')
 				.update({ status: SwapStatus.ACCEPTED })
@@ -228,7 +239,7 @@ export class SwapService {
 				throw new Error('You cannot cancel this swap request');
 			}
 
-			// Update the status
+			// Update the status to cancelled
 			const { data, error } = await supabase
 				.from('swap_requests')
 				.update({ 
@@ -251,7 +262,7 @@ export class SwapService {
 	}
 
 	/**
-	 * Complete a swap request with rating and feedback
+	 * Mark a swap as completed by one party
 	 */
 	static async completeSwapRequest(
 		requestId: string, 
@@ -278,21 +289,20 @@ export class SwapService {
 				throw new Error('You cannot complete this swap request');
 			}
 
-			// Determine which rating field to update
-			const updateData: any = {
-				status: SwapStatus.COMPLETED,
-				completed_at: new Date().toISOString()
-			};
+			// Determine which completion fields to update
+			const updateData: any = {};
 
 			if (request.requester_id === userId) {
+				updateData.requester_completed_at = new Date().toISOString();
 				updateData.requester_rating = completion.rating;
 				updateData.requester_feedback = completion.feedback || null;
 			} else {
+				updateData.owner_completed_at = new Date().toISOString();
 				updateData.owner_rating = completion.rating;
 				updateData.owner_feedback = completion.feedback || null;
 			}
 
-			// Update the request
+			// Update the request (trigger will handle full completion logic)
 			const { data, error } = await supabase
 				.from('swap_requests')
 				.update(updateData)
@@ -312,7 +322,81 @@ export class SwapService {
 	}
 
 	/**
-	 * Get a single swap request by ID
+	 * Get swap requests for a user (both incoming and outgoing)
+	 */
+	static async getSwapRequestsForUser(userId: string): Promise<{
+		incoming: SwapRequestWithDetails[];
+		outgoing: SwapRequestWithDetails[];
+	}> {
+		try {
+			// Get incoming requests (user is the book owner)
+			const { data: incoming, error: incomingError } = await supabase
+				.from('swap_requests')
+				.select(`
+					*,
+					book:books!swap_requests_book_id_fkey (
+						id, title, authors, thumbnail_url, condition, owner_id
+					),
+					offered_book:books!swap_requests_offered_book_id_fkey (
+						id, title, authors, thumbnail_url, condition, owner_id
+					),
+					counter_offered_book:books!swap_requests_counter_offered_book_id_fkey (
+						id, title, authors, thumbnail_url, condition, owner_id
+					),
+					requester_profile:profiles!swap_requests_requester_id_fkey (
+						id, username, full_name, avatar_url
+					),
+					owner_profile:profiles!swap_requests_owner_id_fkey (
+						id, username, full_name, avatar_url
+					)
+				`)
+				.eq('owner_id', userId)
+				.order('created_at', { ascending: false });
+
+			if (incomingError) {
+				throw new Error(`Failed to fetch incoming requests: ${incomingError.message}`);
+			}
+
+			// Get outgoing requests (user is the requester)
+			const { data: outgoing, error: outgoingError } = await supabase
+				.from('swap_requests')
+				.select(`
+					*,
+					book:books!swap_requests_book_id_fkey (
+						id, title, authors, thumbnail_url, condition, owner_id
+					),
+					offered_book:books!swap_requests_offered_book_id_fkey (
+						id, title, authors, thumbnail_url, condition, owner_id
+					),
+					counter_offered_book:books!swap_requests_counter_offered_book_id_fkey (
+						id, title, authors, thumbnail_url, condition, owner_id
+					),
+					requester_profile:profiles!swap_requests_requester_id_fkey (
+						id, username, full_name, avatar_url
+					),
+					owner_profile:profiles!swap_requests_owner_id_fkey (
+						id, username, full_name, avatar_url
+					)
+				`)
+				.eq('requester_id', userId)
+				.order('created_at', { ascending: false });
+
+			if (outgoingError) {
+				throw new Error(`Failed to fetch outgoing requests: ${outgoingError.message}`);
+			}
+
+			return {
+				incoming: (incoming || []) as SwapRequestWithDetails[],
+				outgoing: (outgoing || []) as SwapRequestWithDetails[]
+			};
+		} catch (error) {
+			console.error('Error fetching swap requests:', error);
+			throw error;
+		}
+	}
+
+	/**
+	 * Get a single swap request by ID with full details
 	 */
 	static async getSwapRequestById(requestId: string): Promise<SwapRequestWithDetails | null> {
 		try {
@@ -321,16 +405,19 @@ export class SwapService {
 				.select(`
 					*,
 					book:books!swap_requests_book_id_fkey (
-						id, title, authors, thumbnail_url, condition
+						id, title, authors, thumbnail_url, condition, owner_id
 					),
 					offered_book:books!swap_requests_offered_book_id_fkey (
-						id, title, authors, thumbnail_url, condition
+						id, title, authors, thumbnail_url, condition, owner_id
+					),
+					counter_offered_book:books!swap_requests_counter_offered_book_id_fkey (
+						id, title, authors, thumbnail_url, condition, owner_id
 					),
 					requester_profile:profiles!swap_requests_requester_id_fkey (
-						username, full_name, avatar_url
+						id, username, full_name, avatar_url
 					),
 					owner_profile:profiles!swap_requests_owner_id_fkey (
-						username, full_name, avatar_url
+						id, username, full_name, avatar_url
 					)
 				`)
 				.eq('id', requestId)
@@ -355,60 +442,50 @@ export class SwapService {
 	 */
 	static async getSwapStatistics(userId: string): Promise<SwapStatistics> {
 		try {
-			// Get all completed swaps for the user
-			const { data: completedSwaps, error } = await supabase
+			// Get all swaps for the user
+			const { data: allSwaps, error: allError } = await supabase
 				.from('swap_requests')
-				.select('requester_rating, owner_rating, requester_id, owner_id')
-				.eq('status', SwapStatus.COMPLETED)
+				.select('status, requester_rating, owner_rating, requester_id, owner_id')
 				.or(`requester_id.eq.${userId},owner_id.eq.${userId}`);
 
-			if (error) {
-				throw new Error(`Failed to fetch swap statistics: ${error.message}`);
+			if (allError) {
+				throw new Error(`Failed to fetch swap statistics: ${allError.message}`);
 			}
 
-			// Get total swaps (all statuses)
-			const { count: totalSwaps, error: countError } = await supabase
-				.from('swap_requests')
-				.select('*', { count: 'exact', head: true })
-				.or(`requester_id.eq.${userId},owner_id.eq.${userId}`);
-
-			if (countError) {
-				throw new Error(`Failed to count total swaps: ${countError.message}`);
-			}
-
-			const completed = completedSwaps || [];
-			const ratings: number[] = [];
-
-			// Collect ratings given TO this user (not BY this user)
-			completed.forEach(swap => {
+			const swaps = allSwaps || [];
+			const completedSwaps = swaps.filter(s => s.status === SwapStatus.COMPLETED);
+			
+			// Calculate ratings given TO this user (not BY this user)
+			const ratingsReceived: number[] = [];
+			completedSwaps.forEach(swap => {
 				if (swap.requester_id === userId && swap.owner_rating !== null) {
-					ratings.push(swap.owner_rating);
+					ratingsReceived.push(swap.owner_rating);
 				} else if (swap.owner_id === userId && swap.requester_rating !== null) {
-					ratings.push(swap.requester_rating);
+					ratingsReceived.push(swap.requester_rating);
 				}
 			});
 
-			const averageRating = ratings.length > 0 
-				? ratings.reduce((sum, rating) => sum + rating, 0) / ratings.length 
+			const averageRating = ratingsReceived.length > 0 
+				? ratingsReceived.reduce((sum, rating) => sum + rating, 0) / ratingsReceived.length 
 				: 0;
 
-			const completionRate = totalSwaps && totalSwaps > 0 
-				? (completed.length / totalSwaps) * 100 
+			const completionRate = swaps.length > 0 
+				? (completedSwaps.length / swaps.length) * 100 
 				: 0;
 
 			return {
-				total_completed: completed.length,
-				average_rating: Math.round(averageRating * 100) / 100, // Round to 2 decimal places
-				completion_rate: Math.round(completionRate * 100) / 100, // Round to 2 decimal places
-				total_swaps: totalSwaps || 0
+				total_swaps: swaps.length,
+				total_completed: completedSwaps.length,
+				completion_rate: Math.round(completionRate * 100) / 100,
+				average_rating: Math.round(averageRating * 100) / 100
 			};
 		} catch (error) {
 			console.error('Error fetching swap statistics:', error);
 			return {
+				total_swaps: 0,
 				total_completed: 0,
-				average_rating: 0,
 				completion_rate: 0,
-				total_swaps: 0
+				average_rating: 0
 			};
 		}
 	}
@@ -418,24 +495,16 @@ export class SwapService {
 	 */
 	static async getAvailableBooksForSwapping(excludeUserId?: string): Promise<any[]> {
 		try {
-			// Get books that are currently in active swaps
-			const { data: activeSwaps } = await supabase
-				.from('swap_requests')
-				.select('book_id, offered_book_id')
-				.in('status', [SwapStatus.PENDING, SwapStatus.ACCEPTED]);
+			// Get books that are currently in active swaps using the database function
+			const { data: busyBooks } = await supabase.rpc('get_books_in_active_swaps');
+			const busyBookIds = busyBooks?.map((b: { book_id: string }) => b.book_id) || [];
 
-			const busyBookIds = new Set<string>();
-			activeSwaps?.forEach(swap => {
-				if (swap.book_id) busyBookIds.add(swap.book_id);
-				if (swap.offered_book_id) busyBookIds.add(swap.offered_book_id);
-			});
-
-			// Build query
+			// Build query for available books
 			let query = supabase
 				.from('books')
 				.select(`
 					id, title, authors, thumbnail_url, condition, owner_id, created_at,
-					profiles!books_owner_id_fkey (username, full_name, avatar_url)
+					profiles!books_owner_id_fkey (id, username, full_name, avatar_url)
 				`)
 				.eq('is_available', true);
 
@@ -443,8 +512,8 @@ export class SwapService {
 				query = query.neq('owner_id', excludeUserId);
 			}
 
-			if (busyBookIds.size > 0) {
-				query = query.not('id', 'in', `(${Array.from(busyBookIds).join(',')})`);
+			if (busyBookIds.length > 0) {
+				query = query.not('id', 'in', `(${busyBookIds.join(',')})`);
 			}
 
 			const { data, error } = await query.order('created_at', { ascending: false });
@@ -466,26 +535,18 @@ export class SwapService {
 	static async getUserAvailableBooksForOffering(userId: string): Promise<any[]> {
 		try {
 			// Get books that are currently in active swaps
-			const { data: activeSwaps } = await supabase
-				.from('swap_requests')
-				.select('book_id, offered_book_id')
-				.in('status', [SwapStatus.PENDING, SwapStatus.ACCEPTED]);
+			const { data: busyBooks } = await supabase.rpc('get_books_in_active_swaps');
+			const busyBookIds = busyBooks?.map((b: { book_id: string }) => b.book_id) || [];
 
-			const busyBookIds = new Set<string>();
-			activeSwaps?.forEach(swap => {
-				if (swap.book_id) busyBookIds.add(swap.book_id);
-				if (swap.offered_book_id) busyBookIds.add(swap.offered_book_id);
-			});
-
-			// Build query
+			// Build query for user's available books
 			let query = supabase
 				.from('books')
 				.select('id, title, authors, thumbnail_url, condition')
 				.eq('owner_id', userId)
 				.eq('is_available', true);
 
-			if (busyBookIds.size > 0) {
-				query = query.not('id', 'in', `(${Array.from(busyBookIds).join(',')})`);
+			if (busyBookIds.length > 0) {
+				query = query.not('id', 'in', `(${busyBookIds.join(',')})`);
 			}
 
 			const { data, error } = await query.order('created_at', { ascending: false });
@@ -498,6 +559,48 @@ export class SwapService {
 		} catch (error) {
 			console.error('Error fetching user books:', error);
 			throw error;
+		}
+	}
+
+	/**
+	 * Get swaps that need completion reminders (one party completed >24 hours ago)
+	 */
+	static async getSwapsNeedingReminders(): Promise<SwapRequestWithDetails[]> {
+		try {
+			const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+
+			const { data, error } = await supabase
+				.from('swap_requests')
+				.select(`
+					*,
+					book:books!swap_requests_book_id_fkey (
+						id, title, authors, thumbnail_url, condition, owner_id
+					),
+					offered_book:books!swap_requests_offered_book_id_fkey (
+						id, title, authors, thumbnail_url, condition, owner_id
+					),
+					counter_offered_book:books!swap_requests_counter_offered_book_id_fkey (
+						id, title, authors, thumbnail_url, condition, owner_id
+					),
+					requester_profile:profiles!swap_requests_requester_id_fkey (
+						id, username, full_name, avatar_url
+					),
+					owner_profile:profiles!swap_requests_owner_id_fkey (
+						id, username, full_name, avatar_url
+					)
+				`)
+				.eq('status', SwapStatus.ACCEPTED)
+				.is('completed_at', null)
+				.or(`and(requester_completed_at.not.is.null,requester_completed_at.lt.${twentyFourHoursAgo},owner_completed_at.is.null),and(owner_completed_at.not.is.null,owner_completed_at.lt.${twentyFourHoursAgo},requester_completed_at.is.null)`);
+
+			if (error) {
+				throw new Error(`Failed to fetch swaps needing reminders: ${error.message}`);
+			}
+
+			return (data || []) as SwapRequestWithDetails[];
+		} catch (error) {
+			console.error('Error fetching swaps needing reminders:', error);
+			return [];
 		}
 	}
 }
