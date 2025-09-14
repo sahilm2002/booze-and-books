@@ -1,10 +1,11 @@
 -- Fix RLS issue with book ownership transfer on swap completion
 -- The transfer function needs to bypass RLS to transfer ownership between users
+-- Note: This is an alternate version - the canonical implementation is in migration 027
 
 -- Drop and recreate the transfer function with proper RLS bypass
-DROP FUNCTION IF EXISTS transfer_book_ownership_on_completion() CASCADE;
+DROP FUNCTION IF EXISTS transfer_book_ownership_on_completion_rls_024();
 
-CREATE OR REPLACE FUNCTION transfer_book_ownership_on_completion()
+CREATE OR REPLACE FUNCTION transfer_book_ownership_on_completion_rls_024()
 RETURNS TRIGGER AS $$
 DECLARE
     requested_book_owner_id UUID;
@@ -58,14 +59,14 @@ END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- Recreate trigger to execute ownership transfer after swap completion
-CREATE TRIGGER trigger_transfer_ownership_on_completion
+CREATE TRIGGER trigger_transfer_ownership_on_completion_rls_024
     AFTER UPDATE ON swap_requests
     FOR EACH ROW
     WHEN (NEW.status = 'COMPLETED')
-    EXECUTE FUNCTION transfer_book_ownership_on_completion();
+    EXECUTE FUNCTION transfer_book_ownership_on_completion_rls_024();
 
 -- Grant execute permissions
-GRANT EXECUTE ON FUNCTION transfer_book_ownership_on_completion() TO authenticated;
+GRANT EXECUTE ON FUNCTION transfer_book_ownership_on_completion_rls_024() TO authenticated;
 
 -- Add policy to allow the function to update book ownership during swaps
 -- This policy allows updates to books.owner_id when it's part of a swap completion

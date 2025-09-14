@@ -1,10 +1,11 @@
 -- Simplify swap completion trigger to remove problematic ownership validation
 -- The ownership validation is causing issues as it tries to validate original ownership
 -- when books may have already changed hands through the swap process
+-- Note: This is an alternate version - the canonical implementation is in migration 027
 
-DROP FUNCTION IF EXISTS transfer_book_ownership_on_completion() CASCADE;
+DROP FUNCTION IF EXISTS transfer_book_ownership_on_completion_simplified_033();
 
-CREATE OR REPLACE FUNCTION transfer_book_ownership_on_completion()
+CREATE OR REPLACE FUNCTION transfer_book_ownership_on_completion_simplified_033()
 RETURNS TRIGGER AS $$
 BEGIN
     -- Only proceed if this swap record is transitioning to COMPLETED status
@@ -48,16 +49,16 @@ END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- Recreate the trigger
-DROP TRIGGER IF EXISTS trigger_transfer_ownership_on_completion ON swap_requests;
-CREATE TRIGGER trigger_transfer_ownership_on_completion
+DROP TRIGGER IF EXISTS trigger_transfer_ownership_on_completion_simplified_033 ON swap_requests;
+CREATE TRIGGER trigger_transfer_ownership_on_completion_simplified_033
     AFTER UPDATE ON swap_requests
     FOR EACH ROW
     WHEN (NEW.status = 'COMPLETED')
-    EXECUTE FUNCTION transfer_book_ownership_on_completion();
+    EXECUTE FUNCTION transfer_book_ownership_on_completion_simplified_033();
 
 -- Grant execute permissions
-GRANT EXECUTE ON FUNCTION transfer_book_ownership_on_completion() TO authenticated;
+GRANT EXECUTE ON FUNCTION transfer_book_ownership_on_completion_simplified_033() TO authenticated;
 
 -- Add comment explaining the simplified logic
-COMMENT ON FUNCTION transfer_book_ownership_on_completion() 
+COMMENT ON FUNCTION transfer_book_ownership_on_completion_simplified_033() 
 IS 'Transfers book ownership when swap is completed without ownership validation checks that were causing issues';
