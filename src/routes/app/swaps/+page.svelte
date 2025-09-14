@@ -6,7 +6,7 @@
 	import { auth } from '$lib/stores/auth';
 	import type { PageData } from './$types';
 
-	export const data: PageData = undefined;
+	export let data: PageData;
 
 	let activeTab: 'incoming' | 'outgoing' = 'incoming';
 	let statusFilter: 'all' | 'pending' | 'accepted' | 'counter_offer' | 'cancelled' | 'completed' = 'all';
@@ -53,6 +53,7 @@
 			console.log('After mount:', {
 				incoming: $incomingSwapRequests.length,
 				outgoing: $outgoingSwapRequests.length,
+				completed: $completedSwapRequests.length,
 				loading: $swapRequestsLoading,
 				error: $swapRequestsError
 			});
@@ -70,6 +71,16 @@
 
 	// For completed swaps, show all completed swaps regardless of tab
 	$: filteredCompleted = statusFilter === 'completed' ? $completedSwapRequests : [];
+	
+	// Debug completed swaps
+	$: if (import.meta.env.DEV && statusFilter === 'completed') {
+		console.log('Debug completed swaps:', {
+			statusFilter,
+			completedSwapRequestsLength: $completedSwapRequests.length,
+			filteredCompletedLength: filteredCompleted.length,
+			completedSwapRequests: $completedSwapRequests
+		});
+	}
 
 	$: currentRequests = statusFilter === 'completed' ? filteredCompleted : 
 		(activeTab === 'incoming' ? filteredIncoming : filteredOutgoing);
@@ -169,7 +180,7 @@
 		background: white;
 		border: 1px solid #e2e8f0;
 		border-radius: 12px;
-		padding: 1.5rem;
+		padding: 1.5rem 1.5rem 0 1.5rem;
 		margin-bottom: 2rem;
 		box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
 	}
@@ -178,7 +189,7 @@
 		display: flex;
 		gap: 1rem;
 		border-bottom: 2px solid #f1f3f4;
-		margin-bottom: -1.5rem;
+		margin-bottom: 0;
 		padding-bottom: 0;
 	}
 
@@ -192,10 +203,10 @@
 		display: flex;
 		align-items: center;
 		gap: 0.5rem;
-		padding: 0.75rem 1rem;
+		padding: 1rem 1.5rem;
 		background: none;
 		border: none;
-		border-bottom: 2px solid transparent;
+		border-bottom: 3px solid transparent;
 		color: #718096;
 		font-size: 0.95rem;
 		font-weight: 500;
@@ -203,15 +214,18 @@
 		transition: all 0.2s ease;
 		white-space: nowrap;
 		margin-bottom: -2px;
+		border-radius: 8px 8px 0 0;
 	}
 
 	.tab-button:hover {
 		color: #8B2635;
+		background: #f8f9fa;
 		border-bottom-color: #e2e8f0;
 	}
 
 	.tab-button.active {
 		color: #8B2635;
+		background: #f8f9fa;
 		border-bottom-color: #8B2635;
 		font-weight: 600;
 	}
@@ -220,10 +234,10 @@
 		display: inline-flex;
 		align-items: center;
 		justify-content: center;
-		min-width: 20px;
-		height: 20px;
+		min-width: 22px;
+		height: 22px;
 		padding: 0 6px;
-		border-radius: 10px;
+		border-radius: 11px;
 		font-size: 0.75rem;
 		font-weight: 700;
 		line-height: 1;
@@ -250,7 +264,7 @@
 	}
 
 	.filters-header {
-		margin-bottom: 1rem;
+		margin-bottom: 1.5rem;
 	}
 
 	.filters-title {
@@ -466,7 +480,7 @@
 	{/if}
 
 	<!-- Tabs -->
-	<div class="tabs-section">
+	<div class="tabs-section card">
 		<nav class="tabs-nav" aria-label="Tabs">
 			<button
 				type="button"
@@ -500,7 +514,7 @@
 	</div>
 
 	<!-- Status Filter -->
-	<div class="filters-section">
+	<div class="filters-section card">
 		<div class="filters-header">
 			<h3 class="filters-title">Filter by Status</h3>
 		</div>
@@ -517,7 +531,7 @@
 					type="button"
 					class="filter-tag"
 					class:active={statusFilter === filterOption.value}
-					on:click={() => statusFilter = filterOption.value}
+					on:click={() => statusFilter = filterOption.value as typeof statusFilter}
 				>
 					{filterOption.label}
 				</button>

@@ -19,10 +19,6 @@
 	let searchError: string | null = null;
 	let debounceTimeout: ReturnType<typeof setTimeout> | undefined;
 
-	$: if (value) {
-		handleInput();
-	}
-
 	onMount(() => {
 		return () => {
 			if (debounceTimeout) {
@@ -31,9 +27,11 @@
 		};
 	});
 
-	function handleInput() {
-		const query = value.trim();
-		dispatch('input', { value });
+	function handleInput(event: Event) {
+		const target = event.target as HTMLInputElement;
+		const query = target.value.trim();
+		
+		dispatch('input', { value: target.value });
 
 		if (debounceTimeout) {
 			clearTimeout(debounceTimeout);
@@ -82,22 +80,35 @@
 	}
 
 	function selectBook(result: any, googleBook: GoogleBookResult) {
-		value = result.displayText;
-		searchResults = [];
-		showDropdown = false;
+		// Clear any pending search timeout
+		if (debounceTimeout) {
+			clearTimeout(debounceTimeout);
+			debounceTimeout = undefined;
+		}
 		
+		// Immediately hide dropdown and clear results
+		showDropdown = false;
+		searchResults = [];
+		isSearching = false;
+		searchError = null;
+		
+		// Update the input value
+		value = result.displayText;
+		
+		// Dispatch the selection event
 		dispatch('select', { 
 			book: googleBook,
 			extracted: GoogleBooksService.extractBookData(googleBook)
 		});
 		
+		// Blur the input to remove focus
 		searchInput.blur();
 	}
 
 	function closeDropdown() {
 		setTimeout(() => {
 			showDropdown = false;
-		}, 150);
+		}, 200);
 	}
 
 	function handleKeydown(event: KeyboardEvent) {
@@ -114,7 +125,11 @@
 			bind:this={searchInput}
 			bind:value
 			on:input={handleInput}
-			on:focus={() => value.length >= 2 && (showDropdown = true)}
+			on:focus={() => {
+				if (value.length >= 2 && searchResults.length > 0) {
+					showDropdown = true;
+				}
+			}}
 			on:blur={closeDropdown}
 			on:keydown={handleKeydown}
 			{placeholder}
@@ -135,55 +150,63 @@
 	</div>
 
 	{#if showDropdown && (searchResults.length > 0 || searchError || isSearching)}
-		<div class="absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-96 overflow-y-auto">
+		<div class="search-dropdown">
 			{#if isSearching}
-				<div class="p-3 text-center text-gray-500">
-					<svg class="animate-spin mx-auto h-6 w-6 mb-2" fill="none" viewBox="0 0 24 24">
-						<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-						<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-					</svg>
-					Searching...
+				<div class="search-state">
+					<div class="search-loading">
+						<svg class="loading-icon" fill="none" viewBox="0 0 24 24">
+							<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+							<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+						</svg>
+						<span class="search-text">Searching books...</span>
+					</div>
 				</div>
 			{:else if searchError}
-				<div class="p-3 text-center text-gray-500">
-					<svg class="mx-auto h-6 w-6 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
-					</svg>
-					{searchError}
+				<div class="search-state">
+					<div class="search-error">
+						<svg class="error-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+						</svg>
+						<span class="error-text">{searchError}</span>
+					</div>
 				</div>
 			{:else}
-				{#each searchResults as result, index (result.googleBookId)}
-					<button
-						type="button"
-						on:mousedown|preventDefault={() => selectBook(result, { id: result.googleBookId, volumeInfo: { title: result.title, authors: result.authors, description: result.description, categories: result.genre ? [result.genre] : [], imageLinks: result.thumbnail_url ? { thumbnail: result.thumbnail_url } : undefined, industryIdentifiers: result.isbn ? [{ type: 'ISBN_13', identifier: result.isbn }] : [] } })}
-						class="w-full text-left p-3 hover:bg-gray-50 focus:bg-gray-50 focus:outline-none border-b border-gray-100 last:border-b-0"
-					>
-						<div class="flex gap-3">
-							{#if result.thumbnail_url}
-								<img 
-									src={result.thumbnail_url} 
-									alt="{result.title} cover"
-									class="w-12 h-16 object-cover rounded shadow-sm flex-shrink-0"
-									loading="lazy"
-								/>
-							{:else}
-								<div class="w-12 h-16 bg-gray-200 rounded shadow-sm flex items-center justify-center flex-shrink-0">
-									<svg class="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-										<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.746 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/>
-									</svg>
+				<div class="search-results">
+					{#each searchResults as result, index (result.googleBookId)}
+						<button
+							type="button"
+							on:click|preventDefault={() => selectBook(result, { id: result.googleBookId, volumeInfo: { title: result.title, authors: result.authors, description: result.description, categories: result.genre ? [result.genre] : [], imageLinks: result.thumbnail_url ? { thumbnail: result.thumbnail_url } : undefined, industryIdentifiers: result.isbn ? [{ type: 'ISBN_13', identifier: result.isbn }] : [] } })}
+							class="search-result-item"
+						>
+							<div class="result-content">
+								<div class="book-cover">
+									{#if result.thumbnail_url}
+										<img 
+											src={result.thumbnail_url} 
+											alt="{result.title} cover"
+											class="cover-image"
+											loading="lazy"
+										/>
+									{:else}
+										<div class="cover-placeholder">
+											<svg class="placeholder-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+												<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.746 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/>
+											</svg>
+										</div>
+									{/if}
 								</div>
-							{/if}
-							
-							<div class="flex-1 min-w-0">
-								<h4 class="font-medium text-gray-900 text-sm line-clamp-2">{result.title}</h4>
-								<p class="text-gray-600 text-sm line-clamp-1">by {result.authors.join(', ')}</p>
-								{#if result.genre}
-									<p class="text-gray-500 text-xs mt-1">{result.genre}</p>
-								{/if}
+								
+								<div class="book-details">
+									<h4 class="book-title">{result.title}</h4>
+									<p class="book-authors">by {result.authors.join(', ')}</p>
+									{#if result.genre}
+										<span class="book-genre">{result.genre}</span>
+									{/if}
+								</div>
 							</div>
-						</div>
-					</button>
-				{/each}
+						</button>
+					{/each}
+				</div>
 			{/if}
 		</div>
 	{/if}
@@ -219,17 +242,218 @@
 		color: #9ca3af;
 	}
 
-	.line-clamp-1 {
+	/* Search Dropdown */
+	.search-dropdown {
+		position: absolute;
+		z-index: 50;
+		width: 100%;
+		max-width: 500px;
+		margin-top: 0.5rem;
+		background: white;
+		border: 1px solid #e2e8f0;
+		border-radius: 12px;
+		box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+		max-height: 400px;
 		overflow: hidden;
-		display: -webkit-box;
-		-webkit-line-clamp: 1;
-		-webkit-box-orient: vertical;
 	}
-	
-	.line-clamp-2 {
-		overflow: hidden;
-		display: -webkit-box;
-		-webkit-line-clamp: 2;
-		-webkit-box-orient: vertical;
+
+	/* Search States */
+	.search-state {
+		padding: 2rem 1.5rem;
+		text-align: center;
+	}
+
+	.search-loading {
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		gap: 1rem;
+	}
+
+	.loading-icon {
+		width: 2rem;
+		height: 2rem;
+		color: #8B2635;
+		animation: spin 1s linear infinite;
+	}
+
+	@keyframes spin {
+		from {
+			transform: rotate(0deg);
+		}
+		to {
+			transform: rotate(360deg);
+		}
+	}
+
+	.search-text {
+		color: #718096;
+		font-size: 0.95rem;
+		font-weight: 500;
+	}
+
+	.search-error {
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		gap: 1rem;
+	}
+
+	.error-icon {
+		width: 2rem;
+		height: 2rem;
+		color: #dc2626;
+	}
+
+	.error-text {
+		color: #dc2626;
+		font-size: 0.95rem;
+		font-weight: 500;
+	}
+
+	/* Search Results */
+	.search-results {
+		max-height: 400px;
+		overflow-y: auto;
+	}
+
+	.search-result-item {
+		width: 100%;
+		text-align: left;
+		padding: 0;
+		border: none;
+		background: none;
+		cursor: pointer;
+		transition: all 0.2s ease;
+		border-bottom: 1px solid #f1f3f4;
+	}
+
+	.search-result-item:last-child {
+		border-bottom: none;
+	}
+
+	.search-result-item:hover {
+		background: #f8f9fa;
+	}
+
+	.search-result-item:focus {
+		outline: none;
+		background: #f8f9fa;
+		box-shadow: inset 3px 0 0 #8B2635;
+	}
+
+	.result-content {
+		display: flex;
+		gap: 1rem;
+		padding: 1rem 1.5rem;
+		align-items: flex-start;
+	}
+
+	/* Book Cover */
+	.book-cover {
+		flex-shrink: 0;
+		width: 3rem;
+		height: 4rem;
+	}
+
+	.cover-image {
+		width: 100%;
+		height: 100%;
+		object-fit: cover;
+		border-radius: 6px;
+		box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+	}
+
+	.cover-placeholder {
+		width: 100%;
+		height: 100%;
+		background: linear-gradient(135deg, #f1f3f4 0%, #e2e8f0 100%);
+		border-radius: 6px;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+	}
+
+	.placeholder-icon {
+		width: 1.5rem;
+		height: 1.5rem;
+		color: #9ca3af;
+	}
+
+	/* Book Details */
+	.book-details {
+		flex: 1;
+		min-width: 0;
+		max-width: calc(100% - 4rem);
+		display: flex;
+		flex-direction: column;
+		gap: 0.25rem;
+	}
+
+	.book-title {
+		color: #2d3748;
+		font-size: 0.95rem;
+		font-weight: 600;
+		line-height: 1.4;
+		margin: 0;
+		word-wrap: break-word;
+		overflow-wrap: break-word;
+		hyphens: auto;
+		max-width: 100%;
+	}
+
+	.book-authors {
+		color: #718096;
+		font-size: 0.85rem;
+		font-weight: 500;
+		margin: 0;
+		line-height: 1.3;
+		word-wrap: break-word;
+		overflow-wrap: break-word;
+		max-width: 100%;
+	}
+
+	.book-genre {
+		display: inline-block;
+		background: #f1f3f4;
+		color: #8B2635;
+		font-size: 0.75rem;
+		font-weight: 600;
+		padding: 0.25rem 0.5rem;
+		border-radius: 12px;
+		margin-top: 0.25rem;
+		align-self: flex-start;
+	}
+
+	/* Responsive Design */
+	@media (max-width: 640px) {
+		.search-dropdown {
+			margin-top: 0.25rem;
+			border-radius: 8px;
+			max-width: 400px;
+		}
+
+		.result-content {
+			padding: 0.75rem 1rem;
+			gap: 0.75rem;
+		}
+
+		.book-cover {
+			width: 2.5rem;
+			height: 3.5rem;
+		}
+
+		.book-details {
+			max-width: calc(100% - 3.25rem);
+		}
+
+		.book-title {
+			font-size: 0.9rem;
+		}
+
+		.book-authors {
+			font-size: 0.8rem;
+		}
 	}
 </style>

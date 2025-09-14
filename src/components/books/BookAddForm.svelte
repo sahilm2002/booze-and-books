@@ -73,6 +73,14 @@
 	let errors: Record<string, string> = {};
 	let searchValue = '';
 	let isManualEntry = false;
+	let selectedBookPreview: {
+		title: string;
+		authors: string[];
+		thumbnail_url?: string;
+		genre?: string;
+		description?: string;
+		isbn?: string;
+	} | null = null;
 
 	$: conditionOptions = getConditionOptions();
 
@@ -89,6 +97,7 @@
 
 	async function handleSubmit() {
 		if (!validateForm()) return;
+
 
 		saving = true;
 		
@@ -116,7 +125,17 @@
 
 
 	function handleGoogleBookSelect(event: CustomEvent<{ book: GoogleBookResult; extracted: any }>) {
-		const { extracted } = event.detail;
+		const { book, extracted } = event.detail;
+		
+		// Store preview data for the book card
+		selectedBookPreview = {
+			title: extracted.title,
+			authors: extracted.authors,
+			thumbnail_url: book.volumeInfo?.imageLinks?.thumbnail,
+			genre: extracted.genre,
+			description: extracted.description,
+			isbn: extracted.isbn
+		};
 		
 		formData = {
 			...formData,
@@ -178,25 +197,100 @@
 	}
 </script>
 
-<div class="form-container">
+<div class="form-container card">
 	<div class="form-header">
 		<div class="form-header-content">
 			<h3 class="form-title">Book Details</h3>
 			<button type="button" on:click={toggleManualEntry} class="toggle-btn">
-				{isManualEntry ? '🔍 Search Google Books' : '✏️ Enter Manually'}
+				{#if isManualEntry}
+					<svg class="btn-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+					</svg>
+					Search Google Books
+				{:else}
+					<svg class="btn-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/>
+					</svg>
+					Enter Manually
+				{/if}
 			</button>
 		</div>
 	</div>
 
 	<form on:submit|preventDefault={handleSubmit} class="form-content">
 		{#if !isManualEntry}
-			<div class="field-group full-width">
-				<label class="field-label">Search Google Books</label>
-				<GoogleBookSearch
-					bind:value={searchValue}
-					on:select={handleGoogleBookSelect}
-					placeholder="Search by title, author, or ISBN..."
-				/>
+			<div class="search-section">
+				<h4 class="section-title">Search Google Books</h4>
+				<div class="search-input-wrapper">
+					<GoogleBookSearch
+						bind:value={searchValue}
+						on:select={handleGoogleBookSelect}
+						placeholder="Search by title, author, or ISBN..."
+					/>
+				</div>
+			</div>
+		{/if}
+
+		<!-- Book Preview Card -->
+		{#if selectedBookPreview && !isManualEntry}
+			<div class="book-preview-section">
+				<h4 class="section-title">Selected Book</h4>
+				<div class="book-preview-card">
+					<div class="book-cover">
+						{#if selectedBookPreview.thumbnail_url}
+							<img 
+								src={selectedBookPreview.thumbnail_url} 
+								alt="{selectedBookPreview.title} cover"
+								class="cover-image"
+								loading="lazy"
+							/>
+						{:else}
+							<div class="cover-placeholder">
+								<svg class="placeholder-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+									<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.746 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/>
+								</svg>
+							</div>
+						{/if}
+					</div>
+					
+					<div class="book-details">
+						<h5 class="book-title">{selectedBookPreview.title}</h5>
+						<p class="book-authors">by {selectedBookPreview.authors.join(', ')}</p>
+						{#if selectedBookPreview.genre}
+							<span class="book-genre">{selectedBookPreview.genre}</span>
+						{/if}
+						{#if selectedBookPreview.isbn}
+							<p class="book-isbn">ISBN: {selectedBookPreview.isbn}</p>
+						{/if}
+						{#if selectedBookPreview.description}
+							<p class="book-description">{selectedBookPreview.description.length > 200 ? selectedBookPreview.description.substring(0, 200) + '...' : selectedBookPreview.description}</p>
+						{/if}
+					</div>
+
+					<button
+						type="button"
+						class="remove-selection-btn"
+						on:click={() => {
+							selectedBookPreview = null;
+							formData = {
+								title: '',
+								authors: [''],
+								isbn: '',
+								condition: BookCondition.GOOD,
+								genre: '',
+								description: '',
+								google_volume_id: ''
+							};
+							selectedGenres = [];
+							searchValue = '';
+						}}
+						aria-label="Remove selected book"
+					>
+						<svg class="remove-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+						</svg>
+					</button>
+				</div>
 			</div>
 		{/if}
 
@@ -276,31 +370,35 @@
 
 			<div class="field-group full-width">
 				<label class="field-label">Genres</label>
-				<div class="genre-selector">
-					<div class="selected-genres">
+				<div class="genre-section">
+					<div class="selected-genres-display">
 						{#if selectedGenres.length === 0}
-							<span class="no-genres">No genres selected</span>
+							<span class="no-genres-text">No genres selected - choose from options below</span>
 						{:else}
-							{#each selectedGenres as genre}
-								<span class="selected-genre">
-									{genre}
-									<button
-										type="button"
-										class="remove-genre"
-										on:click={() => toggleGenre(genre)}
-										aria-label="Remove {genre}"
-									>
-										×
-									</button>
-								</span>
-							{/each}
+							<div class="selected-genres-tags">
+								{#each selectedGenres as genre}
+									<span class="selected-genre-tag">
+										{genre}
+										<button
+											type="button"
+											class="remove-genre-btn"
+											on:click={() => toggleGenre(genre)}
+											aria-label="Remove {genre}"
+										>
+											<svg class="remove-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+												<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+											</svg>
+										</button>
+									</span>
+								{/each}
+							</div>
 						{/if}
 					</div>
-					<div class="genre-options">
+					<div class="genre-options-grid">
 						{#each genreOptions as genre}
 							<button
 								type="button"
-								class="genre-option"
+								class="genre-option-tag"
 								class:selected={selectedGenres.includes(genre)}
 								on:click={() => toggleGenre(genre)}
 							>
@@ -375,7 +473,7 @@
 	}
 
 	.form-header {
-		background: linear-gradient(135deg, #f8f9fa 0%, #f1f3f4 100%);
+		background: white;
 		border-bottom: 1px solid #e2e8f0;
 		padding: 1.25rem 1.5rem;
 	}
@@ -402,20 +500,25 @@
 	}
 
 	.toggle-btn {
-		background: #8B2635;
+		display: inline-flex;
+		align-items: center;
+		gap: 0.5rem;
+		background: linear-gradient(135deg, #8B2635 0%, #722F37 100%);
 		color: #F5F5DC;
 		border: none;
-		padding: 0.5rem 1rem;
-		border-radius: 6px;
+		padding: 0.75rem 1rem;
+		border-radius: 8px;
 		font-size: 0.9rem;
-		font-weight: 500;
+		font-weight: 600;
 		cursor: pointer;
 		transition: all 0.2s ease;
+		box-shadow: 0 4px 12px rgba(139, 38, 53, 0.3);
 	}
 
 	.toggle-btn:hover {
-		background: #722F37;
-		transform: translateY(-1px);
+		background: linear-gradient(135deg, #722F37 0%, #8B2635 100%);
+		transform: translateY(-2px);
+		box-shadow: 0 6px 20px rgba(139, 38, 53, 0.4);
 	}
 
 	.form-content {
@@ -565,47 +668,71 @@
 		margin: 0;
 	}
 
-	/* Genre Selector */
-	.genre-selector {
-		background: #f8f9fa;
-		border: 1px solid #d1d5db;
-		border-radius: 8px;
-		padding: 1rem;
+	/* Search Section */
+	.search-section {
+		background: white;
+		border: 1px solid #e2e8f0;
+		border-radius: 12px;
+		padding: 1.5rem;
+		margin-bottom: 1rem;
+		box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
 	}
 
-	.selected-genres {
-		margin-bottom: 1rem;
+	.section-title {
+		color: #2d3748;
+		font-size: 1.125rem;
+		font-weight: 600;
+		margin: 0 0 1rem 0;
+	}
+
+	.search-input-wrapper {
+		max-width: 500px;
+	}
+
+	/* Genre Section */
+	.genre-section {
+		background: white;
+		border: 1px solid #e2e8f0;
+		border-radius: 12px;
+		padding: 1.5rem;
+		box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+	}
+
+	.selected-genres-display {
+		margin-bottom: 1.5rem;
 		min-height: 2.5rem;
 		display: flex;
-		flex-wrap: wrap;
-		gap: 0.5rem;
 		align-items: center;
 	}
 
-	.no-genres {
-		color: #9ca3af;
+	.no-genres-text {
+		color: #718096;
+		font-size: 0.95rem;
 		font-style: italic;
-		font-size: 0.9rem;
 	}
 
-	.selected-genre {
+	.selected-genres-tags {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.5rem;
+	}
+
+	.selected-genre-tag {
 		display: inline-flex;
 		align-items: center;
 		background: #8B2635;
 		color: #F5F5DC;
-		padding: 0.375rem 0.75rem;
+		padding: 0.5rem 1rem;
 		border-radius: 20px;
 		font-size: 0.85rem;
 		font-weight: 500;
 		gap: 0.5rem;
 	}
 
-	.remove-genre {
+	.remove-genre-btn {
 		background: none;
 		border: none;
 		color: #F5F5DC;
-		font-size: 1.25rem;
-		line-height: 1;
 		cursor: pointer;
 		padding: 0;
 		width: 16px;
@@ -617,42 +744,44 @@
 		transition: all 0.2s ease;
 	}
 
-	.remove-genre:hover {
+	.remove-genre-btn:hover {
 		background: rgba(245, 245, 220, 0.2);
 	}
 
-	.genre-options {
-		display: grid;
-		grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-		gap: 0.5rem;
-		max-height: 200px;
-		overflow-y: auto;
-		border-top: 1px solid #e2e8f0;
-		padding-top: 1rem;
+	.remove-icon {
+		width: 12px;
+		height: 12px;
 	}
 
-	.genre-option {
-		padding: 0.5rem 0.75rem;
+	.genre-options-grid {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.5rem;
+		border-top: 1px solid #e2e8f0;
+		padding-top: 1.5rem;
+	}
+
+	.genre-option-tag {
+		padding: 0.5rem 1rem;
 		border: 1px solid #d1d5db;
-		border-radius: 6px;
+		border-radius: 20px;
 		background: white;
 		color: #374151;
 		font-size: 0.85rem;
+		font-weight: 500;
 		cursor: pointer;
 		transition: all 0.2s ease;
-		text-align: left;
 	}
 
-	.genre-option:hover {
-		border-color: #8B2635;
+	.genre-option-tag:hover {
 		background: #f8f9fa;
+		border-color: #8B2635;
 	}
 
-	.genre-option.selected {
+	.genre-option-tag.selected {
 		background: #8B2635;
 		border-color: #8B2635;
 		color: #F5F5DC;
-		font-weight: 500;
 	}
 
 	.error-message {
@@ -784,5 +913,116 @@
 		to {
 			transform: rotate(360deg);
 		}
+	}
+
+	/* Book preview styles */
+	.book-preview-section {
+		background: white;
+		border: 1px solid #e2e8f0;
+		border-radius: 12px;
+		padding: 1rem;
+		margin-bottom: 1rem;
+		box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.06);
+	}
+
+	.book-preview-card {
+		display: flex;
+		gap: 1rem;
+		align-items: flex-start;
+		position: relative;
+		padding: 0.75rem;
+		border-radius: 12px;
+		border: 1px solid #eef2f6;
+		background: #fff;
+	}
+
+	.book-cover {
+		flex-shrink: 0;
+		width: 96px;
+		height: 128px;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		overflow: hidden;
+		border-radius: 8px;
+		box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+		background: linear-gradient(135deg, #f8f9fa 0%, #f1f3f4 100%);
+	}
+
+	.cover-image {
+		width: 100%;
+		height: 100%;
+		object-fit: cover;
+	}
+
+	.cover-placeholder {
+		width: 100%;
+		height: 100%;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+	}
+
+	.book-details {
+		flex: 1;
+		min-width: 0;
+		display: flex;
+		flex-direction: column;
+		gap: 0.25rem;
+	}
+
+	.book-title {
+		color: #2d3748;
+		font-size: 1rem;
+		font-weight: 700;
+		margin: 0;
+		line-height: 1.2;
+		overflow-wrap: break-word;
+	}
+
+	.book-authors {
+		color: #6b7280;
+		font-size: 0.9rem;
+		margin: 0;
+	}
+
+	.book-genre {
+		display: inline-block;
+		background: #f1f3f4;
+		color: #8B2635;
+		font-size: 0.75rem;
+		font-weight: 600;
+		padding: 0.25rem 0.5rem;
+		border-radius: 12px;
+		margin-top: 0.25rem;
+	}
+
+	.book-isbn {
+		color: #718096;
+		font-size: 0.85rem;
+		margin: 0.25rem 0 0 0;
+	}
+
+	.book-description {
+		color: #4b5563;
+		font-size: 0.9rem;
+		margin-top: 0.5rem;
+	}
+
+	.remove-selection-btn {
+		position: absolute;
+		top: 8px;
+		right: 8px;
+		background: none;
+		border: none;
+		color: #8B2635;
+		padding: 0.25rem;
+		border-radius: 6px;
+		cursor: pointer;
+		transition: background 0.15s ease;
+	}
+
+	.remove-selection-btn:hover {
+		background: rgba(139, 38, 53, 0.08);
 	}
 </style>

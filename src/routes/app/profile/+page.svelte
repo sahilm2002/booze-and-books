@@ -84,13 +84,23 @@
 		margin: 0;
 	}
 
-	/* Profile Grid Layout */
+	/* Profile Grid Layout (responsive sweep) */
 	.profile-grid {
 		display: grid;
 		grid-template-columns: 1fr;
-		gap: 2rem;
+		gap: 1.5rem;
 	}
 
+	/* Tablet: sidebar becomes fixed width for predictable layout */
+	@media (min-width: 768px) {
+		.profile-grid {
+			grid-template-columns: 1fr 320px;
+			align-items: start;
+			gap: 1.75rem;
+		}
+	}
+
+	/* Desktop: slightly wider main column */
 	@media (min-width: 1024px) {
 		.profile-grid {
 			grid-template-columns: 2fr 1fr;
@@ -99,12 +109,13 @@
 
 	.profile-main {
 		min-width: 0;
+		max-width: 100%;
 	}
 
 	.profile-sidebar {
 		display: flex;
 		flex-direction: column;
-		gap: 1.5rem;
+		gap: 1rem;
 	}
 
 	/* Stats Card */

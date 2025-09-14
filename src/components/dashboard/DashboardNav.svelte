@@ -11,8 +11,7 @@
 		{
 			name: 'Profile',
 			href: '/app/profile',
-			icon: 'user',
-			hideOnPaths: ['/app']
+			icon: 'user'
 		},
 		{
 			name: 'My Books',

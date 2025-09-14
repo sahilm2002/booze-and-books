@@ -1,5 +1,6 @@
 import { supabase } from '$lib/supabase';
 import type { Book, BookInput, BookUpdate, BookWithOwner } from '$lib/types/book';
+import { withValidSession } from '$lib/utils/apiWrapper';
 
 export class BookService {
 	/**
@@ -166,78 +167,84 @@ export class BookService {
 	 * Create a new book
 	 */
 	static async createBook(userId: string, bookData: BookInput): Promise<Book> {
-		const bookToInsert = {
-			...bookData,
-			owner_id: userId
-		};
+		return withValidSession(async () => {
+			const bookToInsert = {
+				...bookData,
+				owner_id: userId
+			};
 
-		const { data, error } = await supabase
-			.from('books')
-			.insert(bookToInsert)
-			.select()
-			.single();
+			const { data, error } = await supabase
+				.from('books')
+				.insert(bookToInsert)
+				.select()
+				.single();
 
-		if (error) {
-			// Handle unique constraint violation for Google Books ID
-			if (error.code === '23505' && error.message.includes('unique_user_google_book')) {
-				throw new Error('You have already added this book to your collection');
+			if (error) {
+				// Handle unique constraint violation for Google Books ID
+				if (error.code === '23505' && error.message.includes('unique_user_google_book')) {
+					throw new Error('You have already added this book to your collection');
+				}
+				throw new Error(`Failed to create book: ${error.message}`);
 			}
-			throw new Error(`Failed to create book: ${error.message}`);
-		}
 
-		return data;
+			return data;
+		});
 	}
 
 	/**
 	 * Update a book (only owner can update)
 	 */
 	static async updateBook(bookId: string, updates: BookUpdate, userId: string): Promise<Book> {
-		// First check if the book exists and belongs to the user
-		const existingBook = await this.getBook(bookId);
-		if (!existingBook) {
-			throw new Error('Book not found');
-		}
-		if (existingBook.owner_id !== userId) {
-			throw new Error('You can only update your own books');
-		}
+		return withValidSession(async () => {
+			// First check if the book exists and belongs to the user
+			const existingBook = await this.getBook(bookId);
+			if (!existingBook) {
+				throw new Error('Book not found');
+			}
+			if (existingBook.owner_id !== userId) {
+				throw new Error('You can only update your own books');
+			}
 
-		const { data, error } = await supabase
-			.from('books')
-			.update(updates)
-			.eq('id', bookId)
-			.eq('owner_id', userId)
-			.select()
-			.single();
+			const { data, error } = await supabase
+				.from('books')
+				.update(updates)
+				.eq('id', bookId)
+				.eq('owner_id', userId)
+				.select()
+				.single();
 
-		if (error) {
-			throw new Error(`Failed to update book: ${error.message}`);
-		}
+			if (error) {
+				throw new Error(`Failed to update book: ${error.message}`);
+			}
 
-		return data;
+			return data;
+		});
 	}
 
 	/**
 	 * Delete a book (only owner can delete)
 	 */
 	static async deleteBook(bookId: string, userId: string): Promise<void> {
-		// First check if the book exists and belongs to the user
-		const existingBook = await this.getBook(bookId);
-		if (!existingBook) {
-			throw new Error('Book not found');
-		}
-		if (existingBook.owner_id !== userId) {
-			throw new Error('You can only delete your own books');
-		}
+		return withValidSession(async () => {
+			// First check if the book exists and belongs to the user
+			const existingBook = await this.getBook(bookId);
+			if (!existingBook) {
+				throw new Error('Book not found');
+			}
+			if (existingBook.owner_id !== userId) {
+				throw new Error('You can only delete your own books');
+			}
 
-		const { error } = await supabase
-			.from('books')
-			.delete()
-			.eq('id', bookId)
-			.eq('owner_id', userId);
+			const { error } = await supabase
+				.from('books')
+				.delete()
+				.eq('id', bookId)
+				.eq('owner_id', userId);
 
-		if (error) {
-			throw new Error(`Failed to delete book: ${error.message}`);
-		}
+			if (error) {
+				throw new Error(`Failed to delete book: ${error.message}`);
+			}
+		});
 	}
 
 	/**
