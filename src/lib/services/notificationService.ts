@@ -3,12 +3,16 @@ import type { Notification, NotificationInput } from '../types/notification.js';
 import { NotificationType } from '../types/notification.js';
 
 export class NotificationService {
-	// Get notifications for a user
+	// Get notifications for a user (last 180 days only)
 	static async getNotifications(userId: string, limit = 20, offset = 0): Promise<Notification[]> {
+		const oneHundredEightyDaysAgo = new Date();
+		oneHundredEightyDaysAgo.setDate(oneHundredEightyDaysAgo.getDate() - 180);
+
 		const { data, error } = await supabase
 			.from('notifications')
 			.select('*')
 			.eq('user_id', userId)
+			.gte('created_at', oneHundredEightyDaysAgo.toISOString())
 			.order('created_at', { ascending: false })
 			.range(offset, offset + limit - 1);
 
@@ -19,13 +23,17 @@ export class NotificationService {
 		return data || [];
 	}
 
-	// Get unread notifications count
+	// Get unread notifications count (last 180 days only)
 	static async getUnreadCount(userId: string): Promise<number> {
+		const oneHundredEightyDaysAgo = new Date();
+		oneHundredEightyDaysAgo.setDate(oneHundredEightyDaysAgo.getDate() - 180);
+
 		const { count, error } = await supabase
 			.from('notifications')
 			.select('id', { count: 'exact', head: true })
 			.eq('user_id', userId)
-			.eq('is_read', false);
+			.eq('is_read', false)
+			.gte('created_at', oneHundredEightyDaysAgo.toISOString());
 
 		if (error) {
 			throw new Error(`Failed to count unread notifications: ${error.message}`);
@@ -50,13 +58,17 @@ export class NotificationService {
 		return data;
 	}
 
-	// Mark all notifications as read for a user
+	// Mark all notifications as read for a user (last 180 days only)
 	static async markAllAsRead(userId: string): Promise<void> {
+		const oneHundredEightyDaysAgo = new Date();
+		oneHundredEightyDaysAgo.setDate(oneHundredEightyDaysAgo.getDate() - 180);
+
 		const { error } = await supabase
 			.from('notifications')
 			.update({ is_read: true })
 			.eq('user_id', userId)
-			.eq('is_read', false);
+			.eq('is_read', false)
+			.gte('created_at', oneHundredEightyDaysAgo.toISOString());
 
 		if (error) {
 			throw new Error(`Failed to mark all notifications as read: ${error.message}`);
