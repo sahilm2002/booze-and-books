@@ -2,10 +2,10 @@
 -- This migration addresses the critical flaw where counter-offers don't transfer the correct books
 
 -- Drop the existing function to recreate it with counter-offer support
-DROP FUNCTION IF EXISTS transfer_book_ownership_on_completion();
+DROP FUNCTION IF EXISTS transfer_book_ownership_on_completion_counter_offer_026();
 
 -- Create updated function that properly handles both regular swaps and counter-offers
-CREATE OR REPLACE FUNCTION transfer_book_ownership_on_completion()
+CREATE OR REPLACE FUNCTION transfer_book_ownership_on_completion_counter_offer_026()
 RETURNS TRIGGER
 LANGUAGE plpgsql
 SECURITY DEFINER
@@ -88,10 +88,10 @@ END;
 $$;
 
 -- Recreate the trigger
-DROP TRIGGER IF EXISTS trigger_transfer_book_ownership_on_completion ON swap_requests;
+DROP TRIGGER IF EXISTS trigger_transfer_book_ownership_on_completion_counter_offer_026 ON swap_requests;
 
-CREATE TRIGGER trigger_transfer_book_ownership_on_completion
+CREATE TRIGGER trigger_transfer_book_ownership_on_completion_counter_offer_026
 AFTER UPDATE ON swap_requests
 FOR EACH ROW
 WHEN (NEW.status = 'COMPLETED' AND (OLD.status IS NULL OR OLD.status <> 'COMPLETED'))
-EXECUTE FUNCTION transfer_book_ownership_on_completion();
+EXECUTE FUNCTION transfer_book_ownership_on_completion_counter_offer_026();

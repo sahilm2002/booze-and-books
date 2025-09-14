@@ -1,8 +1,9 @@
 -- Simplified swap completion trigger without complex RLS handling
+-- Note: This is an alternate version - the canonical implementation is in migration 027
 
-DROP FUNCTION IF EXISTS transfer_book_ownership_on_completion() CASCADE;
+DROP FUNCTION IF EXISTS transfer_book_ownership_on_completion_simple_030();
 
-CREATE OR REPLACE FUNCTION transfer_book_ownership_on_completion()
+CREATE OR REPLACE FUNCTION transfer_book_ownership_on_completion_simple_030()
 RETURNS TRIGGER AS $$
 BEGIN
     -- Only proceed if swap is being marked as completed for the first time
@@ -38,12 +39,12 @@ END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- Recreate the trigger
-DROP TRIGGER IF EXISTS trigger_transfer_ownership_on_completion ON swap_requests;
-CREATE TRIGGER trigger_transfer_ownership_on_completion
+DROP TRIGGER IF EXISTS trigger_transfer_ownership_on_completion_simple_030 ON swap_requests;
+CREATE TRIGGER trigger_transfer_ownership_on_completion_simple_030
     AFTER UPDATE ON swap_requests
     FOR EACH ROW
     WHEN (NEW.status = 'COMPLETED')
-    EXECUTE FUNCTION transfer_book_ownership_on_completion();
+    EXECUTE FUNCTION transfer_book_ownership_on_completion_simple_030();
 
 -- Grant execute permissions
-GRANT EXECUTE ON FUNCTION transfer_book_ownership_on_completion() TO authenticated;
+GRANT EXECUTE ON FUNCTION transfer_book_ownership_on_completion_simple_030() TO authenticated;
