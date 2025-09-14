@@ -20,7 +20,8 @@ WITH CHECK (
 );
 
 -- Update the trigger function to set session variable before transfers
-CREATE OR REPLACE FUNCTION transfer_book_ownership_on_completion()
+-- Note: This is an alternate version - the canonical implementation is in migration 027
+CREATE OR REPLACE FUNCTION transfer_book_ownership_on_completion_rls_policy_025()
 RETURNS TRIGGER AS $$
 BEGIN
   PERFORM set_config('search_path', 'pg_catalog,public', true);

@@ -1,7 +1,8 @@
 -- Fix swap completion trigger to work regardless of which party completes it
 -- Either the book owner OR the requester can mark a swap as completed
+-- This is the CANONICAL implementation of transfer_book_ownership_on_completion()
 
-DROP FUNCTION IF EXISTS transfer_book_ownership_on_completion() CASCADE;
+DROP FUNCTION IF EXISTS transfer_book_ownership_on_completion();
 
 CREATE OR REPLACE FUNCTION transfer_book_ownership_on_completion()
 RETURNS TRIGGER AS $$

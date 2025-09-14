@@ -198,76 +198,17 @@ export class SwapServiceServer {
 
 		// Enrich requests with book and profile data
 		return requests.map(req => {
-			const book = booksMap.get(req.book_id) || { 
-				id: req.book_id, 
-				title: 'Unknown', 
-				authors: [], 
-				google_volume_id: null, 
-				condition: 'Unknown',
-				owner_id: req.owner_id
-			};
-			const offered_book = req.offered_book_id ? (booksMap.get(req.offered_book_id) || {
-				id: req.offered_book_id,
-				title: 'Unknown',
-				authors: [],
-				google_volume_id: null,
-				condition: 'Unknown',
-				owner_id: req.requester_id
-			}) : null;
-			const counter_offered_book = req.counter_offered_book_id ? (booksMap.get(req.counter_offered_book_id) || {
-				id: req.counter_offered_book_id,
-				title: 'Unknown',
-				authors: [],
-				google_volume_id: null,
-				condition: 'Unknown',
-				owner_id: req.owner_id
-			}) : null;
-			const requester_profile = profilesMap.get(req.requester_id) || { 
-				id: req.requester_id,
-				username: null, 
-				full_name: null, 
-				avatar_url: null, 
-				email: null, 
-				city: null,
-				state: null,
-				zip_code: null
-			};
-			const owner_profile = profilesMap.get(req.owner_id) || { 
-				id: req.owner_id,
-				username: null, 
-				full_name: null, 
-				avatar_url: null, 
-				email: null, 
-				city: null,
-				state: null,
-				zip_code: null
-			};
+			const book = booksMap.get(req.book_id) || { id: req.book_id, title: 'Unknown', authors: [], thumbnail_url: null, condition: 'Unknown' };
+			const offered_book = req.offered_book_id ? booksMap.get(req.offered_book_id) || null : null;
+			const requester_profile = profilesMap.get(req.requester_id) || { username: null, full_name: null, avatar_url: null };
+			const owner_profile = profilesMap.get(req.owner_id) || { username: null, full_name: null, avatar_url: null };
 
 			return {
 				...req,
 				book,
 				offered_book,
-				counter_offered_book,
-				requester_profile: type === 'incoming' ? requester_profile : { 
-					id: req.requester_id,
-					username: null, 
-					full_name: null, 
-					avatar_url: null, 
-					email: null, 
-					city: null,
-					state: null,
-					zip_code: null
-				},
-				owner_profile: type === 'outgoing' ? owner_profile : { 
-					id: req.owner_id,
-					username: null, 
-					full_name: null, 
-					avatar_url: null, 
-					email: null, 
-					city: null,
-					state: null,
-					zip_code: null
-				}
+				requester_profile: type === 'incoming' ? requester_profile : { username: null, full_name: null, avatar_url: null },
+				owner_profile: type === 'outgoing' ? owner_profile : { username: null, full_name: null, avatar_url: null }
 			} as SwapRequestWithDetails;
 		});
 	}
