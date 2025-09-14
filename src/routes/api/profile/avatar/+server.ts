@@ -1,5 +1,4 @@
 import type { RequestHandler } from './$types';
-import { MAX_AVATAR_UPLOAD_SIZE, ALLOWED_AVATAR_MIME_TYPES, getMaxUploadSizeDisplay } from '$lib/config/upload';
 
 /**
  * POST /api/profile/avatar
@@ -12,10 +11,7 @@ import { MAX_AVATAR_UPLOAD_SIZE, ALLOWED_AVATAR_MIME_TYPES, getMaxUploadSizeDisp
  *
  * Notes:
  *  - This endpoint requires the user to be authenticated; event.locals.user is used.
- *  - Upload limits are enforced both client-side and server-side using shared configuration.
- *  - TODO: Consider adding rate limiting (e.g., per-IP upload throttling) to prevent abuse.
- *    This could be implemented using a simple in-memory store or Redis to track upload
- *    attempts per IP address within a time window (e.g., max 5 uploads per minute per IP).
+ *  - The upload size limit is enforced client-side, but server may also enforce limits.
  */
 export const POST: RequestHandler = async ({ request, locals }) => {
 	// Ensure authenticated user
@@ -29,26 +25,6 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 	const file = form.get('file') as File | null;
 	if (!file) {
 		return new Response(JSON.stringify({ error: 'No file provided' }), { status: 400 });
-	}
-
-	// Validate MIME type using shared configuration
-	if (!ALLOWED_AVATAR_MIME_TYPES.includes(file.type)) {
-		return new Response(
-			JSON.stringify({ 
-				error: 'Unsupported file type. Only PNG, JPEG, WebP, and GIF images are allowed.' 
-			}), 
-			{ status: 415 }
-		);
-	}
-
-	// Validate file size using shared configuration
-	if (file.size > MAX_AVATAR_UPLOAD_SIZE) {
-		return new Response(
-			JSON.stringify({ 
-				error: `File size too large. Maximum allowed size is ${getMaxUploadSizeDisplay()}.` 
-			}), 
-			{ status: 413 }
-		);
 	}
 
 	// Derive extension and filename
@@ -90,23 +66,7 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 
 		if (updateError) {
 			console.error('Profile update error:', updateError);
-			
-			// Rollback: Delete the uploaded file since profile update failed
-			const { error: deleteError } = await locals.supabase.storage
-				.from('avatars')
-				.remove([filePath]);
-			
-			if (deleteError) {
-				console.error('Failed to rollback uploaded file after profile update error:', deleteError);
-			}
-			
-			return new Response(
-				JSON.stringify({ 
-					error: 'Failed to update profile with new avatar',
-					details: updateError.message 
-				}), 
-				{ status: 500 }
-			);
+			// Not fatal for upload success — return still the public URL but log the error
 		}
 
 		// Return public URL

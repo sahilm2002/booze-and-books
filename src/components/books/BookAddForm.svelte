@@ -99,11 +99,6 @@
 	async function handleSubmit() {
 		if (!validateForm()) return;
 
-		// Check authentication before attempting any write operations
-		if (!$auth.user) {
-			goto('/auth/login?redirectTo=/app/books');
-			return;
-		}
 
 		saving = true;
 		
