@@ -27,6 +27,30 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 		return new Response(JSON.stringify({ error: 'No file provided' }), { status: 400 });
 	}
 
+	// Define allowed MIME types and file size limit
+	const allowedMimeTypes = ['image/png', 'image/jpeg', 'image/webp', 'image/gif'];
+	const maxFileSize = 5 * 1024 * 1024; // 5MB in bytes
+
+	// Validate MIME type
+	if (!allowedMimeTypes.includes(file.type)) {
+		return new Response(
+			JSON.stringify({ 
+				error: 'Unsupported file type. Only PNG, JPEG, WebP, and GIF images are allowed.' 
+			}), 
+			{ status: 415 }
+		);
+	}
+
+	// Validate file size
+	if (file.size > maxFileSize) {
+		return new Response(
+			JSON.stringify({ 
+				error: `File size too large. Maximum allowed size is ${maxFileSize / (1024 * 1024)}MB.` 
+			}), 
+			{ status: 413 }
+		);
+	}
+
 	// Derive extension and filename
 	let fileExt = (file.name || '').split('.').pop();
 	if (!fileExt || fileExt === file.name) {
