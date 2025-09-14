@@ -7,7 +7,7 @@
 	import type { PageData } from './$types';
 	import type { SwapRequestWithDetails } from '$lib/types/swap';
 
-	export const data: PageData = undefined;
+	export let data: PageData;
 
 	let statusFilter: 'all' | 'pending' | 'accepted' | 'counter_offer' | 'cancelled' | 'completed' = 'all';
 	let typeFilter: 'all' | 'incoming' | 'outgoing' = 'all';
@@ -27,8 +27,34 @@
 			activeTab = 'incoming';
 		}
 		
-		// Load swap requests using the store
-		await swapStore.loadSwapRequests();
+		if (import.meta.env.DEV) {
+			console.log('Initial tab:', activeTab);
+		}
+		
+		// Only fetch swap requests if stores are empty (avoid reloading on navigation)
+		if ($incomingSwapRequests.length === 0 && $outgoingSwapRequests.length === 0) {
+			if (import.meta.env.DEV) {
+				console.log('Stores are empty, fetching swap requests...');
+			}
+			await swapStore.refresh();
+		} else {
+			if (import.meta.env.DEV) {
+				console.log('Using cached swap requests:', {
+					incoming: $incomingSwapRequests.length,
+					outgoing: $outgoingSwapRequests.length
+				});
+			}
+		}
+		
+		if (import.meta.env.DEV) {
+			console.log('After mount:', {
+				incoming: $incomingSwapRequests.length,
+				outgoing: $outgoingSwapRequests.length,
+				completed: $completedSwapRequests.length,
+				loading: $swapRequestsLoading,
+				error: $swapRequestsError
+			});
+		}
 	});
 
 	// Filter requests based on status
@@ -42,6 +68,16 @@
 
 	// For completed swaps, show all completed swaps regardless of tab
 	$: filteredCompleted = statusFilter === 'completed' ? $completedSwapRequests : [];
+	
+	// Debug completed swaps
+	$: if (import.meta.env.DEV && statusFilter === 'completed') {
+		console.log('Debug completed swaps:', {
+			statusFilter,
+			completedSwapRequestsLength: $completedSwapRequests.length,
+			filteredCompletedLength: filteredCompleted.length,
+			completedSwapRequests: $completedSwapRequests
+		});
+	}
 
 	$: currentRequests = statusFilter === 'completed' ? filteredCompleted : 
 		(activeTab === 'incoming' ? filteredIncoming : filteredOutgoing);
@@ -448,7 +484,41 @@
 		</div>
 	{/if}
 
-	<!-- Filters -->
+	<!-- Tabs -->
+	<div class="tabs-section card">
+		<nav class="tabs-nav" aria-label="Tabs">
+			<button
+				type="button"
+				class="tab-button"
+				class:active={activeTab === 'incoming'}
+				on:click={() => activeTab = 'incoming'}
+			>
+				Incoming Requests
+				{#if incomingCounts.pending > 0}
+					<span class="tab-badge incoming">
+						{incomingCounts.pending}
+					</span>
+				{/if}
+			</button>
+			<button
+				type="button"
+				class="tab-button"
+				class:active={activeTab === 'outgoing'}
+				on:click={() => {
+					activeTab = 'outgoing';
+				}}
+			>
+				My Requests
+				{#if outgoingCounts.pending > 0}
+					<span class="tab-badge outgoing">
+						{outgoingCounts.pending}
+					</span>
+				{/if}
+			</button>
+		</nav>
+	</div>
+
+	<!-- Status Filter -->
 	<div class="filters-section card">
 		<div class="filters-header">
 			<h3 class="filters-title">Filters</h3>
@@ -466,7 +536,7 @@
 					type="button"
 					class="filter-tag"
 					class:active={statusFilter === filterOption.value}
-					on:click={() => statusFilter = filterOption.value}
+					on:click={() => statusFilter = filterOption.value as typeof statusFilter}
 				>
 					{filterOption.label}
 				</button>
