@@ -7,6 +7,7 @@ import {
 	type SwapRequestWithBook,
 	type SwapCompletion
 } from '../types/swap.js';
+import { withValidSession } from '$lib/utils/apiWrapper';
 
 export class SwapService {
 	// Helper function to build profile select query based on swap status
@@ -30,101 +31,103 @@ export class SwapService {
 	}
 	// Create a new swap request
 	static async createSwapRequest(input: SwapRequestInput, requesterId: string): Promise<SwapRequest> {
-		// Validate the book exists and is available (owner_id will be populated by DB trigger)
-		const { data: book, error: bookError } = await supabase
-			.from('books')
-			.select('id, owner_id, is_available')
-			.eq('id', input.book_id)
-			.single();
-
-		if (bookError) {
-			throw new Error(`Book not found: ${bookError.message}`);
-		}
-
-		if (!book.is_available) {
-			throw new Error('This book is not available for swap requests');
-		}
-
-		if (book.owner_id === requesterId) {
-			throw new Error('You cannot request a swap for your own book');
-		}
-
-		// If offered book is provided, validate it belongs to requester
-		if (input.offered_book_id) {
-			const { data: offeredBook, error: offeredBookError } = await supabase
+		return withValidSession(async () => {
+			// Validate the book exists and is available (owner_id will be populated by DB trigger)
+			const { data: book, error: bookError } = await supabase
 				.from('books')
-				.select('owner_id, is_available')
-				.eq('id', input.offered_book_id)
+				.select('id, owner_id, is_available')
+				.eq('id', input.book_id)
 				.single();
 
-			if (offeredBookError) {
-				throw new Error(`Offered book not found: ${offeredBookError.message}`);
+			if (bookError) {
+				throw new Error(`Book not found: ${bookError.message}`);
 			}
 
-			if (offeredBook.owner_id !== requesterId) {
-				throw new Error('You can only offer books that you own');
+			if (!book.is_available) {
+				throw new Error('This book is not available for swap requests');
 			}
 
-			if (!offeredBook.is_available) {
-				throw new Error('The offered book is not available');
+			if (book.owner_id === requesterId) {
+				throw new Error('You cannot request a swap for your own book');
 			}
-		}
 
-		// Check if there's already a pending request for this book by this user
-		const { data: existingRequests, error: checkError } = await supabase
-			.from('swap_requests')
-			.select('id, status, offered_book_id')
-			.eq('book_id', input.book_id)
-			.eq('requester_id', requesterId)
-			.eq('status', SwapStatus.PENDING);
+			// If offered book is provided, validate it belongs to requester
+			if (input.offered_book_id) {
+				const { data: offeredBook, error: offeredBookError } = await supabase
+					.from('books')
+					.select('owner_id, is_available')
+					.eq('id', input.offered_book_id)
+					.single();
 
-		if (checkError) {
-			throw new Error(`Failed to check existing requests: ${checkError.message}`);
-		}
+				if (offeredBookError) {
+					throw new Error(`Offered book not found: ${offeredBookError.message}`);
+				}
 
-		// If there's already a pending request, update it instead of creating a new one
-		if (existingRequests && existingRequests.length > 0) {
-			const existingRequest = existingRequests[0];
+				if (offeredBook.owner_id !== requesterId) {
+					throw new Error('You can only offer books that you own');
+				}
+
+				if (!offeredBook.is_available) {
+					throw new Error('The offered book is not available');
+				}
+			}
+
+			// Check if there's already a pending request for this book by this user
+			const { data: existingRequests, error: checkError } = await supabase
+				.from('swap_requests')
+				.select('id, status, offered_book_id')
+				.eq('book_id', input.book_id)
+				.eq('requester_id', requesterId)
+				.eq('status', SwapStatus.PENDING);
+
+			if (checkError) {
+				throw new Error(`Failed to check existing requests: ${checkError.message}`);
+			}
+
+			// If there's already a pending request, update it instead of creating a new one
+			if (existingRequests && existingRequests.length > 0) {
+				const existingRequest = existingRequests[0];
+				const { data, error } = await supabase
+					.from('swap_requests')
+					.update({
+						message: input.message,
+						offered_book_id: input.offered_book_id,
+						updated_at: new Date().toISOString()
+					})
+					.eq('id', existingRequest.id)
+					.select()
+					.single();
+
+				if (error) {
+					throw new Error(`Failed to update swap request: ${error.message}`);
+				}
+
+				return data;
+			}
+
+			// No existing request, create a new one
+			// Note: owner_id will be automatically populated by database trigger
+			const insertData = {
+				book_id: input.book_id,
+				requester_id: requesterId,
+				message: input.message,
+				offered_book_id: input.offered_book_id,
+				status: SwapStatus.PENDING
+			};
+
+			// Create the swap request
 			const { data, error } = await supabase
 				.from('swap_requests')
-				.update({
-					message: input.message,
-					offered_book_id: input.offered_book_id,
-					updated_at: new Date().toISOString()
-				})
-				.eq('id', existingRequest.id)
+				.insert(insertData)
 				.select()
 				.single();
 
 			if (error) {
-				throw new Error(`Failed to update swap request: ${error.message}`);
+				throw new Error(`Failed to create swap request: ${error.message}`);
 			}
 
 			return data;
-		}
-
-		// No existing request, create a new one
-		// Note: owner_id will be automatically populated by database trigger
-		const insertData = {
-			book_id: input.book_id,
-			requester_id: requesterId,
-			message: input.message,
-			offered_book_id: input.offered_book_id,
-			status: SwapStatus.PENDING
-		};
-
-		// Create the swap request
-		const { data, error } = await supabase
-			.from('swap_requests')
-			.insert(insertData)
-			.select()
-			.single();
-
-		if (error) {
-			throw new Error(`Failed to create swap request: ${error.message}`);
-		}
-
-		return data;
+		});
 	}
 
 	// Get swap requests for a user (both incoming and outgoing) - simplified version
@@ -468,55 +471,58 @@ export class SwapService {
 		userId: string,
 		completion: SwapCompletion
 	): Promise<SwapRequest> {
-		// First verify the request can be completed
-		const { data: request, error: fetchError } = await supabase
-			.from('swap_requests')
-			.select('*')
-			.eq('id', requestId)
-			.single();
+		return withValidSession(async () => {
+			// First verify the request can be completed
+			const { data: request, error: fetchError } = await supabase
+				.from('swap_requests')
+				.select('*')
+				.eq('id', requestId)
+				.single();
 
-		if (fetchError) {
-			throw new Error(`Swap request not found: ${fetchError.message}`);
-		}
+			if (fetchError) {
+				throw new Error(`Swap request not found: ${fetchError.message}`);
+			}
 
-		if (request.status !== SwapStatus.ACCEPTED) {
-			throw new Error('Only accepted requests can be completed');
-		}
+			if (request.status !== SwapStatus.ACCEPTED) {
+				throw new Error('Only accepted requests can be completed');
+			}
 
-		if (request.requester_id !== userId && request.owner_id !== userId) {
-			throw new Error('Only swap participants can mark a swap as completed');
-		}
+			if (request.requester_id !== userId && request.owner_id !== userId) {
+				throw new Error('Only swap participants can mark a swap as completed');
+			}
 
-		// Determine if user is requester or owner and set appropriate rating
-		const updateData: any = {
-			status: SwapStatus.COMPLETED,
-			completion_date: new Date().toISOString()
-		};
+			// Determine if user is requester or owner and set appropriate rating
+			const updateData: any = {
+				status: SwapStatus.COMPLETED,
+				completion_date: new Date().toISOString()
+			};
 
-		if (request.requester_id === userId) {
-			updateData.requester_rating = completion.rating;
-			updateData.requester_feedback = completion.feedback;
-		} else {
-			updateData.owner_rating = completion.rating;
-			updateData.owner_feedback = completion.feedback;
-		}
+			if (request.requester_id === userId) {
+				updateData.requester_rating = completion.rating;
+				updateData.requester_feedback = completion.feedback;
+			} else {
+				updateData.owner_rating = completion.rating;
+				updateData.owner_feedback = completion.feedback;
+			}
 
-		const { data, error } = await supabase
-			.from('swap_requests')
-			.update(updateData)
-			.eq('id', requestId)
-			.select()
-			.single();
+			const { data, error } = await supabase
+				.from('swap_requests')
+				.update(updateData)
+				.eq('id', requestId)
+				.select()
+				.single();
 
-		if (error) {
-			throw new Error(`Failed to complete swap: ${error.message}`);
-		}
+			if (error) {
+				throw new Error(`Failed to complete swap: ${error.message}`);
+			}
 
-		return data;
+			return data;
+		});
 	}
 
 	// Get completed swaps for a user
 	static async getCompletedSwaps(userId: string): Promise<SwapRequestWithBook[]> {
+		
 		const { data, error } = await supabase
 			.from('swap_requests')
 			.select(`

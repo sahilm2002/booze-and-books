@@ -1,77 +1,199 @@
 <script lang="ts">
-	import { profileWithUser, profileLoading } from '$lib/stores/profile';
-	import { ProfileService } from '$lib/services/profileService';
+  import { profileWithUser, profileLoading } from '$lib/stores/profile';
+  import { ProfileService } from '$lib/services/profileService';
 
-	export let showEditButton = true;
-	export let onEdit: (() => void) | undefined = undefined;
+  export let showEditButton = true;
+  export let onEdit: (() => void) | undefined = undefined;
 
-	$: avatarUrl = ProfileService.getAvatarUrl($profileWithUser?.avatar_url);
-	$: initials = ProfileService.generateInitials(
-		$profileWithUser?.full_name,
-		$profileWithUser?.username,
-		$profileWithUser?.email
-	);
+  $: avatarUrl = ProfileService.getAvatarUrl($profileWithUser?.avatar_url ?? null);
+  $: initials = ProfileService.generateInitials(
+    $profileWithUser?.full_name ?? '',
+    $profileWithUser?.username ?? '',
+    $profileWithUser?.email ?? ''
+  );
 </script>
 
 {#if $profileLoading}
-	<div class="bg-white shadow rounded-lg p-6">
-		<div class="animate-pulse">
-			<div class="w-20 h-20 bg-gray-300 rounded-full mx-auto mb-4"></div>
-			<div class="h-4 bg-gray-300 rounded mb-2"></div>
-			<div class="h-3 bg-gray-300 rounded mb-4 w-2/3 mx-auto"></div>
-			<div class="h-3 bg-gray-300 rounded mb-2"></div>
-			<div class="h-3 bg-gray-300 rounded"></div>
-		</div>
-	</div>
+  <div class="profile-card">
+    <div class="skeleton">
+      <div class="avatar-skel" />
+      <div class="line short" />
+      <div class="line mid" />
+      <div class="line long" />
+    </div>
+  </div>
 {:else if $profileWithUser}
-	<div class="bg-white shadow rounded-lg overflow-hidden">
-		<div class="p-6">
-			<div class="flex flex-col items-center">
-				<div class="w-20 h-20 rounded-full bg-gray-200 flex items-center justify-center text-2xl font-bold text-gray-600 mb-4">
-					{#if avatarUrl}
-						<img src={avatarUrl} alt="Profile" class="w-full h-full rounded-full object-cover" />
-					{/if}
-				</div>
-				
-				<h2 class="text-xl font-bold text-gray-900 mb-1">
-					{$profileWithUser.full_name || $profileWithUser.username || 'Anonymous User'}
-				</h2>
-				
-				{#if $profileWithUser.username && $profileWithUser.full_name}
-					<p class="text-gray-600 mb-2">@{$profileWithUser.username}</p>
-				{/if}
-				
-				<p class="text-gray-600 mb-2">{$profileWithUser.email}</p>
-				
-				{#if $profileWithUser.bio}
-					<p class="text-gray-700 text-center mb-4">{$profileWithUser.bio}</p>
-				{/if}
-				
-				{#if $profileWithUser.location}
-					<div class="flex items-center text-gray-600 mb-4">
-						<svg class="w-4 h-4 mr-1" width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path>
-							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path>
-						</svg>
-						{$profileWithUser.location}
-					</div>
-				{/if}
-				
-				{#if showEditButton && onEdit}
-					<button
-						on:click={onEdit}
-						class="btn-primary"
-					>
-						Edit Profile
-					</button>
-				{/if}
-			</div>
-		</div>
-	</div>
+  <div class="profile-card" role="region" aria-label="User summary">
+    <div class="avatar">
+      {#if avatarUrl}
+        <img src={avatarUrl} alt="Profile avatar" class="avatar-image" />
+      {:else}
+        <div class="avatar-initials" aria-hidden="true">{initials}</div>
+      {/if}
+    </div>
+
+    <div class="content">
+      <h2 class="name">{$profileWithUser.full_name || $profileWithUser.username || 'Anonymous User'}</h2>
+
+      {#if $profileWithUser.username && $profileWithUser.full_name}
+        <p class="handle">@{$profileWithUser.username}</p>
+      {/if}
+
+      <p class="email">{$profileWithUser.email}</p>
+
+      {#if $profileWithUser.bio}
+        <p class="bio">{$profileWithUser.bio}</p>
+      {/if}
+
+      {#if $profileWithUser.location}
+        <p class="location">📍 {$profileWithUser.location}</p>
+      {/if}
+    </div>
+
+    {#if showEditButton && onEdit}
+      <div class="edit-row">
+        <button type="button" class="btn-edit" on:click={onEdit} aria-label="Edit profile">Edit Profile</button>
+      </div>
+    {/if}
+  </div>
 {:else}
-	<div class="bg-white shadow rounded-lg p-6">
-		<div class="text-center text-gray-600">
-			<p>Profile not found</p>
-		</div>
-	</div>
+  <div class="profile-card empty-card">
+    <p>Profile not found</p>
+  </div>
 {/if}
+
+<style>
+  /* Rebuilt profile card — clean, single-responsibility layout */
+  .profile-card {
+    background: white;
+    border: 1px solid #eaeff4;
+    border-radius: 12px;
+    box-shadow: 0 6px 18px rgba(16, 24, 40, 0.04);
+    padding: 1.5rem;
+    box-sizing: border-box;
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.75rem;
+  }
+
+  .skeleton {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.75rem;
+  }
+  .avatar-skel {
+    width: 5rem;
+    height: 5rem;
+    border-radius: 9999px;
+    background: #eef2f7;
+  }
+  .line {
+    height: 10px;
+    background: #eef2f7;
+    border-radius: 6px;
+    width: 70%;
+  }
+  .line.short { width: 40%; }
+  .line.mid { width: 55%; }
+  .line.long { width: 85%; }
+
+  .avatar {
+    width: 5rem;
+    height: 5rem;
+    border-radius: 9999px;
+    background: linear-gradient(135deg, #f8f9fa 0%, #f1f3f4 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 8px 30px rgba(16, 24, 40, 0.06);
+    overflow: hidden;
+  }
+
+  .avatar-image {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+
+  .avatar-initials {
+    font-weight: 700;
+    color: #6b7280;
+    font-size: 1.25rem;
+  }
+
+  .content {
+    width: 100%;
+    text-align: center;
+  }
+
+  .name {
+    margin: 0;
+    font-size: 1.125rem;
+    color: #111827;
+    font-weight: 700;
+    line-height: 1.2;
+  }
+
+  .handle {
+    margin: 0.25rem 0 0;
+    color: #6b7280;
+    font-size: 0.95rem;
+  }
+
+  .email {
+    margin: 0.5rem 0 0;
+    color: #6b7280;
+    font-size: 0.95rem;
+  }
+
+  .bio {
+    margin: 0.5rem 0 0;
+    color: #374151;
+    font-size: 0.95rem;
+  }
+
+  .location {
+    margin: 0.5rem 0 0;
+    color: #6b7280;
+    font-size: 0.95rem;
+  }
+
+  .edit-row {
+    width: 100%;
+    display: flex;
+    justify-content: center;
+    margin-top: 0.5rem;
+  }
+
+  .btn-edit {
+    background: linear-gradient(135deg, #8B2635 0%, #722F37 100%);
+    color: #F5F5DC;
+    border: none;
+    padding: 0.6rem 1rem;
+    border-radius: 8px;
+    font-weight: 600;
+    cursor: pointer;
+    box-shadow: 0 6px 20px rgba(139, 38, 53, 0.12);
+  }
+
+  .btn-edit:hover { transform: translateY(-2px); }
+
+  /* empty state */
+  .empty-card {
+    padding: 1.5rem;
+    text-align: center;
+    color: #6b7280;
+  }
+
+  @media (max-width: 640px) {
+    .profile-card { padding: 1rem; }
+    .avatar { width: 4.25rem; height: 4.25rem; }
+    .name { font-size: 1rem; }
+    .btn-edit { width: 100%; justify-content: center; }
+  }
+</style>
