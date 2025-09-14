@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { page } from '$app/stores';
-	import { pendingIncomingCount } from '$lib/stores/swaps';
+	import { pendingSwapCounts } from '$lib/stores/swaps';
 	
 	$: navItems = [
 		{
@@ -27,7 +27,7 @@
 			name: 'Swap Requests',
 			href: '/app/swaps',
 			icon: 'exchange',
-			badgeCount: $pendingIncomingCount
+			badgeCount: $pendingSwapCounts.incoming
 		}
 	];
 

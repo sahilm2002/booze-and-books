@@ -1,9 +1,10 @@
 -- Fix swap completion validation trigger
 -- The validation logic needs to properly check current book ownership
+-- Note: This is an alternate version - the canonical implementation is in migration 027
 
-DROP FUNCTION IF EXISTS transfer_book_ownership_on_completion() CASCADE;
+DROP FUNCTION IF EXISTS transfer_book_ownership_on_completion_validation_025();
 
-CREATE OR REPLACE FUNCTION transfer_book_ownership_on_completion()
+CREATE OR REPLACE FUNCTION transfer_book_ownership_on_completion_validation_025()
 RETURNS TRIGGER AS $$
 DECLARE
     current_requested_book_owner UUID;
@@ -83,16 +84,16 @@ END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- Recreate the trigger
-DROP TRIGGER IF EXISTS trigger_transfer_ownership_on_completion ON swap_requests;
-CREATE TRIGGER trigger_transfer_ownership_on_completion
+DROP TRIGGER IF EXISTS trigger_transfer_ownership_on_completion_validation_025 ON swap_requests;
+CREATE TRIGGER trigger_transfer_ownership_on_completion_validation_025
     AFTER UPDATE ON swap_requests
     FOR EACH ROW
     WHEN (NEW.status = 'COMPLETED')
-    EXECUTE FUNCTION transfer_book_ownership_on_completion();
+    EXECUTE FUNCTION transfer_book_ownership_on_completion_validation_025();
 
 -- Grant execute permissions
-GRANT EXECUTE ON FUNCTION transfer_book_ownership_on_completion() TO authenticated;
+GRANT EXECUTE ON FUNCTION transfer_book_ownership_on_completion_validation_025() TO authenticated;
 
 -- Add comment
-COMMENT ON FUNCTION transfer_book_ownership_on_completion() 
+COMMENT ON FUNCTION transfer_book_ownership_on_completion_validation_025() 
 IS 'Transfers book ownership when a swap is marked as completed with proper validation';

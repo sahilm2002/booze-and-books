@@ -1,8 +1,9 @@
 -- Debug version of swap completion trigger to see what's happening
+-- Note: This is a debug version - the canonical implementation is in migration 027
 
-DROP FUNCTION IF EXISTS transfer_book_ownership_on_completion() CASCADE;
+DROP FUNCTION IF EXISTS transfer_book_ownership_on_completion_debug_026();
 
-CREATE OR REPLACE FUNCTION transfer_book_ownership_on_completion()
+CREATE OR REPLACE FUNCTION transfer_book_ownership_on_completion_debug_026()
 RETURNS TRIGGER AS $$
 DECLARE
     current_requested_book_owner UUID;
@@ -76,12 +77,12 @@ END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- Recreate the trigger
-DROP TRIGGER IF EXISTS trigger_transfer_ownership_on_completion ON swap_requests;
-CREATE TRIGGER trigger_transfer_ownership_on_completion
+DROP TRIGGER IF EXISTS trigger_transfer_ownership_on_completion_debug_026 ON swap_requests;
+CREATE TRIGGER trigger_transfer_ownership_on_completion_debug_026
     AFTER UPDATE ON swap_requests
     FOR EACH ROW
     WHEN (NEW.status = 'COMPLETED')
-    EXECUTE FUNCTION transfer_book_ownership_on_completion();
+    EXECUTE FUNCTION transfer_book_ownership_on_completion_debug_026();
 
 -- Grant execute permissions
-GRANT EXECUTE ON FUNCTION transfer_book_ownership_on_completion() TO authenticated;
+GRANT EXECUTE ON FUNCTION transfer_book_ownership_on_completion_debug_026() TO authenticated;

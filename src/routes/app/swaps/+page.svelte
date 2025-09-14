@@ -2,21 +2,25 @@
 	import { onMount } from 'svelte';
 	import { page } from '$app/stores';
 	import SwapRequestCard from '../../../components/swaps/SwapRequestCard.svelte';
-	import { swapStore, incomingSwapRequests, outgoingSwapRequests, completedSwapRequests, swapRequestsLoading, swapRequestsError } from '$lib/stores/swaps';
+	import { SwapService } from '$lib/services/swapService';
 	import { auth } from '$lib/stores/auth';
 	import type { PageData } from './$types';
+	import type { SwapRequest } from '$lib/types/swap';
+	import type { Book } from '$lib/types/book';
+	import type { Profile } from '$lib/types/profile';
+	import { BookCondition } from '$lib/types/book';
 
 	export let data: PageData;
 
 	let activeTab: 'incoming' | 'outgoing' = 'incoming';
 	let statusFilter: 'all' | 'pending' | 'accepted' | 'counter_offer' | 'cancelled' | 'completed' = 'all';
 
-	// Load swap requests on client side to avoid server-side issues
+	let swapRequests: SwapRequest[] = [];
+	let loading = false;
+	let error: string | null = null;
+
+	// Load swap requests on client side
 	onMount(async () => {
-		if (import.meta.env.DEV) {
-			console.log('Swaps page mounted, loading data...');
-		}
-		
 		// Set page title
 		if (typeof document !== 'undefined') {
 			document.title = 'Swap Requests - Booze & Books';
@@ -30,85 +34,67 @@
 			activeTab = 'incoming';
 		}
 		
-		if (import.meta.env.DEV) {
-			console.log('Initial tab:', activeTab);
-		}
-		
-		// Only fetch swap requests if stores are empty (avoid reloading on navigation)
-		if ($incomingSwapRequests.length === 0 && $outgoingSwapRequests.length === 0) {
-			if (import.meta.env.DEV) {
-				console.log('Stores are empty, fetching swap requests...');
-			}
-			await swapStore.refresh();
-		} else {
-			if (import.meta.env.DEV) {
-				console.log('Using cached swap requests:', {
-					incoming: $incomingSwapRequests.length,
-					outgoing: $outgoingSwapRequests.length
-				});
-			}
-		}
-		
-		if (import.meta.env.DEV) {
-			console.log('After mount:', {
-				incoming: $incomingSwapRequests.length,
-				outgoing: $outgoingSwapRequests.length,
-				completed: $completedSwapRequests.length,
-				loading: $swapRequestsLoading,
-				error: $swapRequestsError
-			});
-		}
+		await loadSwapRequests();
 	});
 
-	// Filter requests based on status
-	$: filteredIncoming = statusFilter === 'completed' ? [] : $incomingSwapRequests.filter(request => 
-		statusFilter === 'all' || request.status === statusFilter.toUpperCase()
-	);
-
-	$: filteredOutgoing = statusFilter === 'completed' ? [] : $outgoingSwapRequests.filter(request => 
-		statusFilter === 'all' || request.status === statusFilter.toUpperCase()
-	);
-
-	// For completed swaps, show all completed swaps regardless of tab
-	$: filteredCompleted = statusFilter === 'completed' ? $completedSwapRequests : [];
-	
-	// Debug completed swaps
-	$: if (import.meta.env.DEV && statusFilter === 'completed') {
-		console.log('Debug completed swaps:', {
-			statusFilter,
-			completedSwapRequestsLength: $completedSwapRequests.length,
-			filteredCompletedLength: filteredCompleted.length,
-			completedSwapRequests: $completedSwapRequests
-		});
+	async function loadSwapRequests() {
+		if (!$auth.user) return;
+		
+		loading = true;
+		error = null;
+		
+		try {
+			const { incoming, outgoing } = await SwapService.getSwapRequestsForUser($auth.user.id);
+			swapRequests = [...incoming, ...outgoing];
+		} catch (err) {
+			error = err instanceof Error ? err.message : 'Failed to load swap requests';
+		} finally {
+			loading = false;
+		}
 	}
 
-	$: currentRequests = statusFilter === 'completed' ? filteredCompleted : 
-		(activeTab === 'incoming' ? filteredIncoming : filteredOutgoing);
+	// Filter requests based on tab and status
+	$: filteredRequests = swapRequests.filter(request => {
+		// Filter by tab (incoming/outgoing)
+		const isIncoming = request.owner_id === $auth.user?.id;
+		const isOutgoing = request.requester_id === $auth.user?.id;
+		
+		if (activeTab === 'incoming' && !isIncoming) return false;
+		if (activeTab === 'outgoing' && !isOutgoing) return false;
+		
+		// Filter by status
+		if (statusFilter === 'all') return true;
+		return request.status === statusFilter.toUpperCase();
+	});
 
-	async function handleRequestUpdated() {
-		// Refresh swap requests from the server
-		await swapStore.refresh();
+	async function handleRequestUpdated(event: CustomEvent<SwapRequest>) {
+		// Update the local request
+		const updatedRequest = event.detail;
+		swapRequests = swapRequests.map(req => 
+			req.id === updatedRequest.id ? updatedRequest : req
+		);
 	}
 
-	function getStatusCounts(requests: typeof $incomingSwapRequests) {
+	function handleRequestError(event: CustomEvent<string>) {
+		error = event.detail;
+	}
+
+	function getStatusCounts(requests: SwapRequest[], isIncoming: boolean) {
+		const filtered = requests.filter(r => 
+			isIncoming ? r.owner_id === $auth.user?.id : r.requester_id === $auth.user?.id
+		);
+		
 		return {
-			pending: requests.filter(r => r.status === 'PENDING').length,
-			accepted: requests.filter(r => r.status === 'ACCEPTED').length,
-			counter_offer: requests.filter(r => r.status === 'COUNTER_OFFER').length,
-			cancelled: requests.filter(r => r.status === 'CANCELLED').length,
-			completed: requests.filter(r => r.status === 'COMPLETED').length
+			pending: filtered.filter(r => r.status === 'PENDING').length,
+			accepted: filtered.filter(r => r.status === 'ACCEPTED').length,
+			cancelled: filtered.filter(r => r.status === 'CANCELLED').length,
+			completed: filtered.filter(r => r.status === 'COMPLETED').length
 		};
 	}
 
-	$: incomingCounts = getStatusCounts($incomingSwapRequests);
-	$: outgoingCounts = getStatusCounts($outgoingSwapRequests);
-	
-	// For completed count, always show total completed swaps
-	$: completedCount = $completedSwapRequests.length;
-	
-	$: currentCounts = statusFilter === 'completed' ? 
-		{ ...incomingCounts, completed: completedCount } :
-		(activeTab === 'incoming' ? incomingCounts : outgoingCounts);
+	$: incomingCounts = getStatusCounts(swapRequests, true);
+	$: outgoingCounts = getStatusCounts(swapRequests, false);
+	$: currentCounts = activeTab === 'incoming' ? incomingCounts : outgoingCounts;
 </script>
 
 <style>
@@ -468,13 +454,13 @@
 	</div>
 
 	<!-- Error Message -->
-	{#if $swapRequestsError}
+	{#if error}
 		<div class="error-message">
 			<div class="error-content">
 				<svg class="error-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
 				</svg>
-				<p class="error-text">{$swapRequestsError}</p>
+				<p class="error-text">{error}</p>
 			</div>
 		</div>
 	{/if}
@@ -520,12 +506,11 @@
 		</div>
 		<div class="filter-tags">
 			{#each [
-				{ value: 'all', label: `All (${currentRequests.length})` },
+				{ value: 'all', label: `All (${filteredRequests.length})` },
 				{ value: 'pending', label: `Pending (${currentCounts.pending})` },
 				{ value: 'accepted', label: `Accepted (${currentCounts.accepted})` },
-				{ value: 'counter_offer', label: `Counter Offer (${currentCounts.counter_offer})` },
 				{ value: 'cancelled', label: `Cancelled (${currentCounts.cancelled})` },
-				{ value: 'completed', label: `Completed (${completedCount})` }
+				{ value: 'completed', label: `Completed (${currentCounts.completed})` }
 			] as filterOption}
 				<button
 					type="button"
@@ -540,7 +525,7 @@
 	</div>
 
 	<!-- Loading State -->
-	{#if $swapRequestsLoading}
+	{#if loading}
 		<div class="loading-state">
 			<div class="loading-content">
 				<svg class="loading-spinner" fill="none" viewBox="0 0 24 24">
@@ -552,7 +537,7 @@
 		</div>
 		{:else}
 		<!-- Content -->
-		{#if currentRequests.length === 0}
+		{#if filteredRequests.length === 0}
 			<div class="empty-state">
 				<div class="empty-icon">
 					{#if activeTab === 'incoming'}
@@ -600,17 +585,56 @@
 					</button>
 				{/if}
 			</div>
-		{:else}
 			<div class="requests-grid">
-				{#each currentRequests as request (request.id)}
-					{@const currentUser = $auth.user}
-					{@const requestType = statusFilter === 'completed' ? 
-						(currentUser?.id === request.requester_id ? 'outgoing' : 'incoming') : 
-						activeTab}
+				{#each filteredRequests as request (request.id)}
+					{@const isIncoming = request.owner_id === $auth.user?.id}
+					{@const requestedBook = { 
+						id: request.book_id, 
+						title: 'Book Title', 
+						authors: ['Author'], 
+						condition: BookCondition.GOOD,
+						owner_id: request.owner_id,
+						is_available: true,
+						created_at: '',
+						updated_at: '',
+						isbn: null,
+						genre: null,
+						description: null,
+						google_volume_id: null
+					}}
+					{@const offeredBook = { 
+						id: request.offered_book_id || '', 
+						title: 'Offered Book', 
+						authors: ['Author'], 
+						condition: BookCondition.GOOD,
+						owner_id: request.requester_id,
+						is_available: true,
+						created_at: '',
+						updated_at: '',
+						isbn: null,
+						genre: null,
+						description: null,
+						google_volume_id: null
+					}}
+					{@const otherUserProfile = { 
+						id: isIncoming ? request.requester_id : request.owner_id, 
+						username: 'User', 
+						avatar_url: null,
+						full_name: null,
+						bio: null,
+						location: null,
+						created_at: '',
+						updated_at: ''
+					}}
+					
 					<SwapRequestCard
-						{request}
-						type={requestType}
+						swapRequest={request}
+						{requestedBook}
+						{offeredBook}
+						{otherUserProfile}
+						isIncoming={isIncoming}
 						on:updated={handleRequestUpdated}
+						on:error={handleRequestError}
 					/>
 				{/each}
 			</div>

@@ -2,7 +2,7 @@
 -- Adds automatic availability management when swaps complete
 -- Books are marked as unavailable after transfer to prevent immediate re-swapping
 
-CREATE OR REPLACE FUNCTION transfer_book_ownership_on_completion()
+CREATE OR REPLACE FUNCTION transfer_book_ownership_on_completion_availability_027()
 RETURNS TRIGGER AS $$
 DECLARE
   book_to_transfer_id UUID;
@@ -75,3 +75,18 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER
 SET search_path = public, pg_temp;
+
+-- Create trigger for the availability management function
+DROP TRIGGER IF EXISTS trigger_transfer_ownership_availability_027 ON swap_requests;
+CREATE TRIGGER trigger_transfer_ownership_availability_027
+    AFTER UPDATE ON swap_requests
+    FOR EACH ROW
+    WHEN (NEW.status = 'COMPLETED')
+    EXECUTE FUNCTION transfer_book_ownership_on_completion_availability_027();
+
+-- Grant execute permissions
+GRANT EXECUTE ON FUNCTION transfer_book_ownership_on_completion_availability_027() TO authenticated;
+
+-- Add comment explaining the function
+COMMENT ON FUNCTION transfer_book_ownership_on_completion_availability_027() 
+IS 'Transfers book ownership and marks books as unavailable when swap is completed (migration 027 availability version)';
