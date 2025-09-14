@@ -228,8 +228,8 @@
 	}
 
 	.swap-request-status {
-		background: #e6fffa;
-		border: 1px solid #81e6d9;
+		background: white;
+		border: 1px solid #e2e8f0;
 		border-radius: 8px;
 		padding: 1rem;
 		margin: 1rem 1.5rem;
@@ -387,14 +387,14 @@
 		}
 	}
 
-	/* Modern Contact Information Styles */
+	/* Neutral Contact Information Styles */
 	.contact-information-section {
-		background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
-		border: 1px solid #0ea5e9;
+		background: white;
+		border: 1px solid #e2e8f0;
 		border-radius: 12px;
 		padding: 1.5rem;
 		margin: 1rem 1.5rem;
-		box-shadow: 0 4px 12px rgba(14, 165, 233, 0.1);
+		box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
 	}
 
 	.contact-header {
@@ -403,20 +403,20 @@
 		gap: 1rem;
 		margin-bottom: 1.5rem;
 		padding-bottom: 1rem;
-		border-bottom: 1px solid rgba(14, 165, 233, 0.2);
+		border-bottom: 1px solid #e2e8f0;
 	}
 
 	.contact-icon {
 		width: 48px;
 		height: 48px;
-		background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+		background: linear-gradient(135deg, #8B2635 0%, #722F37 100%);
 		border-radius: 12px;
 		display: flex;
 		align-items: center;
 		justify-content: center;
-		color: white;
+		color: #F5F5DC;
 		flex-shrink: 0;
-		box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+		box-shadow: 0 4px 12px rgba(139, 38, 53, 0.3);
 	}
 
 	.contact-header-content {
@@ -426,12 +426,12 @@
 	.contact-title {
 		font-size: 1.25rem;
 		font-weight: 700;
-		color: #0c4a6e;
+		color: #2d3748;
 		margin: 0 0 0.25rem 0;
 	}
 
 	.contact-subtitle {
-		color: #0369a1;
+		color: #718096;
 		font-size: 0.95rem;
 		margin: 0;
 	}
@@ -441,11 +441,11 @@
 	}
 
 	.contact-card {
-		background: white;
-		border: 1px solid rgba(14, 165, 233, 0.2);
+		background: #f8fafc;
+		border: 1px solid #e2e8f0;
 		border-radius: 12px;
 		padding: 1.25rem;
-		box-shadow: 0 2px 8px rgba(14, 165, 233, 0.1);
+		box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
 	}
 
 	.contact-person-header {
@@ -461,7 +461,7 @@
 		border-radius: 12px;
 		overflow: hidden;
 		flex-shrink: 0;
-		border: 2px solid #e0f2fe;
+		border: 2px solid #e2e8f0;
 	}
 
 	.contact-avatar-img {
@@ -487,13 +487,13 @@
 	.contact-person-name {
 		font-size: 1.1rem;
 		font-weight: 600;
-		color: #0c4a6e;
+		color: #2d3748;
 		margin: 0 0 0.25rem 0;
 	}
 
 	.contact-person-role {
 		font-size: 0.875rem;
-		color: #0369a1;
+		color: #718096;
 		margin: 0;
 		font-weight: 500;
 	}
@@ -503,23 +503,23 @@
 		align-items: center;
 		gap: 0.75rem;
 		padding: 0.75rem 1.25rem;
-		background: linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%);
-		color: white;
+		background: linear-gradient(135deg, #8B2635 0%, #722F37 100%);
+		color: #F5F5DC;
 		border: none;
 		border-radius: 8px;
 		font-weight: 600;
 		font-size: 0.9rem;
 		text-decoration: none;
 		transition: all 0.2s ease;
-		box-shadow: 0 2px 8px rgba(14, 165, 233, 0.3);
+		box-shadow: 0 4px 12px rgba(139, 38, 53, 0.3);
 	}
 
 	.contact-email-button:hover {
-		background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%);
-		transform: translateY(-1px);
-		box-shadow: 0 4px 12px rgba(14, 165, 233, 0.4);
+		background: linear-gradient(135deg, #722F37 0%, #8B2635 100%);
+		transform: translateY(-2px);
+		box-shadow: 0 6px 20px rgba(139, 38, 53, 0.4);
 		text-decoration: none;
-		color: white;
+		color: #F5F5DC;
 	}
 
 	.contact-email-address {
@@ -528,8 +528,8 @@
 	}
 
 	.next-steps-card {
-		background: rgba(255, 255, 255, 0.8);
-		border: 1px solid rgba(14, 165, 233, 0.2);
+		background: white;
+		border: 1px solid #e2e8f0;
 		border-radius: 12px;
 		padding: 1.25rem;
 		display: flex;
@@ -540,14 +540,14 @@
 	.next-steps-icon {
 		width: 40px;
 		height: 40px;
-		background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+		background: #f8f9fa;
+		border: 1px solid #e2e8f0;
 		border-radius: 10px;
 		display: flex;
 		align-items: center;
 		justify-content: center;
-		color: white;
+		color: #8B2635;
 		flex-shrink: 0;
-		box-shadow: 0 2px 8px rgba(245, 158, 11, 0.3);
 	}
 
 	.next-steps-content {
@@ -557,7 +557,7 @@
 	.next-steps-title {
 		font-size: 1rem;
 		font-weight: 600;
-		color: #0c4a6e;
+		color: #2d3748;
 		margin: 0 0 0.75rem 0;
 	}
 
@@ -571,7 +571,7 @@
 	}
 
 	.next-steps-list li {
-		color: #0369a1;
+		color: #718096;
 		font-size: 0.9rem;
 		line-height: 1.4;
 	}
@@ -639,9 +639,9 @@
 	<div class="card-header">
 		
 		<div class="flex items-start gap-4">
-			{#if request.book.google_volume_id && !imageLoadFailed}
+			{#if request.book.thumbnail_url && !imageLoadFailed}
 				<img
-					src="https://books.google.com/books/content?id={request.book.google_volume_id}&printsec=frontcover&img=1&zoom=1&source=gbs_api"
+					src={request.book.thumbnail_url}
 					alt="{request.book.title} cover"
 					class="book-thumbnail"
 					loading="lazy"
@@ -705,10 +705,10 @@
 							{type === 'incoming' ? 'They are offering:' : 'You are offering:'}
 						</div>
 						<div class="flex items-start gap-4">
-							{#if request.offered_book.google_volume_id}
+							{#if request.offered_book?.thumbnail_url}
 								<div class="w-10 h-14 flex-shrink-0">
 									<img
-										src="https://books.google.com/books/content?id={request.offered_book.google_volume_id}&printsec=frontcover&img=1&zoom=1&source=gbs_api"
+										src={request.offered_book.thumbnail_url}
 										alt="{request.offered_book.title} cover"
 										class="w-full h-full object-cover rounded shadow-sm"
 									/>
@@ -738,10 +738,10 @@
 							Counter-offer: {type === 'outgoing' ? 'They are offering instead:' : 'You are offering instead:'}
 						</div>
 						<div class="flex items-start gap-4">
-							{#if request.counter_offered_book.google_volume_id}
+							{#if request.counter_offered_book?.thumbnail_url}
 								<div class="w-10 h-14 flex-shrink-0">
 									<img
-										src="https://books.google.com/books/content?id={request.counter_offered_book.google_volume_id}&printsec=frontcover&img=1&zoom=1&source=gbs_api"
+										src={request.counter_offered_book.thumbnail_url}
 										alt="{request.counter_offered_book.title} cover"
 										class="w-full h-full object-cover rounded shadow-sm"
 									/>
@@ -931,24 +931,24 @@
 				<!-- Owner actions for PENDING: Accept/Counter-Offer/Cancel -->
 				<div class="action-buttons">
 					<div class="button-row">
-						<button
-							type="button"
-							class="btn-success"
-							on:click={handleAccept}
-							disabled={isLoading}
-						>
-							{#if isLoading}
-								<div class="flex items-center justify-center">
-									<svg class="animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
-										<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-										<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-									</svg>
-									Processing...
-								</div>
-							{:else}
-								Accept
-							{/if}
-						</button>
+					<button
+						type="button"
+						class="btn-primary"
+						on:click={handleAccept}
+						disabled={isLoading}
+					>
+						{#if isLoading}
+							<div class="flex items-center justify-center">
+								<svg class="animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
+									<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+									<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 8-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 714 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+								</svg>
+								Processing...
+							</div>
+						{:else}
+							Accept Offer
+						{/if}
+					</button>
 						<button
 							type="button"
 							class="btn-secondary"

@@ -32,6 +32,50 @@ function createAuthStore() {
 		subscribe,
 		
 		/**
+		 * Check if session is valid and refresh if needed
+		 */
+		ensureValidSession: async (): Promise<boolean> => {
+			try {
+				const { data: { session }, error } = await supabase.auth.getSession();
+				
+				if (error) {
+					console.error('Error getting session:', error);
+					return false;
+				}
+				
+				if (!session) {
+					console.log('No active session found');
+					await auth.signOut();
+					return false;
+				}
+				
+				// Check if token is expired or will expire soon (within 5 minutes)
+				const now = Math.floor(Date.now() / 1000);
+				const expiresAt = session.expires_at || 0;
+				
+				if (expiresAt <= now + 300) { // 5 minutes buffer
+					console.log('Token expired or expiring soon, attempting refresh');
+					const { data: { session: refreshedSession }, error: refreshError } = await supabase.auth.refreshSession();
+					
+					if (refreshError || !refreshedSession) {
+						console.error('Failed to refresh session:', refreshError);
+						await auth.signOut();
+						return false;
+					}
+					
+					console.log('Session refreshed successfully');
+					return true;
+				}
+				
+				return true;
+			} catch (error) {
+				console.error('Error ensuring valid session:', error);
+				await auth.signOut();
+				return false;
+			}
+		},
+
+		/**
 		 * Initialize the auth store with session data from the server
 		 */
 		initialize: (session: Session | null) => {
