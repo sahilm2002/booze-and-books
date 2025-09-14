@@ -21,6 +21,11 @@
 			icon: 'home'
 		},
 		{
+			name: 'Profile',
+			href: '/app/profile',
+			icon: 'user'
+		},
+		{
 			name: 'My Books',
 			href: '/app/books',
 			icon: 'book'
