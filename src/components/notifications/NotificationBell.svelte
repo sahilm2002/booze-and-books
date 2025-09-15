@@ -62,17 +62,26 @@
 	}
 
 	async function handleNotificationClick(notification: Notification) {
-		// Mark as read if not already
-		if (!notification.is_read) {
-			await notificationStore.markAsRead(notification.id);
-		}
-
-		// Navigate based on notification type
+		// Check authentication first before any operations
 		if (!$auth.user) {
 			goto('/auth/login?redirectTo=/app/swaps');
 			return;
 		}
-		
+
+		// Close modal immediately to avoid UI stalling
+		isOpen = false;
+
+		// Mark as read if not already (with error handling)
+		if (!notification.is_read) {
+			try {
+				await notificationStore.markAsRead(notification.id);
+			} catch (error) {
+				// Log error but don't prevent navigation
+				console.error('Failed to mark notification as read:', error);
+			}
+		}
+
+		// Navigate based on notification type (don't await navigation)
 		switch (notification.type) {
 			case 'SWAP_REQUEST':
 				goto('/app/swaps?tab=incoming');
@@ -87,8 +96,6 @@
 				goto('/app/swaps');
 				break;
 		}
-
-		isOpen = false;
 	}
 
 	function getNotificationIcon(type: NotificationType): string {

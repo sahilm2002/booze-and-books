@@ -8,15 +8,17 @@
 	export let onCancel: (() => void) | undefined = undefined;
 
 	let formData: ProfileUpdate = {
-		username: $profile?.username || '',
-		full_name: $profile?.full_name || '',
-		bio: $profile?.bio || '',
-		location: $profile?.location || ''
+		username: '',
+		full_name: '',
+		bio: '',
+		location: ''
 	};
 
 	let saving = false;
 	let uploading = false;
 	let errors: Record<string, string> = {};
+	let initialized = false;
+	let dirty = false;
 
 	function validateForm(): boolean {
 		const validation = validateProfileUpdate(formData);
@@ -35,7 +37,9 @@
 		saving = true;
 		
 		try {
-			const success = await profileStore.updateProfile(formData);
+			// Remove username from the submitted payload since it's immutable
+			const { username, ...updatePayload } = formData;
+			const success = await profileStore.updateProfile(updatePayload);
 			
 			if (success && onSave) {
 				onSave();
@@ -60,25 +64,37 @@
 	}
 
 	function handleCancel() {
+		// Reset to latest profile values and clear dirty state
 		formData = {
 			username: $profile?.username || '',
 			full_name: $profile?.full_name || '',
 			bio: $profile?.bio || '',
 			location: $profile?.location || ''
 		};
+		
+		// Reset flags to allow reinitialization
+		initialized = false;
+		dirty = false;
 
 		if (onCancel) {
 			onCancel();
 		}
 	}
 
-	$: if ($profile) {
+	function markDirty() {
+		dirty = true;
+	}
+
+	// Initialize formData only once when profile first becomes available
+	// and don't overwrite if user has made changes (dirty flag)
+	$: if ($profile && !initialized && !dirty) {
 		formData = {
 			username: $profile.username || '',
 			full_name: $profile.full_name || '',
 			bio: $profile.bio || '',
 			location: $profile.location || ''
 		};
+		initialized = true;
 	}
 </script>
 
@@ -141,6 +157,7 @@
 						type="text"
 						id="full_name"
 						bind:value={formData.full_name}
+						on:input={markDirty}
 						class="form-input"
 						placeholder="Enter your full name"
 					/>
@@ -155,6 +172,7 @@
 						type="text"
 						id="location"
 						bind:value={formData.location}
+						on:input={markDirty}
 						class="form-input"
 						placeholder="Enter your address or location"
 					/>
@@ -170,6 +188,7 @@
 					id="bio"
 					rows="4"
 					bind:value={formData.bio}
+					on:input={markDirty}
 					class="form-textarea"
 					placeholder="Tell us about yourself, your reading preferences, or anything you'd like other members to know..."
 				></textarea>
