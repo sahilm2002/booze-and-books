@@ -12,22 +12,20 @@ import { withValidSession } from '$lib/utils/apiWrapper';
 export class SwapService {
 	// Helper function to build profile select query based on swap status
 	private static getProfileSelectQuery(includeEmail: boolean = false): string {
-		const baseQuery = `
-			username,
-			full_name,
-			avatar_url
-		`;
-		
 		if (includeEmail) {
 			return `
 				username,
 				full_name,
 				avatar_url,
-				users!profiles_id_fkey(email)
+				email
 			`;
 		}
 		
-		return baseQuery;
+		return `
+			username,
+			full_name,
+			avatar_url
+		`;
 	}
 	// Create a new swap request
 	static async createSwapRequest(input: SwapRequestInput, requesterId: string): Promise<SwapRequest> {
@@ -145,32 +143,27 @@ export class SwapService {
 					title,
 					authors,
 					google_volume_id,
-					condition
+					condition,
+					thumbnail_url
 				),
 				offered_book:books!swap_requests_offered_book_id_fkey (
 					id,
 					title,
 					authors,
 					google_volume_id,
-					condition
+					condition,
+					thumbnail_url
 				),
 				counter_offered_book:books!swap_requests_counter_offered_book_id_fkey (
 					id,
 					title,
 					authors,
 					google_volume_id,
-					condition
+					condition,
+					thumbnail_url
 				),
-				requester_profile:profiles!swap_requests_requester_id_fkey (
-					username,
-					full_name,
-					avatar_url
-				),
-				owner_profile:profiles!swap_requests_owner_id_fkey (
-					username,
-					full_name,
-					avatar_url
-				)
+				requester_profile:profiles!swap_requests_requester_id_fkey (${this.getProfileSelectQuery(true)}),
+				owner_profile:profiles!swap_requests_owner_id_fkey (${this.getProfileSelectQuery(true)})
 			`)
 			.eq('owner_id', userId)
 			.order('created_at', { ascending: false });
@@ -189,21 +182,24 @@ export class SwapService {
 					title,
 					authors,
 					google_volume_id,
-					condition
+					condition,
+					thumbnail_url
 				),
 				offered_book:books!swap_requests_offered_book_id_fkey (
 					id,
 					title,
 					authors,
 					google_volume_id,
-					condition
+					condition,
+					thumbnail_url
 				),
 				counter_offered_book:books!swap_requests_counter_offered_book_id_fkey (
 					id,
 					title,
 					authors,
 					google_volume_id,
-					condition
+					condition,
+					thumbnail_url
 				),
 				requester_profile:profiles!swap_requests_requester_id_fkey (
 					username,
@@ -321,21 +317,24 @@ export class SwapService {
 					title,
 					authors,
 					google_volume_id,
-					condition
+					condition,
+					thumbnail_url
 				),
 				offered_book:books!swap_requests_offered_book_id_fkey (
 					id,
 					title,
 					authors,
 					google_volume_id,
-					condition
+					condition,
+					thumbnail_url
 				),
 				counter_offered_book:books!swap_requests_counter_offered_book_id_fkey (
 					id,
 					title,
 					authors,
 					google_volume_id,
-					condition
+					condition,
+					thumbnail_url
 				),
 				requester_profile:profiles!swap_requests_requester_id_fkey (
 					username,
@@ -532,21 +531,24 @@ export class SwapService {
 					title,
 					authors,
 					google_volume_id,
-					condition
+					condition,
+					thumbnail_url
 				),
 				offered_book:books!swap_requests_offered_book_id_fkey (
 					id,
 					title,
 					authors,
 					google_volume_id,
-					condition
+					condition,
+					thumbnail_url
 				),
 				counter_offered_book:books!swap_requests_counter_offered_book_id_fkey (
 					id,
 					title,
 					authors,
 					google_volume_id,
-					condition
+					condition,
+					thumbnail_url
 				),
 				requester_profile:profiles!swap_requests_requester_id_fkey (
 					username,
@@ -622,8 +624,7 @@ export class SwapService {
 			.from('swap_requests')
 			.select('requester_rating, owner_rating, requester_id, owner_id')
 			.eq('status', SwapStatus.COMPLETED)
-			.or(`requester_id.eq.${userId},owner_id.eq.${userId}`)
-			.or('requester_rating.not.is.null,owner_rating.not.is.null');
+			.or(`requester_id.eq.${userId},owner_id.eq.${userId}`);
 
 		if (error) {
 			throw new Error(`Failed to fetch user ratings: ${error.message}`);
@@ -632,7 +633,12 @@ export class SwapService {
 		const ratings: number[] = [];
 		const breakdown = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
 
-		data?.forEach(swap => {
+		// Filter for swaps with ratings in TypeScript after receiving results
+		const swapsWithRatings = data?.filter(swap => 
+			swap.requester_rating !== null || swap.owner_rating !== null
+		) || [];
+
+		swapsWithRatings.forEach(swap => {
 			// Get the rating given TO this user (not BY this user)
 			if (swap.requester_id === userId && swap.owner_rating !== null) {
 				ratings.push(swap.owner_rating);
