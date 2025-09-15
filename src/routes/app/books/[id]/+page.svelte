@@ -15,7 +15,7 @@
 		showSwapDialog = true;
 	}
 
-	function handleSwapSuccess(event: CustomEvent<{ message: string }>) {
+	function handleSwapSuccess() {
 		showSwapDialog = false;
 		
 		if (!$auth.user) {
@@ -75,8 +75,8 @@
 	/>
 
 	<SwapRequestDialog
-		book={data.book}
-		isOpen={showSwapDialog}
+		targetBook={data.book}
+		bind:show={showSwapDialog}
 		on:close={handleCloseSwapDialog}
 		on:success={handleSwapSuccess}
 	/>

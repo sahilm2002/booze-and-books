@@ -82,6 +82,7 @@
 		isbn?: string;
 	} | null = null;
 
+	let conditionOptions = [];
 	$: conditionOptions = getConditionOptions();
 
 	function validateForm(): boolean {
@@ -98,6 +99,11 @@
 	async function handleSubmit() {
 		if (!validateForm()) return;
 
+		// Check authentication before attempting any write operations
+		if (!$auth.user) {
+			goto('/auth/login?redirectTo=/app/books');
+			return;
+		}
 
 		saving = true;
 		
@@ -109,10 +115,6 @@
 				if (onSave) {
 					onSave();
 				} else {
-					if (!$auth.user) {
-						goto('/auth/login?redirectTo=/app/books');
-						return;
-					}
 					goto('/app/books');
 				}
 			}

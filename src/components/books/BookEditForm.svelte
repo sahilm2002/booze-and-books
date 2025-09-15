@@ -59,6 +59,7 @@
 	let saving = false;
 	let errors: Record<string, string> = {};
 
+	let conditionOptions: Array<{label: string; value: string}> = [];
 	$: conditionOptions = getConditionOptions();
 
 	function toggleGenre(genre: string) {

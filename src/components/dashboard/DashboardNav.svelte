@@ -83,7 +83,7 @@
 
 <style>
 	/* Books & Booze Theme Colors */
-	:root {
+	:global(:root) {
 		--primary-burgundy: #8B2635;
 		--secondary-gold: #D4AF37;
 		--accent-cream: #F5F5DC;

@@ -34,7 +34,9 @@ function parseSQL(sql) {
           const stmtLen = stmt.RawStmt.stmt_len || 0;
           
           if (stmtLen > 0) {
-            const stmtText = sanitizedSQL.substr(stmtLocation, stmtLen).trim();
+            // Guard against negative stmt_location (pgsql-parser may emit -1)
+            const start = Math.max(0, stmtLocation);
+            const stmtText = sanitizedSQL.slice(start, start + stmtLen).trim();
             if (stmtText && !stmtText.startsWith('--')) {
               statements.push(stmtText);
             }
@@ -131,6 +133,7 @@ function customSQLTokenizer(sql) {
       let tag = '$';
       i++;
       
+      // Build the opening tag without modifying current yet
       while (i < sql.length && sql[i] !== '$') {
         tag += sql[i];
         i++;
@@ -139,28 +142,33 @@ function customSQLTokenizer(sql) {
       if (i < sql.length && sql[i] === '$') {
         tag += '$';
         i++;
-        current += tag;
         
         const closingTag = tag;
         let found = false;
+        let contentEnd = i;
         
-        while (i <= sql.length - closingTag.length) {
-          if (sql.substr(i, closingTag.length) === closingTag) {
-            current += sql.substr(dollarStart + tag.length, i - dollarStart - tag.length);
-            current += closingTag;
-            i += closingTag.length;
+        // Scan forward for closing tag without mutating current
+        while (contentEnd <= sql.length - closingTag.length) {
+          if (sql.slice(contentEnd, contentEnd + closingTag.length) === closingTag) {
+            // Found closing tag - append the full dollar-quoted content
+            current += tag; // opener
+            current += sql.slice(i, contentEnd); // inner content
+            current += closingTag; // closer
+            i = contentEnd + closingTag.length;
             found = true;
             break;
           }
-          i++;
+          contentEnd++;
         }
         
         if (!found) {
+          // No closing tag found - reset and treat as single '$'
           i = dollarStart + 1;
           current += '$';
         }
         continue;
       } else {
+        // No second '$' found - reset and treat as single '$'
         i = dollarStart + 1;
         current += '$';
         continue;

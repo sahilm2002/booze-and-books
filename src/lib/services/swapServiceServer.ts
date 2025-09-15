@@ -397,12 +397,14 @@ export class SwapServiceServer {
 				requester_profile:profiles!swap_requests_requester_id_profiles_fkey (
 					username,
 					full_name,
-					avatar_url
+					avatar_url,
+					email
 				),
 				owner_profile:profiles!swap_requests_owner_id_profiles_fkey (
 					username,
 					full_name,
-					avatar_url
+					avatar_url,
+					email
 				)
 			`)
 			.eq('id', requestId)
@@ -634,12 +636,14 @@ export class SwapServiceServer {
 				requester_profile:profiles!swap_requests_requester_id_profiles_fkey (
 					username,
 					full_name,
-					avatar_url
+					avatar_url,
+					email
 				),
 				owner_profile:profiles!swap_requests_owner_id_profiles_fkey (
 					username,
 					full_name,
-					avatar_url
+					avatar_url,
+					email
 				)
 			`)
 			.eq('status', SwapStatus.COMPLETED)

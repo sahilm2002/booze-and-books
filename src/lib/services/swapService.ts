@@ -411,10 +411,10 @@ export class SwapService {
 						id, title, authors, thumbnail_url, condition, owner_id
 					),
 					requester_profile:profiles!swap_requests_requester_profile_fkey (
-						id, username, full_name, avatar_url
+						id, username, full_name, avatar_url, location, email
 					),
 					owner_profile:profiles!swap_requests_owner_profile_fkey (
-						id, username, full_name, avatar_url
+						id, username, full_name, avatar_url, location, email
 					)
 				`)
 				.eq('id', requestId)
@@ -497,7 +497,7 @@ export class SwapService {
 			let query = supabase
 				.from('books')
 				.select(`
-					id, title, authors, thumbnail_url, condition, owner_id, created_at,
+					id, title, authors, google_volume_id, condition, thumbnail_url, owner_id, created_at,
 					profiles!books_owner_id_fkey (id, username, full_name, avatar_url)
 				`)
 				.eq('is_available', true);
@@ -596,10 +596,10 @@ export class SwapService {
 						id, title, authors, thumbnail_url, condition, owner_id
 					),
 					requester_profile:profiles!swap_requests_requester_profile_fkey (
-						id, username, full_name, avatar_url
+						id, username, full_name, avatar_url, location, email
 					),
 					owner_profile:profiles!swap_requests_owner_profile_fkey (
-						id, username, full_name, avatar_url
+						id, username, full_name, avatar_url, location, email
 					)
 				`)
 				.eq('status', SwapStatus.ACCEPTED)
