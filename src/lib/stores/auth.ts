@@ -140,21 +140,45 @@ function createAuthStore() {
 		},
 
 		/**
-		 * Sign out the current user
+		 * Sign out the current user using custom JWT endpoint
 		 */
 		signOut: async () => {
 			update(state => ({ ...state, loading: true }));
 			
-			const { error } = await supabase.auth.signOut();
-			
-			if (error) {
+			try {
+				// Use custom JWT logout endpoint
+				const response = await fetch('/api/auth/logout', {
+					method: 'POST'
+				});
+
+				if (!response.ok) {
+					console.error('Error signing out:', response.statusText);
+					update(state => ({ ...state, loading: false }));
+					return { error: new Error('Logout failed') };
+				}
+
+				// Also sign out from Supabase for complete cleanup
+				await supabase.auth.signOut();
+
+				// Clear auth state
+				set({
+					session: null,
+					user: null,
+					loading: false
+				});
+
+				// Stop activity tracking
+				activityService.destroy();
+
+				// Redirect to login
+				await goto('/auth/login', { replaceState: true });
+
+				return { error: null };
+			} catch (error) {
 				console.error('Error signing out:', error);
 				update(state => ({ ...state, loading: false }));
-				return { error };
+				return { error: error as Error };
 			}
-
-			// The onAuthStateChange listener will handle the redirect
-			return { error: null };
 		},
 
 		/**

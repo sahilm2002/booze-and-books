@@ -24,12 +24,31 @@ export const handle: Handle = async ({ event, resolve }) => {
 	});
 
 	/**
-	 * A secure helper that verifies user authentication with Supabase server
-	 * Uses getUser() instead of getSession() for security
+	 * Enhanced authentication with custom JWT validation
+	 * Supports both Supabase sessions and custom JWT tokens
 	 */
 	event.locals.safeGetSession = async () => {
 		try {
-			// Use getUser() for secure server-side verification
+			// First, check for custom JWT token in cookies
+			const customToken = event.cookies.get('custom-auth-token');
+			if (customToken) {
+				// Dynamically import to avoid server startup issues
+				const { validateCustomSession } = await import('$lib/auth/customAuth');
+				const customSession = await validateCustomSession(customToken);
+				
+				if (customSession) {
+					return { 
+						session: {
+							access_token: customSession.customToken,
+							user: customSession.user,
+							expires_at: customSession.payload.exp,
+						}, 
+						user: customSession.user 
+					};
+				}
+			}
+
+			// Fallback to standard Supabase authentication
 			const { data: { user }, error } = await event.locals.supabase.auth.getUser();
 			
 			if (error) {

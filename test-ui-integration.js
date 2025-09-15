@@ -7,8 +7,15 @@ import { createClient } from '@supabase/supabase-js';
 import fetch from 'node-fetch';
 
 // Configuration - Update these with your actual values
-const SUPABASE_URL = 'https://pzmrvovqxbmobunludna.supabase.co';
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InB6bXJ2b3ZxeGJtb2J1bmx1ZG5hIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzEzNzUxOTAsImV4cCI6MjA0Njk1MTE5MH0.gJJPmrmLYKvPgFdwU3U7_Rm68rTZO_uLBVNXs9XLw9k';
+// Load from environment variables - NEVER hardcode credentials!
+const SUPABASE_URL = process.env.PUBLIC_SUPABASE_URL;
+const SUPABASE_ANON_KEY = process.env.PUBLIC_SUPABASE_ANON_KEY;
+
+if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
+  console.error('❌ Missing Supabase credentials in environment variables');
+  console.error('Please set PUBLIC_SUPABASE_URL and PUBLIC_SUPABASE_ANON_KEY in your .env file');
+  process.exit(1);
+}
 const BASE_URL = 'http://localhost:5173'; // Update if running on different port
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);

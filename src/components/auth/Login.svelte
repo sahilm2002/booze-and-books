@@ -1,5 +1,4 @@
 <script lang="ts">
-	import { supabase } from '$lib/supabase';
 	import { goto } from '$app/navigation';
 
 	export let redirectTo: string = '/app';
@@ -19,15 +18,25 @@
 		error = '';
 
 		try {
-			const { error: signInError } = await supabase.auth.signInWithPassword({
-				email: email.trim(),
-				password
+			// Use custom JWT authentication endpoint
+			const response = await fetch('/api/auth/login', {
+				method: 'POST',
+				headers: {
+					'Content-Type': 'application/json',
+				},
+				body: JSON.stringify({
+					email: email.trim(),
+					password
+				})
 			});
 
-			if (signInError) {
-				error = signInError.message;
+			const result = await response.json();
+
+			if (!response.ok || !result.success) {
+				error = result.error || 'Login failed';
 			} else {
 				// Successful login - redirect to intended destination
+				// The secure cookie is automatically set by the server
 				await goto(redirectTo, { replaceState: true });
 			}
 		} catch (err) {

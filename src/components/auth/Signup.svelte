@@ -1,10 +1,11 @@
 <script lang="ts">
-	import { supabase } from '$lib/supabase';
 	import { goto } from '$app/navigation';
 
 	let email = '';
 	let password = '';
 	let confirmPassword = '';
+	let full_name = '';
+	let username = '';
 	let loading = false;
 	let error = '';
 	let success = '';
@@ -42,31 +43,40 @@
 		success = '';
 
 		try {
-			const { data, error: signUpError } = await supabase.auth.signUp({
-				email: email.trim(),
-				password,
-				options: {
-					emailRedirectTo: `${window.location.origin}/app`
-				}
+			// Use custom JWT authentication endpoint
+			const response = await fetch('/api/auth/signup', {
+				method: 'POST',
+				headers: {
+					'Content-Type': 'application/json',
+				},
+				body: JSON.stringify({
+					email: email.trim(),
+					password,
+					full_name: full_name.trim() || undefined,
+					username: username.trim() || undefined
+				})
 			});
 
-			if (signUpError) {
-				error = signUpError.message;
-			} else if (data.session) {
-				// Immediate session (auto-confirm enabled)
-				await goto('/app', { replaceState: true });
+			const result = await response.json();
+
+			if (!response.ok || !result.success) {
+				error = result.error || 'Registration failed';
 			} else {
-				// Email confirmation required
-				success = 'Account created successfully! Please check your email for verification.';
+				// Successful registration - user is automatically logged in
+				// The secure cookie is automatically set by the server
+				success = 'Account created successfully! Redirecting...';
+				
 				// Clear form
 				email = '';
 				password = '';
 				confirmPassword = '';
+				full_name = '';
+				username = '';
 				
-				// Redirect to login after a short delay
+				// Redirect to app
 				setTimeout(() => {
-					goto('/auth/login');
-				}, 3000);
+					goto('/app', { replaceState: true });
+				}, 1000);
 			}
 		} catch (err) {
 			error = 'An unexpected error occurred';
@@ -98,6 +108,32 @@
 			{success}
 		</div>
 	{/if}
+
+	<div class="form-group">
+		<label for="full-name">Full Name (Optional)</label>
+		<input
+			id="full-name"
+			type="text"
+			bind:value={full_name}
+			on:keypress={handleKeypress}
+			placeholder="John Doe"
+			disabled={loading}
+			autocomplete="name"
+		/>
+	</div>
+
+	<div class="form-group">
+		<label for="username">Username (Optional)</label>
+		<input
+			id="username"
+			type="text"
+			bind:value={username}
+			on:keypress={handleKeypress}
+			placeholder="bookworm123"
+			disabled={loading}
+			autocomplete="username"
+		/>
+	</div>
 
 	<div class="form-group">
 		<label for="signup-email">Email</label>
