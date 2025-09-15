@@ -394,7 +394,11 @@ export class SwapStore {
 				
 				if (requesterEmail) {
 					// We need to get the counter-offered book title
-					const { data: counterBook } = await import('../supabase.js').then(s => s.supabase)
+					// First await the dynamic import and extract the supabase client
+					const { supabase } = await import('../supabase.js');
+					
+					// Then perform the query by calling supabase.from(...) and await that result
+					const { data: counterBook } = await supabase
 						.from('books')
 						.select('title')
 						.eq('id', counterOfferedBookId)

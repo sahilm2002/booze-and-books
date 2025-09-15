@@ -398,17 +398,13 @@ export class SwapServiceServer {
 					username,
 					full_name,
 					avatar_url,
-					city,
-					state,
-					zip_code
+					email
 				),
 				owner_profile:profiles!swap_requests_owner_id_profiles_fkey (
 					username,
 					full_name,
 					avatar_url,
-					city,
-					state,
-					zip_code
+					email
 				)
 			`)
 			.eq('id', requestId)
@@ -641,17 +637,13 @@ export class SwapServiceServer {
 					username,
 					full_name,
 					avatar_url,
-					city,
-					state,
-					zip_code
+					email
 				),
 				owner_profile:profiles!swap_requests_owner_id_profiles_fkey (
 					username,
 					full_name,
 					avatar_url,
-					city,
-					state,
-					zip_code
+					email
 				)
 			`)
 			.eq('status', SwapStatus.COMPLETED)
