@@ -547,10 +547,7 @@ export class SwapService {
 			
 			const { data, error } = await supabase
 				.from('profiles')
-				.select(`
-					id,
-					auth_users:auth.users!inner(email)
-				`)
+				.select('id, email')
 				.in('id', userIds);
 
 			if (error) {
@@ -560,8 +557,8 @@ export class SwapService {
 
 			const emailMap: Record<string, string> = {};
 			data?.forEach((profile: any) => {
-				if (profile.auth_users?.email) {
-					emailMap[profile.id] = profile.auth_users.email;
+				if (profile.email) {
+					emailMap[profile.id] = profile.email;
 				}
 			});
 
