@@ -337,6 +337,9 @@ export class SwapService {
 					offered_book:books!swap_requests_offered_book_id_fkey (
 						id, title, authors, thumbnail_url, condition, owner_id, google_volume_id
 					),
+					counter_offered_book:books!swap_requests_counter_offered_book_id_fkey (
+						id, title, authors, thumbnail_url, condition, owner_id, google_volume_id
+					),
 					requester_profile:profiles!swap_requests_requester_profile_fkey (
 						id, username, full_name, avatar_url, location, email
 					),
@@ -360,6 +363,9 @@ export class SwapService {
 						id, title, authors, thumbnail_url, condition, owner_id, google_volume_id
 					),
 					offered_book:books!swap_requests_offered_book_id_fkey (
+						id, title, authors, thumbnail_url, condition, owner_id, google_volume_id
+					),
+					counter_offered_book:books!swap_requests_counter_offered_book_id_fkey (
 						id, title, authors, thumbnail_url, condition, owner_id, google_volume_id
 					),
 					requester_profile:profiles!swap_requests_requester_profile_fkey (
