@@ -73,44 +73,32 @@
 			const formData = new FormData();
 			formData.append('file', file);
 
-			await new Promise<void>((resolve, reject) => {
-				const xhr = new XMLHttpRequest();
-				xhr.open('POST', '/api/profile/avatar');
-
-				// Progress event
-				xhr.upload.onprogress = (event) => {
-					if (event.lengthComputable) {
-						uploadProgress = Math.round((event.loaded / event.total) * 100);
-					}
-				};
-
-				xhr.onload = () => {
-					if (xhr.status >= 200 && xhr.status < 300) {
-						try {
-							const res = JSON.parse(xhr.responseText);
-							// update preview to public url returned by server (if provided)
-							if (res?.publicUrl) {
-								previewUrl = res.publicUrl;
-							}
-							uploadProgress = 100;
-							resolve();
-						} catch (err) {
-							console.error('Failed to parse upload response', err);
-							reject(new Error('Upload failed'));
-						}
-					} else {
-						console.error('Upload failed', xhr.status, xhr.responseText);
-						reject(new Error('Upload failed'));
-					}
-				};
-
-				xhr.onerror = () => {
-					console.error('Network error during avatar upload');
-					reject(new Error('Network error'));
-				};
-
-				xhr.send(formData);
+			// Use modern fetch API for upload
+			// Note: Native fetch doesn't support upload progress tracking
+			// For progress tracking, consider using a library like axios or implementing ReadableStream processing
+			const response = await fetch('/api/profile/avatar', {
+				method: 'POST',
+				body: formData
 			});
+
+			if (!response.ok) {
+				const errorText = await response.text();
+				try {
+					const errorRes = JSON.parse(errorText);
+					const errorMessage = errorRes?.details 
+						? `${errorRes.error}: ${errorRes.details}`
+						: errorRes?.error || `Upload failed: ${response.statusText}`;
+					throw new Error(errorMessage);
+				} catch (parseErr) {
+					throw new Error(`Upload failed: ${response.statusText}`);
+				}
+			}
+
+			const res = await response.json();
+			if (res?.publicUrl) {
+				previewUrl = res.publicUrl;
+			}
+			uploadProgress = 100;
 
 			// Call optional callback for additional handling
 			if (onUpload) {

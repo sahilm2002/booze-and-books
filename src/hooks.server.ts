@@ -24,22 +24,34 @@ export const handle: Handle = async ({ event, resolve }) => {
 	});
 
 	/**
-	 * A convenience helper so we can just call await getSession() instead const { data: { session } } = await supabase.auth.getSession()
+	 * A secure helper that verifies user authentication with Supabase server
+	 * Uses getUser() instead of getSession() for security
 	 */
 	event.locals.safeGetSession = async () => {
-		const {
-			data: { session },
-			error,
-		} = await event.locals.supabase.auth.getSession();
-		if (error) {
-			console.error('Error getting session:', error);
+		try {
+			// Use getUser() for secure server-side verification
+			const { data: { user }, error } = await event.locals.supabase.auth.getUser();
+			
+			if (error) {
+				console.error('Error getting user:', error);
+				return { session: null, user: null };
+			}
+
+			// If user exists, get the session for additional data
+			if (user) {
+				const { data: { session }, error: sessionError } = await event.locals.supabase.auth.getSession();
+				if (sessionError) {
+					console.error('Error getting session after user verification:', sessionError);
+					return { session: null, user };
+				}
+				return { session, user };
+			}
+
+			return { session: null, user: null };
+		} catch (error) {
+			console.error('Error in safeGetSession:', error);
 			return { session: null, user: null };
 		}
-
-		return {
-			session,
-			user: session?.user ?? null,
-		};
 	};
 
 	// Get the current session and user

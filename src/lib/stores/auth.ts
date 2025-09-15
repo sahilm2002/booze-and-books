@@ -32,41 +32,26 @@ function createAuthStore() {
 		subscribe,
 		
 		/**
-		 * Check if session is valid and refresh if needed
+		 * Check if user is authenticated and session is valid
+		 * Uses getUser() for secure server-side verification
 		 */
 		ensureValidSession: async (): Promise<boolean> => {
 			try {
-				const { data: { session }, error } = await supabase.auth.getSession();
+				// Use getUser() instead of getSession() for security
+				const { data: { user }, error } = await supabase.auth.getUser();
 				
 				if (error) {
-					console.error('Error getting session:', error);
+					console.error('Error getting user:', error);
 					return false;
 				}
 				
-				if (!session) {
-					console.log('No active session found');
+				if (!user) {
+					console.log('No authenticated user found');
 					await auth.signOut();
 					return false;
 				}
 				
-				// Check if token is expired or will expire soon (within 5 minutes)
-				const now = Math.floor(Date.now() / 1000);
-				const expiresAt = session.expires_at || 0;
-				
-				if (expiresAt <= now + 300) { // 5 minutes buffer
-					console.log('Token expired or expiring soon, attempting refresh');
-					const { data: { session: refreshedSession }, error: refreshError } = await supabase.auth.refreshSession();
-					
-					if (refreshError || !refreshedSession) {
-						console.error('Failed to refresh session:', refreshError);
-						await auth.signOut();
-						return false;
-					}
-					
-					console.log('Session refreshed successfully');
-					return true;
-				}
-				
+				// User is authenticated and verified by Supabase server
 				return true;
 			} catch (error) {
 				console.error('Error ensuring valid session:', error);
@@ -92,12 +77,37 @@ function createAuthStore() {
 				const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
 					console.log('Auth state changed:', event, session?.user?.email);
 					
-					update(state => ({
-						...state,
-						session,
-						user: session?.user ?? null,
-						loading: false
-					}));
+					// For security, verify user data with server when session changes
+					if (session && (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED')) {
+						try {
+							// Verify user with server for security
+							const { data: { user }, error } = await supabase.auth.getUser();
+							if (error || !user) {
+								console.error('Failed to verify user after auth change:', error);
+								await auth.signOut();
+								return;
+							}
+							
+							update(state => ({
+								...state,
+								session,
+								user, // Use server-verified user data
+								loading: false
+							}));
+						} catch (error) {
+							console.error('Error verifying user:', error);
+							await auth.signOut();
+							return;
+						}
+					} else {
+						// For sign out or other events, use session data directly
+						update(state => ({
+							...state,
+							session,
+							user: session?.user ?? null,
+							loading: false
+						}));
+					}
 
 					// Handle sign out
 					if (event === 'SIGNED_OUT') {

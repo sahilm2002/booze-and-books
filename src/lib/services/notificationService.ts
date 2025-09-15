@@ -2,17 +2,19 @@ import { supabase } from '$lib/supabase';
 import type { Notification, NotificationInput } from '../types/notification.js';
 import { NotificationType } from '../types/notification.js';
 
+const NOTIFICATION_RETENTION_DAYS = 180;
+
 export class NotificationService {
 	// Get notifications for a user (last 180 days only)
 	static async getNotifications(userId: string, limit = 20, offset = 0): Promise<Notification[]> {
-		const oneHundredEightyDaysAgo = new Date();
-		oneHundredEightyDaysAgo.setDate(oneHundredEightyDaysAgo.getDate() - 180);
+		const retentionDate = new Date();
+		retentionDate.setDate(retentionDate.getDate() - NOTIFICATION_RETENTION_DAYS);
 
 		const { data, error } = await supabase
 			.from('notifications')
 			.select('*')
 			.eq('user_id', userId)
-			.gte('created_at', oneHundredEightyDaysAgo.toISOString())
+			.gte('created_at', retentionDate.toISOString())
 			.order('created_at', { ascending: false })
 			.range(offset, offset + limit - 1);
 
@@ -25,15 +27,15 @@ export class NotificationService {
 
 	// Get unread notifications count (last 180 days only)
 	static async getUnreadCount(userId: string): Promise<number> {
-		const oneHundredEightyDaysAgo = new Date();
-		oneHundredEightyDaysAgo.setDate(oneHundredEightyDaysAgo.getDate() - 180);
+		const retentionDate = new Date();
+		retentionDate.setDate(retentionDate.getDate() - NOTIFICATION_RETENTION_DAYS);
 
 		const { count, error } = await supabase
 			.from('notifications')
 			.select('id', { count: 'exact', head: true })
 			.eq('user_id', userId)
 			.eq('is_read', false)
-			.gte('created_at', oneHundredEightyDaysAgo.toISOString());
+			.gte('created_at', retentionDate.toISOString());
 
 		if (error) {
 			throw new Error(`Failed to count unread notifications: ${error.message}`);
@@ -60,15 +62,15 @@ export class NotificationService {
 
 	// Mark all notifications as read for a user (last 180 days only)
 	static async markAllAsRead(userId: string): Promise<void> {
-		const oneHundredEightyDaysAgo = new Date();
-		oneHundredEightyDaysAgo.setDate(oneHundredEightyDaysAgo.getDate() - 180);
+		const retentionDate = new Date();
+		retentionDate.setDate(retentionDate.getDate() - NOTIFICATION_RETENTION_DAYS);
 
 		const { error } = await supabase
 			.from('notifications')
 			.update({ is_read: true })
 			.eq('user_id', userId)
 			.eq('is_read', false)
-			.gte('created_at', oneHundredEightyDaysAgo.toISOString());
+			.gte('created_at', retentionDate.toISOString());
 
 		if (error) {
 			throw new Error(`Failed to mark all notifications as read: ${error.message}`);

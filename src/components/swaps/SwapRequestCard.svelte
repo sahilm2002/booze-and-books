@@ -161,17 +161,45 @@
 		counterOfferBookId = userBooks[0].id;
 	}
 
+	let swapServiceError = false;
+	let swapServiceErrorMessage = '';
+
 	async function loadUserBooks() {
 		if (!currentUser) return;
 		
 		loadingUserBooks = true;
+		swapServiceError = false;
+		swapServiceErrorMessage = '';
+		
 		try {
 			// Import SwapService for this specific method since it's not in the store
 			const { SwapService } = await import('$lib/services/swapService');
 			userBooks = await SwapService.getUserAvailableBooksForOffering(currentUser.id);
 		} catch (error) {
-			console.error('Error loading user books:', error);
-			dispatch('error', 'Failed to load your available books');
+			// Log the full error for debugging
+			console.error('Error loading SwapService or user books:', error);
+			
+			// Set local error state for UI feedback
+			swapServiceError = true;
+			
+			// Determine user-friendly error message based on error type
+			if (error instanceof Error) {
+				if (error.message.includes('Failed to resolve module') || 
+					error.message.includes('import') || 
+					error.message.includes('module')) {
+					swapServiceErrorMessage = 'Unable to load swap functionality. Please refresh the page and try again.';
+				} else {
+					swapServiceErrorMessage = `Failed to load your available books: ${error.message}`;
+				}
+			} else {
+				swapServiceErrorMessage = 'An unexpected error occurred while loading your books. Please try again.';
+			}
+			
+			// Also dispatch error for parent component handling
+			dispatch('error', swapServiceErrorMessage);
+			
+			// Prevent further execution that depends on SwapService
+			return;
 		} finally {
 			loadingUserBooks = false;
 		}
@@ -549,6 +577,26 @@
 								</svg>
 							</div>
 							<p>Loading your available books...</p>
+						</div>
+					{:else if swapServiceError}
+						<div class="error-state">
+							<div class="error-icon">
+								<svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+									<circle cx="12" cy="12" r="10"/>
+									<line x1="15" y1="9" x2="9" y2="15"/>
+									<line x1="9" y1="9" x2="15" y2="15"/>
+								</svg>
+							</div>
+							<h4>Unable to Load Books</h4>
+							<p class="error-message">{swapServiceErrorMessage}</p>
+							<button 
+								type="button" 
+								class="btn btn-secondary retry-btn" 
+								on:click={loadUserBooks}
+								disabled={loadingUserBooks}
+							>
+								{loadingUserBooks ? 'Retrying...' : 'Try Again'}
+							</button>
 						</div>
 					{:else if userBooks.length === 0}
 						<div class="empty-state">
@@ -1391,7 +1439,8 @@
 	}
 
 	.loading-state,
-	.empty-state {
+	.empty-state,
+	.error-state {
 		text-align: center;
 		padding: 3rem 2rem;
 		color: #6b7280;
@@ -1415,6 +1464,35 @@
 		to {
 			transform: rotate(360deg);
 		}
+	}
+
+	.error-state {
+		background: #fef2f2;
+		border: 2px dashed #fca5a5;
+		border-radius: 12px;
+	}
+
+	.error-state h4 {
+		margin: 0 0 0.5rem 0;
+		font-size: 1.125rem;
+		font-weight: 600;
+		color: #dc2626;
+	}
+
+	.error-message {
+		margin: 0.5rem 0 1.5rem 0;
+		font-size: 0.95rem;
+		line-height: 1.5;
+		color: #991b1b;
+	}
+
+	.error-icon {
+		margin: 0 auto 1rem;
+		color: #dc2626;
+	}
+
+	.retry-btn {
+		margin-top: 1rem;
 	}
 
 	.empty-state {
