@@ -1,0 +1,567 @@
+<script lang="ts">
+	import { onMount } from 'svelte';
+	import { page } from '$app/stores';
+	import SwapRequestCard from '../../../components/swaps/SwapRequestCard.svelte';
+	import { swapStore } from '$lib/stores/swaps';
+	import { auth } from '$lib/stores/auth';
+	import type { PageData } from './$types';
+	import type { SwapRequestWithDetails } from '$lib/types/swap';
+
+	export let data: PageData;
+
+	let statusFilter: 'all' | 'pending' | 'accepted' | 'counter_offer' | 'cancelled' | 'completed' = 'all';
+	let typeFilter: 'all' | 'incoming' | 'outgoing' = 'all';
+
+	// Load swap requests on client side
+	onMount(async () => {
+		// Set page title
+		if (typeof document !== 'undefined') {
+			document.title = 'Swap Requests - Booze & Books';
+		}
+		
+		// Load swap requests using the store
+		await swapStore.loadSwapRequests();
+	});
+
+	// Get all swap requests from store, sorted by date (newest first)
+	$: allSwapRequests = [...$swapStore.incoming, ...$swapStore.outgoing]
+		.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+
+	// Filter requests based on type and status
+	$: filteredRequests = allSwapRequests.filter(request => {
+		// Filter by type (incoming/outgoing)
+		if (typeFilter !== 'all') {
+			const isIncoming = request.owner_id === $auth.user?.id;
+			const isOutgoing = request.requester_id === $auth.user?.id;
+			
+			if (typeFilter === 'incoming' && !isIncoming) return false;
+			if (typeFilter === 'outgoing' && !isOutgoing) return false;
+		}
+		
+		// Filter by status
+		if (statusFilter === 'all') return true;
+		return request.status === statusFilter.toUpperCase();
+	});
+
+	async function handleRequestUpdated(event: CustomEvent<SwapRequestWithDetails>) {
+		// Reload swap requests from the store to get the latest data
+		await swapStore.loadSwapRequests();
+	}
+
+	function handleRequestError(event: CustomEvent<string>) {
+		// Error is already handled by the store, just clear any local error
+		swapStore.clearError();
+	}
+
+	function getStatusCounts(requests: SwapRequestWithDetails[], isIncoming: boolean) {
+		const filtered = requests.filter(r => 
+			isIncoming ? r.owner_id === $auth.user?.id : r.requester_id === $auth.user?.id
+		);
+		
+		return {
+			pending: filtered.filter(r => r.status === 'PENDING').length,
+			accepted: filtered.filter(r => r.status === 'ACCEPTED').length,
+			cancelled: filtered.filter(r => r.status === 'CANCELLED').length,
+			completed: filtered.filter(r => r.status === 'COMPLETED').length
+		};
+	}
+
+	$: incomingCounts = getStatusCounts(allSwapRequests, true);
+	$: outgoingCounts = getStatusCounts(allSwapRequests, false);
+	$: allCounts = {
+		pending: incomingCounts.pending + outgoingCounts.pending,
+		accepted: incomingCounts.accepted + outgoingCounts.accepted,
+		cancelled: incomingCounts.cancelled + outgoingCounts.cancelled,
+		completed: incomingCounts.completed + outgoingCounts.completed
+	};
+</script>
+
+<style>
+	/* Page Header */
+	.page-header {
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+		margin-bottom: 2rem;
+		gap: 1rem;
+	}
+
+	@media (max-width: 640px) {
+		.page-header {
+			flex-direction: column;
+			align-items: flex-start;
+			gap: 1.5rem;
+		}
+	}
+
+	.header-content {
+		flex: 1;
+	}
+
+	.page-title {
+		color: #2d3748;
+		font-size: 2rem;
+		font-weight: 700;
+		margin-bottom: 0.5rem;
+		line-height: 1.2;
+	}
+
+	.page-subtitle {
+		color: #718096;
+		font-size: 1rem;
+		margin: 0;
+	}
+
+	/* Error Message */
+	.error-message {
+		background: #fed7d7;
+		border: 1px solid #feb2b2;
+		border-radius: 8px;
+		padding: 1rem 1.5rem;
+		margin-bottom: 1.5rem;
+	}
+
+	.error-content {
+		display: flex;
+		align-items: center;
+		gap: 0.75rem;
+	}
+
+	.error-icon {
+		width: 20px;
+		height: 20px;
+		color: #c53030;
+		flex-shrink: 0;
+	}
+
+	.error-text {
+		color: #c53030;
+		font-weight: 500;
+		margin: 0;
+	}
+
+	/* Tabs Section */
+	.tabs-section {
+		background: white;
+		border: 1px solid #e2e8f0;
+		border-radius: 12px;
+		padding: 1.5rem 1.5rem 0 1.5rem;
+		margin-bottom: 2rem;
+		box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+	}
+
+	.tabs-nav {
+		display: flex;
+		gap: 1rem;
+		border-bottom: 2px solid #f1f3f4;
+		margin-bottom: 0;
+		padding-bottom: 0;
+	}
+
+	@media (max-width: 640px) {
+		.tabs-nav {
+			gap: 0.5rem;
+		}
+	}
+
+	.tab-button {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+		padding: 1rem 1.5rem;
+		background: none;
+		border: none;
+		border-bottom: 3px solid transparent;
+		color: #718096;
+		font-size: 0.95rem;
+		font-weight: 500;
+		cursor: pointer;
+		transition: all 0.2s ease;
+		white-space: nowrap;
+		margin-bottom: -2px;
+		border-radius: 8px 8px 0 0;
+	}
+
+	.tab-button:hover {
+		color: #8B2635;
+		background: #f8f9fa;
+		border-bottom-color: #e2e8f0;
+	}
+
+	.tab-button.active {
+		color: #8B2635;
+		background: #f8f9fa;
+		border-bottom-color: #8B2635;
+		font-weight: 600;
+	}
+
+	.tab-badge {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		min-width: 22px;
+		height: 22px;
+		padding: 0 6px;
+		border-radius: 11px;
+		font-size: 0.75rem;
+		font-weight: 700;
+		line-height: 1;
+	}
+
+	.tab-badge.incoming {
+		background: #dc2626;
+		color: white;
+	}
+
+	.tab-badge.outgoing {
+		background: #D4AF37;
+		color: #8B2635;
+	}
+
+	/* Filters Section */
+	.filters-section {
+		background: white;
+		border: 1px solid #e2e8f0;
+		border-radius: 12px;
+		padding: 1.5rem;
+		margin-bottom: 2rem;
+		box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+	}
+
+	.filters-header {
+		margin-bottom: 1.5rem;
+	}
+
+	.filters-title {
+		color: #2d3748;
+		font-size: 1.125rem;
+		font-weight: 600;
+		margin: 0;
+	}
+
+	.filter-tags {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.5rem;
+	}
+
+	.filter-tag {
+		padding: 0.5rem 1rem;
+		border: 1px solid #d1d5db;
+		border-radius: 20px;
+		background: white;
+		color: #374151;
+		font-size: 0.85rem;
+		font-weight: 500;
+		cursor: pointer;
+		transition: all 0.2s ease;
+	}
+
+	.filter-tag:hover {
+		background: #f8f9fa;
+		border-color: #8B2635;
+	}
+
+	.filter-tag.active {
+		background: #8B2635;
+		border-color: #8B2635;
+		color: #F5F5DC;
+	}
+
+	/* Loading State */
+	.loading-state {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		padding: 3rem 1rem;
+	}
+
+	.loading-content {
+		display: flex;
+		align-items: center;
+		gap: 1rem;
+	}
+
+	.loading-spinner {
+		width: 1.5rem;
+		height: 1.5rem;
+		color: #8B2635;
+		animation: spin 1s linear infinite;
+	}
+
+	@keyframes spin {
+		from {
+			transform: rotate(0deg);
+		}
+		to {
+			transform: rotate(360deg);
+		}
+	}
+
+	.loading-text {
+		color: #718096;
+		font-weight: 500;
+	}
+
+	/* Empty State */
+	.empty-state {
+		text-align: center;
+		padding: 3rem 1rem;
+	}
+
+	.empty-icon {
+		width: 3rem;
+		height: 3rem;
+		color: #9ca3af;
+		margin: 0 auto 1rem;
+	}
+
+	.empty-title {
+		color: #2d3748;
+		font-size: 1.125rem;
+		font-weight: 600;
+		margin: 0 0 0.5rem 0;
+	}
+
+	.empty-subtitle {
+		color: #718096;
+		font-size: 0.95rem;
+		margin: 0 0 1.5rem 0;
+		max-width: 400px;
+		margin-left: auto;
+		margin-right: auto;
+	}
+
+	.btn-primary {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.5rem;
+		padding: 0.75rem 1.5rem;
+		background: linear-gradient(135deg, #8B2635 0%, #722F37 100%);
+		color: #F5F5DC;
+		text-decoration: none;
+		border-radius: 8px;
+		font-weight: 600;
+		font-size: 0.95rem;
+		box-shadow: 0 4px 12px rgba(139, 38, 53, 0.3);
+		transition: all 0.2s ease;
+		border: none;
+		cursor: pointer;
+	}
+
+	.btn-primary:hover {
+		background: linear-gradient(135deg, #722F37 0%, #8B2635 100%);
+		transform: translateY(-2px);
+		box-shadow: 0 6px 20px rgba(139, 38, 53, 0.4);
+	}
+
+	.btn-clear {
+		padding: 0.75rem 1rem;
+		background: #f8f9fa;
+		color: #8B2635;
+		border: 1px solid #e2e8f0;
+		border-radius: 8px;
+		font-size: 0.9rem;
+		font-weight: 500;
+		cursor: pointer;
+		transition: all 0.2s ease;
+		white-space: nowrap;
+	}
+
+	.btn-clear:hover {
+		background: #F5F5DC;
+		border-color: #8B2635;
+		color: #722F37;
+	}
+
+	/* Requests Grid */
+	.requests-grid {
+		display: flex;
+		flex-direction: column;
+		gap: 1rem;
+	}
+
+	/* Override Tailwind classes for consistency */
+	:global(.max-w-7xl) {
+		max-width: 1200px;
+	}
+
+	:global(.mx-auto) {
+		margin-left: auto;
+		margin-right: auto;
+	}
+
+	:global(.px-4) {
+		padding-left: 1rem;
+		padding-right: 1rem;
+	}
+
+	:global(.py-8) {
+		padding-top: 2rem;
+		padding-bottom: 2rem;
+	}
+
+	@media (min-width: 640px) {
+		:global(.sm\:px-6) {
+			padding-left: 1.5rem;
+			padding-right: 1.5rem;
+		}
+	}
+
+	@media (min-width: 1024px) {
+		:global(.lg\:px-8) {
+			padding-left: 2rem;
+			padding-right: 2rem;
+		}
+	}
+</style>
+
+<svelte:head>
+	<title>Swap Requests - Booze & Books</title>
+	<meta name="description" content="Manage your book swap requests" />
+</svelte:head>
+
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+	<!-- Header -->
+	<div class="page-header">
+		<div class="header-content">
+			<h1 class="page-title">Swap Requests</h1>
+			<p class="page-subtitle">
+				Manage your incoming and outgoing book swap requests
+			</p>
+		</div>
+	</div>
+
+	<!-- Error Message -->
+	{#if $swapStore.error}
+		<div class="error-message">
+			<div class="error-content">
+				<svg class="error-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+				</svg>
+				<p class="error-text">{$swapStore.error}</p>
+			</div>
+		</div>
+	{/if}
+
+	<!-- Filters -->
+	<div class="filters-section card">
+		<div class="filters-header">
+			<h3 class="filters-title">Filters</h3>
+		</div>
+		
+		<!-- Type Filter -->
+		<div style="margin-bottom: 1.5rem;">
+			<h4 style="margin: 0 0 0.75rem 0; font-size: 0.95rem; font-weight: 600; color: #4b5563;">Request Type</h4>
+			<div class="filter-tags">
+				{#each [
+					{ value: 'all', label: `All Requests (${allSwapRequests.length})` },
+					{ value: 'incoming', label: `Incoming (${incomingCounts.pending + incomingCounts.accepted + incomingCounts.cancelled + incomingCounts.completed})` },
+					{ value: 'outgoing', label: `My Requests (${outgoingCounts.pending + outgoingCounts.accepted + outgoingCounts.cancelled + outgoingCounts.completed})` }
+				] as filterOption}
+					<button
+						type="button"
+						class="filter-tag"
+						class:active={typeFilter === filterOption.value}
+						on:click={() => typeFilter = filterOption.value as typeof typeFilter}
+					>
+						{filterOption.label}
+					</button>
+				{/each}
+			</div>
+		</div>
+		
+		<!-- Status Filter -->
+		<div>
+			<h4 style="margin: 0 0 0.75rem 0; font-size: 0.95rem; font-weight: 600; color: #4b5563;">Status</h4>
+			<div class="filter-tags">
+				{#each [
+					{ value: 'all', label: `All (${filteredRequests.length})` },
+					{ value: 'pending', label: `Pending (${allCounts.pending})` },
+					{ value: 'accepted', label: `Accepted (${allCounts.accepted})` },
+					{ value: 'cancelled', label: `Cancelled (${allCounts.cancelled})` },
+					{ value: 'completed', label: `Completed (${allCounts.completed})` }
+				] as filterOption}
+					<button
+						type="button"
+						class="filter-tag"
+						class:active={statusFilter === filterOption.value}
+						on:click={() => statusFilter = filterOption.value as typeof statusFilter}
+					>
+						{filterOption.label}
+					</button>
+				{/each}
+			</div>
+		</div>
+	</div>
+
+	<!-- Loading State -->
+	{#if $swapStore.isLoading}
+		<div class="loading-state">
+			<div class="loading-content">
+				<svg class="loading-spinner" fill="none" viewBox="0 0 24 24">
+					<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+					<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+				</svg>
+				<span class="loading-text">Loading swap requests...</span>
+			</div>
+		</div>
+		{:else}
+		<!-- Content -->
+		{#if filteredRequests.length === 0}
+			<div class="empty-state">
+				<div class="empty-icon">
+					<svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
+					</svg>
+				</div>
+				<h3 class="empty-title">
+					No swap requests found
+				</h3>
+				<p class="empty-subtitle">
+					{#if typeFilter === 'incoming'}
+						No incoming swap requests match your current filters.
+					{:else if typeFilter === 'outgoing'}
+						No outgoing swap requests match your current filters.
+					{:else if statusFilter === 'all' && typeFilter === 'all'}
+						You don't have any swap requests yet. Start by discovering books and requesting swaps.
+					{:else}
+						No requests match the selected filters.
+					{/if}
+				</p>
+				{#if statusFilter === 'all' && typeFilter === 'all'}
+					<a 
+						href="/app/discover"
+						class="btn-primary"
+					>
+						Discover Books
+					</a>
+				{:else}
+					<button
+						type="button"
+						class="btn-clear"
+						on:click={() => {
+							statusFilter = 'all';
+							typeFilter = 'all';
+						}}
+					>
+						Clear all filters
+					</button>
+				{/if}
+			</div>
+		{:else}
+			<div class="requests-grid">
+				{#each filteredRequests as request (request.id)}
+					{@const isIncoming = request.owner_id === $auth.user?.id}
+					
+					<SwapRequestCard
+						swapRequest={request}
+						{isIncoming}
+						on:updated={handleRequestUpdated}
+						on:error={handleRequestError}
+					/>
+				{/each}
+			</div>
+		{/if}
+	{/if}
+</div>

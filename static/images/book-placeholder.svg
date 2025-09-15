@@ -1,0 +1,5 @@
+<svg width="120" height="160" xmlns="http://www.w3.org/2000/svg">
+  <rect width="120" height="160" fill="#e2e8f0" stroke="#cbd5e1" stroke-width="2"/>
+  <text x="60" y="80" text-anchor="middle" font-family="Arial, sans-serif" font-size="14" fill="#64748b">Book</text>
+  <text x="60" y="100" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" fill="#94a3b8">Cover</text>
+</svg>
