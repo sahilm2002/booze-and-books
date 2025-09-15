@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { ProfileService } from '$lib/services/profileService';
 	import { profileWithUser, profileStore } from '$lib/stores/profile';
+	import { MAX_AVATAR_UPLOAD_SIZE, getMaxUploadSizeDisplay } from '$lib/config/upload';
 
 	export let onUpload: ((file: File) => Promise<void>) | undefined = undefined;
 	export let currentAvatarUrl: string | null = null;
@@ -52,8 +53,8 @@
 			return;
 		}
 
-		if (file.size > 10 * 1024 * 1024) {
-			alert('File size must be less than 10MB');
+		if (file.size > MAX_AVATAR_UPLOAD_SIZE) {
+			alert(`File size must be less than ${getMaxUploadSizeDisplay()}`);
 			return;
 		}
 
@@ -212,7 +213,7 @@
 
 	<div class="text-center">
 		<p class="text-xs text-gray-500 mt-1">
-			Drag and drop or click the avatar to upload — Max file size: 10MB
+			Drag and drop or click the avatar to upload — Max file size: {getMaxUploadSizeDisplay()}
 		</p>
 	</div>
 </div>

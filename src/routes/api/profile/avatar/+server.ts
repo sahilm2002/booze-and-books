@@ -1,4 +1,5 @@
 import type { RequestHandler } from './$types';
+import { MAX_AVATAR_UPLOAD_SIZE, ALLOWED_AVATAR_MIME_TYPES, getMaxUploadSizeDisplay } from '$lib/config/upload';
 
 /**
  * POST /api/profile/avatar
@@ -11,7 +12,10 @@ import type { RequestHandler } from './$types';
  *
  * Notes:
  *  - This endpoint requires the user to be authenticated; event.locals.user is used.
- *  - The upload size limit is enforced client-side, but server may also enforce limits.
+ *  - Upload limits are enforced both client-side and server-side using shared configuration.
+ *  - TODO: Consider adding rate limiting (e.g., per-IP upload throttling) to prevent abuse.
+ *    This could be implemented using a simple in-memory store or Redis to track upload
+ *    attempts per IP address within a time window (e.g., max 5 uploads per minute per IP).
  */
 export const POST: RequestHandler = async ({ request, locals }) => {
 	// Ensure authenticated user
@@ -27,12 +31,8 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 		return new Response(JSON.stringify({ error: 'No file provided' }), { status: 400 });
 	}
 
-	// Define allowed MIME types and file size limit
-	const allowedMimeTypes = ['image/png', 'image/jpeg', 'image/webp', 'image/gif'];
-	const maxFileSize = 5 * 1024 * 1024; // 5MB in bytes
-
-	// Validate MIME type
-	if (!allowedMimeTypes.includes(file.type)) {
+	// Validate MIME type using shared configuration
+	if (!ALLOWED_AVATAR_MIME_TYPES.includes(file.type)) {
 		return new Response(
 			JSON.stringify({ 
 				error: 'Unsupported file type. Only PNG, JPEG, WebP, and GIF images are allowed.' 
@@ -41,11 +41,11 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 		);
 	}
 
-	// Validate file size
-	if (file.size > maxFileSize) {
+	// Validate file size using shared configuration
+	if (file.size > MAX_AVATAR_UPLOAD_SIZE) {
 		return new Response(
 			JSON.stringify({ 
-				error: `File size too large. Maximum allowed size is ${maxFileSize / (1024 * 1024)}MB.` 
+				error: `File size too large. Maximum allowed size is ${getMaxUploadSizeDisplay()}.` 
 			}), 
 			{ status: 413 }
 		);
