@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { createEventDispatcher, onMount } from 'svelte';
+	import { createEventDispatcher, onMount, onDestroy } from 'svelte';
 	import { GoogleBooksService } from '$lib/services/googleBooksService';
 	import type { GoogleBookResult } from '$lib/types/book';
 
@@ -18,13 +18,31 @@
 	let showDropdown = false;
 	let searchError: string | null = null;
 	let debounceTimeout: ReturnType<typeof setTimeout> | undefined;
+	
+	// Request cancellation and race condition prevention
+	let currentAbortController: AbortController | null = null;
+	let requestId = 0;
 
 	onMount(() => {
 		return () => {
 			if (debounceTimeout) {
 				clearTimeout(debounceTimeout);
 			}
+			if (currentAbortController) {
+				currentAbortController.abort();
+				currentAbortController = null;
+			}
 		};
+	});
+
+	onDestroy(() => {
+		if (debounceTimeout) {
+			clearTimeout(debounceTimeout);
+		}
+		if (currentAbortController) {
+			currentAbortController.abort();
+			currentAbortController = null;
+		}
 	});
 
 	function handleInput(event: Event) {
@@ -33,8 +51,15 @@
 		
 		dispatch('input', { value: target.value });
 
+		// Cancel any pending debounced search
 		if (debounceTimeout) {
 			clearTimeout(debounceTimeout);
+		}
+
+		// Cancel any ongoing request
+		if (currentAbortController) {
+			currentAbortController.abort();
+			currentAbortController = null;
 		}
 
 		if (query.length < 2) {
@@ -51,13 +76,31 @@
 	async function performSearch(query: string) {
 		if (!query.trim()) return;
 
+		// Cancel any existing request before starting a new one
+		if (currentAbortController) {
+			currentAbortController.abort();
+		}
+
+		// Create new AbortController for this request
+		currentAbortController = new AbortController();
+		const currentRequestId = ++requestId;
+		const currentQuery = query;
+
 		isSearching = true;
 		searchError = null;
 		showDropdown = true;
 
 		try {
 			const smartQuery = GoogleBooksService.buildSmartQuery(query);
-			const apiResponse = await fetch(`/api/google-books/search?q=${encodeURIComponent(smartQuery)}&maxResults=8`);
+			const apiResponse = await fetch(
+				`/api/google-books/search?q=${encodeURIComponent(smartQuery)}&maxResults=8`,
+				{ signal: currentAbortController.signal }
+			);
+			
+			// Check if this response is still relevant (not superseded by newer request)
+			if (currentRequestId !== requestId || currentQuery !== query) {
+				return; // Ignore outdated response
+			}
 			
 			if (!apiResponse.ok) {
 				const errorData = await apiResponse.json();
@@ -65,17 +108,39 @@
 			}
 			
 			const response = await apiResponse.json();
+			
+			// Double-check we're still on the same request
+			if (currentRequestId !== requestId || currentQuery !== query) {
+				return; // Ignore outdated response
+			}
+			
 			searchResults = GoogleBooksService.formatSearchResults(response.items || []);
 			
 			if (searchResults.length === 0) {
 				searchError = 'No books found. Try a different search term.';
 			}
 		} catch (error) {
-			console.error('Google Books search error:', error);
-			searchError = error instanceof Error ? error.message : 'Search failed. Please try again.';
-			searchResults = [];
+			// Ignore aborted requests - they're not real errors
+			if (error instanceof Error && error.name === 'AbortError') {
+				return;
+			}
+			
+			// Only show error if this is still the current request
+			if (currentRequestId === requestId && currentQuery === query) {
+				console.error('Google Books search error:', error);
+				searchError = error instanceof Error ? error.message : 'Search failed. Please try again.';
+				searchResults = [];
+			}
 		} finally {
-			isSearching = false;
+			// Only update loading state if this is still the current request
+			if (currentRequestId === requestId && currentQuery === query) {
+				isSearching = false;
+			}
+			
+			// Clean up the controller if it's the current one
+			if (currentAbortController && !currentAbortController.signal.aborted) {
+				currentAbortController = null;
+			}
 		}
 	}
 
