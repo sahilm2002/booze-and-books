@@ -255,10 +255,17 @@
 		<div class="profile-sidebar">
 			<!-- User Rating Section -->
 			{#if $swapStatistics}
-				<UserRating 
-					rating={$swapStatistics.average_rating || 0} 
-					size="medium"
-				/>
+				<div class="stats-card">
+					<div class="card-header">
+						<h3 class="card-title">User Rating</h3>
+					</div>
+					<div class="card-content">
+						<UserRating 
+							rating={$swapStatistics.average_rating || 0} 
+							size="medium"
+						/>
+					</div>
+				</div>
 			{/if}
 
 			<div class="stats-card">

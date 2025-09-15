@@ -149,6 +149,10 @@ BEGIN
     IF TG_OP = 'INSERT' THEN
         -- New swap request created
         notification_message := requester_username || ' wants to swap "' || offered_book_title || '" for your "' || book_title || '"';
+        -- Include custom message if provided
+        IF NEW.message IS NOT NULL AND NEW.message != '' THEN
+            notification_message := notification_message || '. Message: "' || NEW.message || '"';
+        END IF;
         recipient_id := NEW.owner_id;
         
     ELSIF TG_OP = 'UPDATE' THEN
@@ -157,6 +161,10 @@ BEGIN
             CASE NEW.status
                 WHEN 'COUNTER_OFFER' THEN
                     notification_message := owner_username || ' made a counter-offer: "' || counter_book_title || '" instead of "' || book_title || '"';
+                    -- Include counter-offer message if provided
+                    IF NEW.counter_offer_message IS NOT NULL AND NEW.counter_offer_message != '' THEN
+                        notification_message := notification_message || '. Message: "' || NEW.counter_offer_message || '"';
+                    END IF;
                     recipient_id := NEW.requester_id;
                     
                 WHEN 'ACCEPTED' THEN
