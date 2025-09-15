@@ -20,6 +20,19 @@ if (!supabaseKey) {
 
 const supabase = createClient(supabaseUrl, supabaseKey);
 
+/**
+ * Apply a SQL migration file by executing its statements against Supabase via the REST RPC endpoint.
+ *
+ * Reads the file at supabase/migrations/<migrationFile>, splits its contents into semicolon-separated SQL statements
+ * (ignoring empty statements and lines starting with `--`), and attempts to execute each statement using the
+ * Supabase REST RPC at /rest/v1/rpc/exec. If the primary REST call fails, a secondary RPC attempt with a different
+ * payload and a `Prefer: return=minimal` header is tried. DDL statements may intentionally fail via REST; such
+ * failures are logged and the migration file is still considered processed. The function returns true when the
+ * migration file was processed without uncaught errors, or false if an unexpected error occurred.
+ *
+ * @param {string} migrationFile - Name of the SQL migration file (relative to supabase/migrations).
+ * @return {Promise<boolean>} Resolves to true on successful processing, false on failure.
+ */
 async function applyMigration(migrationFile) {
   try {
     console.log(`Applying migration: ${migrationFile}`);
@@ -87,6 +100,14 @@ async function applyMigration(migrationFile) {
   }
 }
 
+/**
+ * Orchestrates applying a predefined list of SQL migration files.
+ *
+ * Reads the hard-coded migrations list, runs each migration via applyMigration,
+ * stops processing on the first failure, and waits 1 second between successful migrations.
+ *
+ * @return {Promise<void>} Resolves when all migrations have been processed or when processing stops due to a failure.
+ */
 async function main() {
   // List of migrations that need to be applied (the ones we modified)
   const migrationsToApply = [

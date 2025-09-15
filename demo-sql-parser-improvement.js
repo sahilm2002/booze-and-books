@@ -7,7 +7,18 @@
 
 import { parse } from 'pgsql-parser';
 
-// Old unsafe approach (for demonstration only)
+/**
+ * Naively splits SQL text on semicolons into trimmed statement strings.
+ *
+ * This simple helper splits the input by ';', trims each segment, and returns
+ * only non-empty segments that do not start with the inline comment marker `--`.
+ * It does not understand SQL syntax (string literals, quoted identifiers,
+ * comments, or dollar-quoted blocks) and therefore can split incorrectly;
+ * use only for demonstration or very controlled inputs.
+ *
+ * @param {string} sql - The SQL text to split.
+ * @return {string[]} Array of trimmed statement strings.
+ */
 function unsafeSQLSplit(sql) {
   return sql
     .split(';')
@@ -15,7 +26,15 @@ function unsafeSQLSplit(sql) {
     .filter(stmt => stmt.length > 0 && !stmt.startsWith('--'));
 }
 
-// New safe approach (copied from sync-database.js)
+/**
+ * Parse a SQL string into individual PostgreSQL statements.
+ *
+ * Attempts to extract statements using the `pgsql-parser` output (RawStmt locations). Input is first sanitized by removing NULL characters. Statements that are empty or begin with `--` (line comments) are excluded. If parsing yields no statements or the parser throws, the function falls back to a robust in-code tokenizer that handles single- and double-quoted literals, line and block comments, and PostgreSQL dollar-quoted strings.
+ *
+ * @param {string} sql - Non-empty SQL source to split into statements; null characters will be removed.
+ * @return {string[]} Array of trimmed SQL statement strings.
+ * @throws {Error} If `sql` is not a non-empty string.
+ */
 function parseSQL(sql) {
   if (!sql || typeof sql !== 'string') {
     throw new Error('Invalid SQL input: must be a non-empty string');
@@ -55,6 +74,24 @@ function parseSQL(sql) {
   }
 }
 
+/**
+ * Split a SQL script into individual statements while preserving quoted literals and comments.
+ *
+ * This tokenizer scans the input SQL and returns an array of statement strings split on top-level
+ * semicolons. It correctly handles:
+ * - single-line comments (`-- ...`), which are skipped,
+ * - block comments (`/* ... */`), which are skipped and replaced with a single space,
+ * - single-quoted strings with doubled-quote escaping (`'it''s'`),
+ * - double-quoted identifiers with doubled-quote escaping (`"a""b"`),
+ * - PostgreSQL dollar-quoted strings (`$tag$...$tag$`) including arbitrary tags.
+ *
+ * The function trims statements and excludes empty or comment-only segments. It does not validate
+ * SQL syntax beyond these token-level rules and falls back to conservative behavior for malformed
+ * constructs (e.g., unterminated dollar-quote or string).
+ *
+ * @param {string} sql - The SQL script to tokenize.
+ * @return {string[]} An array of trimmed SQL statement strings (without the terminating semicolons).
+ */
 function customSQLTokenizer(sql) {
   const statements = [];
   let current = '';

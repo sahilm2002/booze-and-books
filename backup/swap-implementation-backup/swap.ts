@@ -141,7 +141,14 @@ export function validateCompletionWorkflow(status: SwapStatus, currentStatus: Sw
 	return true;
 }
 
-// Helper function to get status display name
+/**
+ * Returns a human-readable display name for the given swap status.
+ *
+ * Maps SwapStatus values to concise labels used in the UI (e.g. `PENDING` -> "Pending").
+ *
+ * @param status - The SwapStatus value to convert to a display string.
+ * @returns The display name for `status`.
+ */
 export function getStatusDisplayName(status: SwapStatus): string {
 	const displayNames: Record<SwapStatus, string> = {
 		[SwapStatus.PENDING]: 'Pending',
@@ -153,7 +160,14 @@ export function getStatusDisplayName(status: SwapStatus): string {
 	return displayNames[status];
 }
 
-// Helper function to get status color class for styling
+/**
+ * Returns the CSS class string used to style a status badge for the given swap status.
+ *
+ * Maps each SwapStatus to a short Tailwind-style class pair (text color + background) suitable for badges.
+ *
+ * @param status - The swap status to map to a color class
+ * @returns A space-separated CSS class string (e.g., `"text-green-600 bg-green-100"`)
+ */
 export function getStatusColor(status: SwapStatus): string {
 	const colors: Record<SwapStatus, string> = {
 		[SwapStatus.PENDING]: 'text-yellow-600 bg-yellow-100',
@@ -171,28 +185,79 @@ export function formatRating(rating: number | null): string {
 	return '★'.repeat(rating) + '☆'.repeat(5 - rating);
 }
 
-// Helper function to check if user can complete swap
+/**
+ * Returns whether the given user may mark an accepted swap as completed.
+ *
+ * Allowed only when `status` is `ACCEPTED` and `userId` matches either the `requesterId` or the `ownerId`.
+ *
+ * @param status - Current swap status.
+ * @param userId - ID of the user attempting to complete the swap.
+ * @param requesterId - ID of the swap requester.
+ * @param ownerId - ID of the book owner.
+ * @returns True if the user is permitted to complete the swap; otherwise false.
+ */
 export function canCompleteSwap(status: SwapStatus, userId: string, requesterId: string, ownerId: string): boolean {
 	return status === SwapStatus.ACCEPTED && (userId === requesterId || userId === ownerId);
 }
 
-// Helper function to check if user can make counter-offer
+/**
+ * Returns whether the given user is allowed to make a counter-offer for a swap.
+ *
+ * The action is allowed only when the swap is in PENDING state and the acting user is the owner.
+ *
+ * @param status - Current swap status
+ * @param userId - ID of the acting user
+ * @param ownerId - ID of the book owner for the swap
+ * @returns True if the user can make a counter-offer, otherwise false
+ */
 export function canMakeCounterOffer(status: SwapStatus, userId: string, ownerId: string): boolean {
 	return status === SwapStatus.PENDING && userId === ownerId;
 }
 
-// Helper function to check if user can accept counter-offer
+/**
+ * Returns whether the given user is allowed to accept a counter-offer.
+ *
+ * Allowed only when the swap is in COUNTER_OFFER status and the user is the original requester.
+ *
+ * @param status - Current swap status
+ * @param userId - ID of the user attempting the action
+ * @param requesterId - ID of the swap requester (the only user allowed to accept a counter-offer)
+ * @returns True if the user may accept the counter-offer; otherwise false
+ */
 export function canAcceptCounterOffer(status: SwapStatus, userId: string, requesterId: string): boolean {
 	return status === SwapStatus.COUNTER_OFFER && userId === requesterId;
 }
 
-// Helper function to check if user can cancel swap
+/**
+ * Returns whether a user is allowed to cancel a swap.
+ *
+ * Cancellation is permitted only when the swap status is PENDING or COUNTER_OFFER,
+ * and the acting user is either the requester or the owner.
+ *
+ * @param status - Current swap status
+ * @param userId - ID of the user attempting the action
+ * @param requesterId - ID of the user who created the swap request
+ * @param ownerId - ID of the owner of the offered/target book
+ * @returns `true` if the user may cancel the swap; otherwise `false`
+ */
 export function canCancelSwap(status: SwapStatus, userId: string, requesterId: string, ownerId: string): boolean {
 	return (status === SwapStatus.PENDING || status === SwapStatus.COUNTER_OFFER) && 
 		   (userId === requesterId || userId === ownerId);
 }
 
-// Helper function to validate counter-offer workflow
+/**
+ * Validates whether a transition to a counter-offer is allowed.
+ *
+ * Returns true for all status changes except when attempting to set the status to `COUNTER_OFFER`.
+ * In that case the transition is allowed only if the current status is `PENDING` and the acting user
+ * is the owner.
+ *
+ * @param status - Desired target status for the swap
+ * @param currentStatus - Current status of the swap
+ * @param userId - ID of the user performing the action
+ * @param ownerId - ID of the swap owner
+ * @returns `true` if the requested workflow transition is permitted, otherwise `false`
+ */
 export function validateCounterOfferWorkflow(status: SwapStatus, currentStatus: SwapStatus, userId: string, ownerId: string): boolean {
 	if (status === SwapStatus.COUNTER_OFFER) {
 		return currentStatus === SwapStatus.PENDING && userId === ownerId;
