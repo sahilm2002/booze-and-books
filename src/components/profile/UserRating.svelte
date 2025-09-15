@@ -3,6 +3,9 @@
 	export let showNumber: boolean = true;
 	export let size: 'small' | 'medium' | 'large' = 'medium';
 
+	// Generate unique ID per component instance to prevent gradient ID collisions
+	const uid = Math.random().toString(36).substr(2, 9);
+
 	$: stars = Array.from({ length: 5 }, (_, i) => ({
 		filled: i < Math.floor(rating),
 		half: i === Math.floor(rating) && rating % 1 >= 0.5
@@ -18,13 +21,13 @@
 				{#if star.half}
 					<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
 						<defs>
-							<linearGradient id="half-fill-{i}">
+							<linearGradient id="half-fill-{i}-{uid}">
 								<stop offset="50%" stop-color="currentColor"/>
 								<stop offset="50%" stop-color="transparent"/>
 							</linearGradient>
 						</defs>
 						<polygon points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26" 
-								 fill="url(#half-fill-{i})" stroke="currentColor"/>
+								 fill="url(#half-fill-{i}-{uid})" stroke="currentColor"/>
 					</svg>
 				{:else}
 					<svg viewBox="0 0 24 24" fill={star.filled ? 'currentColor' : 'none'} stroke="currentColor" stroke-width="2">
