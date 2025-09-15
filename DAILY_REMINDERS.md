@@ -62,7 +62,7 @@ const userIds = await NotificationService.getUsersNeedingReminders();
 
 ```bash
 # Test the daily reminder system
-curl -X POST http://localhost:5173/api/notifications/daily-reminders \
+curl -X POST http://localhost:5175/api/notifications/daily-reminders \
   -H "Authorization: Bearer your-secret-token" \
   -H "Content-Type: application/json"
 ```
@@ -81,10 +81,8 @@ Set up a cron job or scheduler to call the API endpoint daily:
 ### 🔍 **Monitoring**
 
 ```bash
-# Get statistics about users needing reminders (GET request with Authorization header)
-curl -X GET http://localhost:5173/api/notifications/daily-reminders \
-  -H "Authorization: Bearer your-secret-token" \
-  -H "Content-Type: application/json"
+# Get statistics about users needing reminders
+curl "http://localhost:5175/api/notifications/daily-reminders?token=your-secret-token"
 ```
 
 ## Configuration

@@ -2,22 +2,15 @@
 	import { onMount } from 'svelte';
 	import { page } from '$app/stores';
 	import SwapRequestCard from '../../../components/swaps/SwapRequestCard.svelte';
-	import { SwapService } from '$lib/services/swapService';
+	import { swapStore } from '$lib/stores/swaps';
 	import { auth } from '$lib/stores/auth';
 	import type { PageData } from './$types';
-	import type { SwapRequest } from '$lib/types/swap';
-	import type { Book } from '$lib/types/book';
-	import type { Profile } from '$lib/types/profile';
-	import { BookCondition } from '$lib/types/book';
+	import type { SwapRequestWithDetails } from '$lib/types/swap';
 
 	export let data: PageData;
 
 	let statusFilter: 'all' | 'pending' | 'accepted' | 'counter_offer' | 'cancelled' | 'completed' = 'all';
 	let typeFilter: 'all' | 'incoming' | 'outgoing' = 'all';
-
-	let swapRequests: SwapRequest[] = [];
-	let loading = false;
-	let error: string | null = null;
 
 	// Load swap requests on client side
 	onMount(async () => {
@@ -26,60 +19,41 @@
 			document.title = 'Swap Requests - Booze & Books';
 		}
 		
-		// Check for tab parameter in URL
-		const tabParam = $page.url.searchParams.get('tab');
-		if (tabParam === 'outgoing') {
-			activeTab = 'outgoing';
-		} else if (tabParam === 'incoming') {
-			activeTab = 'incoming';
-		}
-		
-		await loadSwapRequests();
+		// Load swap requests using the store
+		await swapStore.loadSwapRequests();
 	});
 
-	async function loadSwapRequests() {
-		if (!$auth.user) return;
-		
-		loading = true;
-		error = null;
-		
-		try {
-			const { incoming, outgoing } = await SwapService.getSwapRequestsForUser($auth.user.id);
-			swapRequests = [...incoming, ...outgoing];
-		} catch (err) {
-			error = err instanceof Error ? err.message : 'Failed to load swap requests';
-		} finally {
-			loading = false;
-		}
-	}
+	// Get all swap requests from store, sorted by date (newest first)
+	$: allSwapRequests = [...$swapStore.incoming, ...$swapStore.outgoing]
+		.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 
-	// Filter requests based on tab and status
-	$: filteredRequests = swapRequests.filter(request => {
-		// Filter by tab (incoming/outgoing)
-		const isIncoming = request.owner_id === $auth.user?.id;
-		const isOutgoing = request.requester_id === $auth.user?.id;
-		
-		if (activeTab === 'incoming' && !isIncoming) return false;
-		if (activeTab === 'outgoing' && !isOutgoing) return false;
+	// Filter requests based on type and status
+	$: filteredRequests = allSwapRequests.filter(request => {
+		// Filter by type (incoming/outgoing)
+		if (typeFilter !== 'all') {
+			const isIncoming = request.owner_id === $auth.user?.id;
+			const isOutgoing = request.requester_id === $auth.user?.id;
+			
+			if (typeFilter === 'incoming' && !isIncoming) return false;
+			if (typeFilter === 'outgoing' && !isOutgoing) return false;
+		}
 		
 		// Filter by status
 		if (statusFilter === 'all') return true;
 		return request.status === statusFilter.toUpperCase();
 	});
 
-	async function handleRequestUpdated(event: CustomEvent<SwapRequest>) {
-		// Update the local request
-		const updatedRequest = event.detail;
-		swapRequests = swapRequests.map(req => 
-			req.id === updatedRequest.id ? updatedRequest : req
-		);
+	async function handleRequestUpdated(event: CustomEvent<SwapRequestWithDetails>) {
+		// Reload swap requests from the store to get the latest data
+		await swapStore.loadSwapRequests();
 	}
 
 	function handleRequestError(event: CustomEvent<string>) {
-		error = event.detail;
+		// Error is already handled by the store, just clear any local error
+		swapStore.clearError();
 	}
 
-	function getStatusCounts(requests: SwapRequest[], isIncoming: boolean) {
+	function getStatusCounts(requests: SwapRequestWithDetails[], isIncoming: boolean) {
 		const filtered = requests.filter(r => 
 			isIncoming ? r.owner_id === $auth.user?.id : r.requester_id === $auth.user?.id
 		);
@@ -92,9 +66,14 @@
 		};
 	}
 
-	$: incomingCounts = getStatusCounts(swapRequests, true);
-	$: outgoingCounts = getStatusCounts(swapRequests, false);
-	$: currentCounts = activeTab === 'incoming' ? incomingCounts : outgoingCounts;
+	$: incomingCounts = getStatusCounts(allSwapRequests, true);
+	$: outgoingCounts = getStatusCounts(allSwapRequests, false);
+	$: allCounts = {
+		pending: incomingCounts.pending + outgoingCounts.pending,
+		accepted: incomingCounts.accepted + outgoingCounts.accepted,
+		cancelled: incomingCounts.cancelled + outgoingCounts.cancelled,
+		completed: incomingCounts.completed + outgoingCounts.completed
+	};
 </script>
 
 <style>
@@ -454,78 +433,70 @@
 	</div>
 
 	<!-- Error Message -->
-	{#if error}
+	{#if $swapStore.error}
 		<div class="error-message">
 			<div class="error-content">
 				<svg class="error-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
 				</svg>
-				<p class="error-text">{error}</p>
+				<p class="error-text">{$swapStore.error}</p>
 			</div>
 		</div>
 	{/if}
 
-	<!-- Tabs -->
-	<div class="tabs-section card">
-		<nav class="tabs-nav" aria-label="Tabs">
-			<button
-				type="button"
-				class="tab-button"
-				class:active={activeTab === 'incoming'}
-				on:click={() => activeTab = 'incoming'}
-			>
-				Incoming Requests
-				{#if incomingCounts.pending > 0}
-					<span class="tab-badge incoming">
-						{incomingCounts.pending}
-					</span>
-				{/if}
-			</button>
-			<button
-				type="button"
-				class="tab-button"
-				class:active={activeTab === 'outgoing'}
-				on:click={() => {
-					activeTab = 'outgoing';
-				}}
-			>
-				My Requests
-				{#if outgoingCounts.pending > 0}
-					<span class="tab-badge outgoing">
-						{outgoingCounts.pending}
-					</span>
-				{/if}
-			</button>
-		</nav>
-	</div>
-
-	<!-- Status Filter -->
+	<!-- Filters -->
 	<div class="filters-section card">
 		<div class="filters-header">
 			<h3 class="filters-title">Filters</h3>
 		</div>
-		<div class="filter-tags">
-			{#each [
-				{ value: 'all', label: `All (${filteredRequests.length})` },
-				{ value: 'pending', label: `Pending (${currentCounts.pending})` },
-				{ value: 'accepted', label: `Accepted (${currentCounts.accepted})` },
-				{ value: 'cancelled', label: `Cancelled (${currentCounts.cancelled})` },
-				{ value: 'completed', label: `Completed (${currentCounts.completed})` }
-			] as filterOption}
-				<button
-					type="button"
-					class="filter-tag"
-					class:active={statusFilter === filterOption.value}
-					on:click={() => statusFilter = filterOption.value as typeof statusFilter}
-				>
-					{filterOption.label}
-				</button>
-			{/each}
+		
+		<!-- Type Filter -->
+		<div style="margin-bottom: 1.5rem;">
+			<h4 style="margin: 0 0 0.75rem 0; font-size: 0.95rem; font-weight: 600; color: #4b5563;">Request Type</h4>
+			<div class="filter-tags">
+				{#each [
+					{ value: 'all', label: `All Requests (${allSwapRequests.length})` },
+					{ value: 'incoming', label: `Incoming (${incomingCounts.pending + incomingCounts.accepted + incomingCounts.cancelled + incomingCounts.completed})` },
+					{ value: 'outgoing', label: `My Requests (${outgoingCounts.pending + outgoingCounts.accepted + outgoingCounts.cancelled + outgoingCounts.completed})` }
+				] as filterOption}
+					<button
+						type="button"
+						class="filter-tag"
+						class:active={typeFilter === filterOption.value}
+						on:click={() => typeFilter = filterOption.value as typeof typeFilter}
+					>
+						{filterOption.label}
+					</button>
+				{/each}
+			</div>
+		</div>
+		
+		<!-- Status Filter -->
+		<div>
+			<h4 style="margin: 0 0 0.75rem 0; font-size: 0.95rem; font-weight: 600; color: #4b5563;">Status</h4>
+			<div class="filter-tags">
+				{#each [
+					{ value: 'all', label: `All (${filteredRequests.length})` },
+					{ value: 'pending', label: `Pending (${allCounts.pending})` },
+					{ value: 'accepted', label: `Accepted (${allCounts.accepted})` },
+					{ value: 'cancelled', label: `Cancelled (${allCounts.cancelled})` },
+					{ value: 'completed', label: `Completed (${allCounts.completed})` }
+				] as filterOption}
+					<button
+						type="button"
+						class="filter-tag"
+						class:active={statusFilter === filterOption.value}
+						on:click={() => statusFilter = filterOption.value as typeof statusFilter}
+					>
+						{filterOption.label}
+					</button>
+				{/each}
+			</div>
 		</div>
 	</div>
 
 	<!-- Loading State -->
-	{#if loading}
+	{#if $swapStore.isLoading}
 		<div class="loading-state">
 			<div class="loading-content">
 				<svg class="loading-spinner" fill="none" viewBox="0 0 24 24">
@@ -578,54 +549,14 @@
 					</button>
 				{/if}
 			</div>
+		{:else}
 			<div class="requests-grid">
 				{#each filteredRequests as request (request.id)}
 					{@const isIncoming = request.owner_id === $auth.user?.id}
-					{@const requestedBook = { 
-						id: request.book_id, 
-						title: 'Book Title', 
-						authors: ['Author'], 
-						condition: BookCondition.GOOD,
-						owner_id: request.owner_id,
-						is_available: true,
-						created_at: '',
-						updated_at: '',
-						isbn: null,
-						genre: null,
-						description: null,
-						google_volume_id: null
-					}}
-					{@const offeredBook = { 
-						id: request.offered_book_id || '', 
-						title: 'Offered Book', 
-						authors: ['Author'], 
-						condition: BookCondition.GOOD,
-						owner_id: request.requester_id,
-						is_available: true,
-						created_at: '',
-						updated_at: '',
-						isbn: null,
-						genre: null,
-						description: null,
-						google_volume_id: null
-					}}
-					{@const otherUserProfile = { 
-						id: isIncoming ? request.requester_id : request.owner_id, 
-						username: 'User', 
-						avatar_url: null,
-						full_name: null,
-						bio: null,
-						location: null,
-						created_at: '',
-						updated_at: ''
-					}}
 					
 					<SwapRequestCard
 						swapRequest={request}
-						{requestedBook}
-						{offeredBook}
-						{otherUserProfile}
-						isIncoming={isIncoming}
+						{isIncoming}
 						on:updated={handleRequestUpdated}
 						on:error={handleRequestError}
 					/>

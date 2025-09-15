@@ -46,13 +46,12 @@ export const POST: RequestHandler = async ({ request }) => {
 
 // GET /api/notifications/daily-reminders
 // Get information about users who need daily reminders (for monitoring)
-export const GET: RequestHandler = async ({ request }) => {
+export const GET: RequestHandler = async ({ url }) => {
 	try {
-		// Use Authorization header instead of query parameter for security
-		const authHeader = request.headers.get('authorization');
+		const authHeader = url.searchParams.get('token');
 		const expectedToken = process.env.DAILY_REMINDER_TOKEN || 'your-secret-token';
 		
-		if (authHeader !== `Bearer ${expectedToken}`) {
+		if (authHeader !== expectedToken) {
 			return json({ error: 'Unauthorized' }, { status: 401 });
 		}
 
