@@ -1,9 +1,22 @@
-const { createClient } = require('@supabase/supabase-js');
-const fs = require('fs');
-const path = require('path');
+import { createClient } from '@supabase/supabase-js';
+import fs from 'fs';
+import path from 'path';
+import dotenv from 'dotenv';
 
-const supabaseUrl = 'https://pzmrvovqxbmobunludna.supabase.co';
-const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InB6bXJ2b3ZxeGJtb2J1bmx1ZG5hIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc1NjkxOTU2NSwiZXhwIjoyMDcyNDk1NTY1fQ.3o9ptCH3gFnyykTte7RUpsAG-etQRJJ0iPn5DnfQ2_M';
+// Load environment variables
+dotenv.config();
+
+// Validate required environment variables
+const supabaseUrl = process.env.SUPABASE_URL;
+const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+if (!supabaseUrl) {
+  throw new Error('SUPABASE_URL environment variable is required but not set');
+}
+
+if (!supabaseKey) {
+  throw new Error('SUPABASE_SERVICE_ROLE_KEY environment variable is required but not set');
+}
 
 const supabase = createClient(supabaseUrl, supabaseKey);
 
