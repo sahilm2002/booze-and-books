@@ -79,7 +79,7 @@ export class BookServiceServer {
 
 		// Exclude books that are in pending swaps if we have any
 		if (excludedBookIds.length > 0) {
-			queryBuilder = queryBuilder.not('id', 'in', `(${excludedBookIds.map(id => `'${id}'`).join(',')})`);
+			queryBuilder = queryBuilder.not('id', 'in', `(${excludedBookIds.join(',')})`);
 		}
 
 		const { data, error } = await queryBuilder

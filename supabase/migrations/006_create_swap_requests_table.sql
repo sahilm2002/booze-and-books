@@ -80,13 +80,6 @@ CREATE POLICY "Users can update swap request status" ON swap_requests
         OR
         -- Requester can update their requests
         (auth.uid() = requester_id AND status = 'PENDING')
-    )
-    WITH CHECK (
-        -- Owner can only accept/decline
-        (auth.uid() = owner_id AND status = 'PENDING' AND NEW.status IN ('ACCEPTED', 'DECLINED'))
-        OR
-        -- Requester can only cancel
-        (auth.uid() = requester_id AND status = 'PENDING' AND NEW.status = 'CANCELLED')
     );
 
 -- Add comments

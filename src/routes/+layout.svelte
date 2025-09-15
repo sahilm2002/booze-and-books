@@ -53,10 +53,10 @@
 
 	// SSR-safe user reference
 	$: user = data.session?.user ?? $auth.user;
-	$: avatarUrl = ProfileService.getAvatarUrl($profile?.avatar_url);
+	$: avatarUrl = ProfileService.getAvatarUrl($profile?.avatar_url || null);
 	$: initials = ProfileService.generateInitials(
-		$profile?.full_name,
-		$profile?.username,
+		$profile?.full_name || null,
+		$profile?.username || null,
 		user?.email
 	);
 </script>
@@ -65,7 +65,7 @@
 	<nav class="main-nav">
 		{#if user}
 			<div class="nav-user">
-				<a href="/app" class="user-profile-link" title="Go to Dashboard">
+				<a href="/app/profile" class="user-profile-link" title="Go to Profile">
 					<div class="user-profile">
 						<div class="user-avatar">
 							{#if avatarUrl}

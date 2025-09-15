@@ -30,10 +30,13 @@ Imagine having access to a vast library of books owned by fellow readers in your
 - Include personal messages to connect with fellow readers
 - **Smart Validation**: System prevents requesting your own books or unavailable titles
 
-#### **Counter-Offer Magic**
-- **Didn't like the offered book?** As a book owner, you can make counter-offers
-- **Flexible Negotiations**: Suggest a different book from the requester's collection
-- **Multiple Options**: Keep negotiating until both parties find the perfect match
+#### **Counter-Offer Magic** ⭐ **NEW**
+- **Professional Counter-Offer Modal**: Beautiful interface for selecting alternative books with covers and details
+- **3-Book Visual Flow**: Clear display showing "They want → They offered (declined) → Your counter-offer (new)"
+- **Smart Book Selection**: Auto-loads your available books with interactive selection grid
+- **Personalized Messages**: Add custom messages explaining why your counter-offer is perfect
+- **Automatic Book Management**: System handles book availability - original offer becomes available, counter-offer gets reserved
+- **Dual Perspective Display**: Both parties see the complete 3-book exchange flow from their perspective
 
 #### **Enhanced Notifications**
 - **Visual Book Covers**: See book cover images in all swap notifications
@@ -128,7 +131,15 @@ We take your privacy seriously:
 
 ## 🛠️ Technical Features & Improvements
 
-### **Recent Enhancements (v1.3)**
+### **Recent Enhancements (v1.4)**
+- **Complete Counter-Offer System**: Professional modal interface with book selection grid and 3-book visual flow
+- **Smart Book Availability Management**: Automatic handling of book availability during counter-offer process
+- **Comprehensive Notification System**: Personalized notifications with user names and complete book context for all swap scenarios
+- **Enhanced Swap Card Display**: 3-book flow visualization showing complete counter-offer progression
+- **Responsive Counter-Offer UI**: Mobile-optimized interface with touch-friendly interactions
+- **Intelligent Book Selection**: Auto-loading available books with interactive selection and visual feedback
+
+### **Previous Enhancements (v1.3)**
 - **Modernized Contact Interface**: Professional contact information cards with user avatars and styled email buttons
 - **Enhanced Swap UI**: Consistent button styling across all swap request interactions with proper spacing
 - **Status Badge Improvements**: Unified status indicator design matching discovery page aesthetics

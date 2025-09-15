@@ -54,8 +54,25 @@ export class SwapServiceServer {
 			}
 		}
 
-		// Create the swap request
-		const { data, error } = await supabase
+		// Try to use the atomic function first
+		const { data, error } = await supabase.rpc('create_swap_request_with_availability', {
+			p_book_id: input.book_id,
+			p_requester_id: requesterId,
+			p_owner_id: book.owner_id,
+			p_message: input.message,
+			p_offered_book_id: input.offered_book_id
+		});
+
+		// If RPC function works, return the result
+		if (!error && data && data.length > 0) {
+			return data[0]; // RPC returns array, get first item
+		}
+
+		// If RPC doesn't work, fall back to manual transaction
+		console.log('RPC function failed, using manual transaction:', error?.message);
+		
+		// Mark both books as unavailable and create swap request atomically
+		const { data: swapData, error: swapError } = await supabase
 			.from('swap_requests')
 			.insert({
 				book_id: input.book_id,
@@ -68,11 +85,25 @@ export class SwapServiceServer {
 			.select()
 			.single();
 
-		if (error) {
-			throw new Error(`Failed to create swap request: ${error.message}`);
+		if (swapError) {
+			throw new Error(`Failed to create swap request: ${swapError.message}`);
 		}
 
-		return data;
+		// Mark requested book as unavailable
+		await supabase
+			.from('books')
+			.update({ is_available: false })
+			.eq('id', input.book_id);
+
+		// Mark offered book as unavailable if provided
+		if (input.offered_book_id) {
+			await supabase
+				.from('books')
+				.update({ is_available: false })
+				.eq('id', input.offered_book_id);
+		}
+
+		return swapData;
 	}
 
 	// Get swap requests for a user (both incoming and outgoing)
@@ -153,11 +184,11 @@ export class SwapServiceServer {
 		const [booksData, profilesData] = await Promise.all([
 			supabase
 				.from('books')
-				.select('id, title, authors, thumbnail_url, condition')
+				.select('id, title, authors, google_volume_id, condition, owner_id')
 				.in('id', Array.from(bookIds)),
 			supabase
 				.from('profiles')
-				.select('id, username, full_name, avatar_url')
+				.select('id, username, full_name, avatar_url, email, location')
 				.in('id', Array.from(userIds))
 		]);
 
@@ -167,17 +198,68 @@ export class SwapServiceServer {
 
 		// Enrich requests with book and profile data
 		return requests.map(req => {
-			const book = booksMap.get(req.book_id) || { id: req.book_id, title: 'Unknown', authors: [], thumbnail_url: null, condition: 'Unknown' };
-			const offered_book = req.offered_book_id ? booksMap.get(req.offered_book_id) || null : null;
-			const requester_profile = profilesMap.get(req.requester_id) || { username: null, full_name: null, avatar_url: null };
-			const owner_profile = profilesMap.get(req.owner_id) || { username: null, full_name: null, avatar_url: null };
+			const book = booksMap.get(req.book_id) || { 
+				id: req.book_id, 
+				title: 'Unknown', 
+				authors: [], 
+				google_volume_id: null, 
+				condition: 'Unknown',
+				owner_id: req.owner_id
+			};
+			const offered_book = req.offered_book_id ? (booksMap.get(req.offered_book_id) || {
+				id: req.offered_book_id,
+				title: 'Unknown',
+				authors: [],
+				google_volume_id: null,
+				condition: 'Unknown',
+				owner_id: req.requester_id
+			}) : null;
+			const counter_offered_book = req.counter_offered_book_id ? (booksMap.get(req.counter_offered_book_id) || {
+				id: req.counter_offered_book_id,
+				title: 'Unknown',
+				authors: [],
+				google_volume_id: null,
+				condition: 'Unknown',
+				owner_id: req.owner_id
+			}) : null;
+			const requester_profile = profilesMap.get(req.requester_id) || { 
+				id: req.requester_id,
+				username: null, 
+				full_name: null, 
+				avatar_url: null, 
+				email: null, 
+				location: null 
+			};
+			const owner_profile = profilesMap.get(req.owner_id) || { 
+				id: req.owner_id,
+				username: null, 
+				full_name: null, 
+				avatar_url: null, 
+				email: null, 
+				location: null 
+			};
 
 			return {
 				...req,
 				book,
 				offered_book,
-				requester_profile: type === 'incoming' ? requester_profile : { username: null, full_name: null, avatar_url: null },
-				owner_profile: type === 'outgoing' ? owner_profile : { username: null, full_name: null, avatar_url: null }
+				counter_offered_book,
+				requester_profile: type === 'incoming' ? requester_profile : { 
+					id: req.requester_id,
+					username: null, 
+					full_name: null, 
+					avatar_url: null, 
+					email: null, 
+					location: null 
+				},
+				owner_profile: type === 'outgoing' ? owner_profile : { 
+					id: req.owner_id,
+					username: null, 
+					full_name: null, 
+					avatar_url: null, 
+					email: null, 
+					location: null 
+				}
 			} as SwapRequestWithDetails;
 		});
 	}
@@ -259,6 +341,31 @@ export class SwapServiceServer {
 
 		if (error) {
 			throw new Error(`Failed to update swap request: ${error.message}`);
+		}
+
+		// Restore book availability when swap is cancelled or completed
+		if (status === SwapStatus.CANCELLED || status === SwapStatus.COMPLETED) {
+			// Mark requested book as available again
+			await supabase
+				.from('books')
+				.update({ is_available: true })
+				.eq('id', request.book_id);
+
+			// Mark offered book as available again if it exists
+			if (request.offered_book_id) {
+				await supabase
+					.from('books')
+					.update({ is_available: true })
+					.eq('id', request.offered_book_id);
+			}
+
+			// Mark counter-offered book as available again if it exists
+			if (request.counter_offered_book_id) {
+				await supabase
+					.from('books')
+					.update({ is_available: true })
+					.eq('id', request.counter_offered_book_id);
+			}
 		}
 
 		return data;

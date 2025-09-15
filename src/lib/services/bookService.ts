@@ -412,20 +412,31 @@ export class BookService {
 		userId: string,
 		googleVolumeId: string
 	): Promise<boolean> {
-		if (!googleVolumeId) return false;
-
-		const { data, error } = await supabase
-			.from('books')
-			.select('id')
-			.eq('owner_id', userId)
-			.eq('google_volume_id', googleVolumeId)
-			.single();
-
-		if (error && error.code !== 'PGRST116') {
-			throw new Error(`Failed to check duplicate book: ${error.message}`);
+		// Return false if no googleVolumeId provided (can't check duplicates)
+		if (!googleVolumeId || googleVolumeId.trim() === '') {
+			return false;
 		}
 
-		return !!data;
+		try {
+			const { data, error } = await supabase
+				.from('books')
+				.select('id')
+				.eq('owner_id', userId)
+				.eq('google_volume_id', googleVolumeId.trim())
+				.maybeSingle(); // Use maybeSingle instead of single to avoid errors when no match
+
+			if (error) {
+				console.error('Error checking duplicate book:', error);
+				// Don't throw error, just return false to allow book creation
+				return false;
+			}
+
+			return !!data;
+		} catch (error) {
+			console.error('Exception checking duplicate book:', error);
+			// Don't throw error, just return false to allow book creation
+			return false;
+		}
 	}
 
 	/**

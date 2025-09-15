@@ -226,4 +226,276 @@ export class NotificationService {
 			console.error('Failed to send counter-offer notifications:', error);
 		}
 	}
+
+	// Daily reminder system methods
+	static async sendDailyReminders(): Promise<void> {
+		try {
+			console.log('Starting daily reminder process...');
+			
+			// Get all users who have active swap requests
+			const { data: activeUsers, error: usersError } = await supabase
+				.from('swap_requests')
+				.select('requester_id, owner_id')
+				.in('status', ['PENDING', 'COUNTER_OFFER', 'ACCEPTED']);
+
+			if (usersError) {
+				console.error('Failed to fetch active users:', usersError);
+				return;
+			}
+
+			// Get unique user IDs
+			const userIds = new Set<string>();
+			activeUsers?.forEach(swap => {
+				userIds.add(swap.requester_id);
+				userIds.add(swap.owner_id);
+			});
+
+			console.log(`Processing daily reminders for ${userIds.size} users`);
+
+			// Send reminders to each user
+			for (const userId of userIds) {
+				await this.sendUserDailyReminder(userId);
+			}
+
+			console.log('Daily reminder process completed');
+		} catch (error) {
+			console.error('Failed to send daily reminders:', error);
+		}
+	}
+
+	static async sendUserDailyReminder(userId: string): Promise<void> {
+		try {
+			// Check if user already received a reminder today
+			const today = new Date();
+			today.setHours(0, 0, 0, 0);
+			
+			const { data: existingReminder } = await supabase
+				.from('notifications')
+				.select('id')
+				.eq('user_id', userId)
+				.in('type', [
+					NotificationType.DAILY_REMINDER_PENDING_SWAPS,
+					NotificationType.DAILY_REMINDER_COUNTER_OFFERS,
+					NotificationType.DAILY_REMINDER_ACCEPTED_SWAPS
+				])
+				.gte('created_at', today.toISOString())
+				.limit(1);
+
+			if (existingReminder && existingReminder.length > 0) {
+				console.log(`User ${userId} already received daily reminder today`);
+				return;
+			}
+
+			// Get pending swap requests (as requester) with book and profile details
+			const { data: pendingSwaps } = await supabase
+				.from('swap_requests')
+				.select(`
+					id, 
+					book_id,
+					owner_id,
+					book:books!swap_requests_book_id_fkey(title),
+					owner_profile:profiles!swap_requests_owner_id_fkey(username, full_name, email)
+				`)
+				.eq('requester_id', userId)
+				.eq('status', 'PENDING');
+
+			// Get counter offers (as requester) with book and profile details
+			const { data: counterOffers } = await supabase
+				.from('swap_requests')
+				.select(`
+					id, 
+					book_id,
+					owner_id,
+					book:books!swap_requests_book_id_fkey(title),
+					owner_profile:profiles!swap_requests_owner_id_fkey(username, full_name, email)
+				`)
+				.eq('requester_id', userId)
+				.eq('status', 'COUNTER_OFFER');
+
+			// Get accepted swaps (as either party) that need completion with full details
+			const { data: acceptedSwaps } = await supabase
+				.from('swap_requests')
+				.select(`
+					id, 
+					book_id,
+					requester_id, 
+					owner_id, 
+					requester_completed_at, 
+					owner_completed_at,
+					book:books!swap_requests_book_id_fkey(title),
+					requester_profile:profiles!swap_requests_requester_id_fkey(username, full_name, email),
+					owner_profile:profiles!swap_requests_owner_id_fkey(username, full_name, email)
+				`)
+				.or(`requester_id.eq.${userId},owner_id.eq.${userId}`)
+				.eq('status', 'ACCEPTED')
+				.or('requester_completed_at.is.null,owner_completed_at.is.null');
+
+			// Send appropriate reminders with detailed information
+			if (pendingSwaps && pendingSwaps.length > 0) {
+				const bookTitles = pendingSwaps.map(s => (s.book as any)?.title || 'Unknown Book').join(', ');
+				const message = pendingSwaps.length === 1 
+					? `Your swap request for "${(pendingSwaps[0].book as any)?.title || 'Unknown Book'}" is still pending. The owner hasn't responded yet.`
+					: `You have ${pendingSwaps.length} pending swap requests (${bookTitles}) waiting for responses.`;
+
+				await this.createDailyReminderNotification(
+					userId,
+					NotificationType.DAILY_REMINDER_PENDING_SWAPS,
+					'Pending Swap Requests',
+					message,
+					{
+						swap_count: pendingSwaps.length,
+						swap_request_ids: pendingSwaps.map(s => s.id),
+						reminder_type: 'pending_swaps'
+					} as any
+				);
+			}
+
+			if (counterOffers && counterOffers.length > 0) {
+				const bookTitles = counterOffers.map(s => (s.book as any)?.title || 'Unknown Book').join(', ');
+				const message = counterOffers.length === 1 
+					? `You have a counter-offer for "${(counterOffers[0].book as any)?.title || 'Unknown Book'}" that needs your response.`
+					: `You have ${counterOffers.length} counter offers (${bookTitles}) that need your response.`;
+
+				await this.createDailyReminderNotification(
+					userId,
+					NotificationType.DAILY_REMINDER_COUNTER_OFFERS,
+					'Counter Offers Awaiting Response',
+					message,
+					{
+						swap_count: counterOffers.length,
+						swap_request_ids: counterOffers.map(s => s.id),
+						reminder_type: 'counter_offers'
+					} as any
+				);
+			}
+
+			if (acceptedSwaps && acceptedSwaps.length > 0) {
+				const incompleteSwaps = acceptedSwaps.filter(swap => {
+					if (swap.requester_id === userId) {
+						return !swap.requester_completed_at;
+					} else {
+						return !swap.owner_completed_at;
+					}
+				});
+
+				if (incompleteSwaps.length > 0) {
+					// Create detailed message with book names and contact info
+					const swapDetails = incompleteSwaps.map(swap => {
+						const bookTitle = (swap.book as any)?.title || 'Unknown Book';
+						const isRequester = swap.requester_id === userId;
+						const otherUser = isRequester ? (swap.owner_profile as any) : (swap.requester_profile as any);
+						const otherUserName = otherUser?.full_name || otherUser?.username || 'Unknown User';
+						const otherUserEmail = otherUser?.email;
+						
+						return {
+							bookTitle,
+							otherUserName,
+							otherUserEmail,
+							swapId: swap.id
+						};
+					});
+
+					let message: string;
+					if (incompleteSwaps.length === 1) {
+						const detail = swapDetails[0];
+						message = `Your accepted swap for "${detail.bookTitle}" needs completion. `;
+						if (detail.otherUserEmail) {
+							message += `Contact ${detail.otherUserName} at ${detail.otherUserEmail} to coordinate the book exchange.`;
+						} else {
+							message += `Contact ${detail.otherUserName} to coordinate the book exchange.`;
+						}
+					} else {
+						const bookTitles = swapDetails.map(d => d.bookTitle).join(', ');
+						message = `You have ${incompleteSwaps.length} accepted swaps (${bookTitles}) that need completion. Check your swaps page for contact details.`;
+					}
+
+					await this.createDailyReminderNotification(
+						userId,
+						NotificationType.DAILY_REMINDER_ACCEPTED_SWAPS,
+						'Accepted Swaps Need Completion',
+						message,
+						{
+							swap_count: incompleteSwaps.length,
+							swap_request_ids: incompleteSwaps.map(s => s.id),
+							reminder_type: 'accepted_swaps'
+						} as any
+					);
+				}
+			}
+
+		} catch (error) {
+			console.error(`Failed to send daily reminder for user ${userId}:`, error);
+		}
+	}
+
+	private static async createDailyReminderNotification(
+		userId: string,
+		type: NotificationType,
+		title: string,
+		message: string,
+		data: { swap_count: number; swap_request_ids: string[]; reminder_type: 'pending_swaps' | 'counter_offers' | 'accepted_swaps' }
+	): Promise<void> {
+		await this.createNotification({
+			user_id: userId,
+			type,
+			title,
+			message,
+			data
+		});
+	}
+
+	// Get users who need daily reminders (have active swaps)
+	static async getUsersNeedingReminders(): Promise<string[]> {
+		try {
+			const { data: activeSwaps, error } = await supabase
+				.from('swap_requests')
+				.select('requester_id, owner_id')
+				.in('status', ['PENDING', 'COUNTER_OFFER', 'ACCEPTED']);
+
+			if (error) {
+				throw new Error(`Failed to fetch users needing reminders: ${error.message}`);
+			}
+
+			const userIds = new Set<string>();
+			activeSwaps?.forEach(swap => {
+				userIds.add(swap.requester_id);
+				userIds.add(swap.owner_id);
+			});
+
+			return Array.from(userIds);
+		} catch (error) {
+			console.error('Failed to get users needing reminders:', error);
+			return [];
+		}
+	}
+
+	// Check if user has received reminder today
+	static async hasReceivedReminderToday(userId: string): Promise<boolean> {
+		try {
+			const today = new Date();
+			today.setHours(0, 0, 0, 0);
+
+			const { data, error } = await supabase
+				.from('notifications')
+				.select('id')
+				.eq('user_id', userId)
+				.in('type', [
+					NotificationType.DAILY_REMINDER_PENDING_SWAPS,
+					NotificationType.DAILY_REMINDER_COUNTER_OFFERS,
+					NotificationType.DAILY_REMINDER_ACCEPTED_SWAPS
+				])
+				.gte('created_at', today.toISOString())
+				.limit(1);
+
+			if (error) {
+				console.error('Failed to check daily reminder status:', error);
+				return false;
+			}
+
+			return data && data.length > 0;
+		} catch (error) {
+			console.error('Failed to check daily reminder status:', error);
+			return false;
+		}
+	}
 }
