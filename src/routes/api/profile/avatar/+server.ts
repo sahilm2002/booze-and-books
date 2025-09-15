@@ -90,7 +90,23 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 
 		if (updateError) {
 			console.error('Profile update error:', updateError);
-			// Not fatal for upload success — return still the public URL but log the error
+			
+			// Rollback: Delete the uploaded file since profile update failed
+			const { error: deleteError } = await locals.supabase.storage
+				.from('avatars')
+				.remove([filePath]);
+			
+			if (deleteError) {
+				console.error('Failed to rollback uploaded file after profile update error:', deleteError);
+			}
+			
+			return new Response(
+				JSON.stringify({ 
+					error: 'Failed to update profile with new avatar',
+					details: updateError.message 
+				}), 
+				{ status: 500 }
+			);
 		}
 
 		// Return public URL
