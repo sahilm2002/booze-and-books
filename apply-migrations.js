@@ -77,16 +77,7 @@ async function applyMigration(migrationFile) {
 async function main() {
   // List of migrations that need to be applied (the ones we modified)
   const migrationsToApply = [
-    '024_fix_book_ownership_transfer_rls.sql',
-    '025_fix_swap_completion_validation.sql',
-    '025_fix_rls_policy_conflict_for_book_ownership_transfer.sql',
-    '026_debug_swap_completion.sql',
-    '027_fix_swap_completion_for_both_parties.sql',
-    '028_debug_ownership_values.sql',
-    '029_fix_rls_context_issue.sql',
-    '030_simple_ownership_transfer.sql',
-    '031_correct_ownership_validation.sql',
-    '033_simplify_swap_completion.sql'
+    '036_rebuild_swap_system.sql'
   ];
 
   console.log('Starting migration application...');

@@ -1,6 +1,8 @@
 // Rebuilt swap system types - matches database schema exactly
 // Clean, comprehensive type definitions for the new swap system
 
+import { BookCondition } from './book';
+
 export enum SwapStatus {
 	PENDING = 'PENDING',
 	COUNTER_OFFER = 'COUNTER_OFFER',
@@ -68,8 +70,8 @@ export interface SwapBookInfo {
 	id: string;
 	title: string;
 	authors: string[] | string;
-	thumbnail_url: string | null;
-	condition: string;
+	google_volume_id: string | null;
+	condition: BookCondition;
 	owner_id: string;
 }
 
@@ -79,6 +81,8 @@ export interface SwapUserProfile {
 	username: string | null;
 	full_name: string | null;
 	avatar_url: string | null;
+	location: string | null;
+	email?: string | null; // Email from auth.users
 }
 
 // Complete swap request with all related data
@@ -279,4 +283,37 @@ export function getCompletionStatusMessage(swap: SwapRequest, currentUserId: str
 	} else {
 		return 'Both parties need to mark the swap as completed';
 	}
+}
+
+// Get detailed completion status with party names
+export function getDetailedCompletionStatus(swap: SwapRequest, requesterProfile: any, ownerProfile: any): {
+	requesterCompleted: boolean;
+	ownerCompleted: boolean;
+	requesterName: string;
+	ownerName: string;
+	message: string;
+} {
+	const requesterCompleted = swap.requester_completed_at !== null;
+	const ownerCompleted = swap.owner_completed_at !== null;
+	const requesterName = requesterProfile?.username || requesterProfile?.full_name || 'Requester';
+	const ownerName = ownerProfile?.username || ownerProfile?.full_name || 'Owner';
+	
+	let message = '';
+	if (requesterCompleted && ownerCompleted) {
+		message = 'Swap completed by both parties!';
+	} else if (requesterCompleted && !ownerCompleted) {
+		message = `${requesterName} has completed. Waiting for ${ownerName}.`;
+	} else if (!requesterCompleted && ownerCompleted) {
+		message = `${ownerName} has completed. Waiting for ${requesterName}.`;
+	} else {
+		message = `Both ${requesterName} and ${ownerName} need to mark as completed.`;
+	}
+	
+	return {
+		requesterCompleted,
+		ownerCompleted,
+		requesterName,
+		ownerName,
+		message
+	};
 }

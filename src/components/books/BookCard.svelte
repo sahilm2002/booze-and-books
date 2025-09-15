@@ -1,14 +1,14 @@
 <script lang="ts">
 	import { createEventDispatcher } from 'svelte';
 	import type { Book, BookWithOwner } from '$lib/types/book';
-	import type { SwapRequestWithBook } from '$lib/types/swap';
-import { SwapStatus } from '$lib/types/swap';
+	import type { SwapRequestWithDetails } from '$lib/types/swap';
+	import { SwapStatus } from '$lib/types/swap';
 	import { getConditionDisplayName } from '$lib/validation/book';
 	import { user } from '$lib/stores/auth';
 	import { bookStore } from '$lib/stores/books';
 	import { SwapService } from '$lib/services/swapService';
 	import ConditionIndicator from './ConditionIndicator.svelte';
-	import BookSelectionModal from './BookSelectionModal.svelte';
+	import SwapRequestDialog from '../swaps/SwapRequestDialog.svelte';
 
 	export let book: Book | BookWithOwner;
 	export let showActions = true;
@@ -38,9 +38,9 @@ import { SwapStatus } from '$lib/types/swap';
 	$: canRequestSwap = enableSwapRequests && !isOwner && isAvailable && $user?.id;
 
 	let isToggling = false;
-	let showBookSelectionModal = false;
+	let showSwapRequestDialog = false;
 	let isCreatingSwapRequest = false;
-	let existingSwapRequest: SwapRequestWithBook | null = null;
+	let existingSwapRequest: SwapRequestWithDetails | null = null;
 	let checkingExistingRequest = false;
 
 	// Check for existing swap request when user changes
@@ -115,7 +115,7 @@ import { SwapStatus } from '$lib/types/swap';
 		});
 		
 		if (canRequestSwap && !existingSwapRequest) {
-			showBookSelectionModal = true;
+			showSwapRequestDialog = true;
 		} else {
 			console.log('Swap request blocked:', {
 				canRequestSwap,
@@ -129,7 +129,9 @@ import { SwapStatus } from '$lib/types/swap';
 		if (!existingSwapRequest?.id || !$user?.id) return;
 
 		try {
-			await SwapService.updateSwapRequestStatus(existingSwapRequest.id, SwapStatus.CANCELLED, $user.id);
+			// Use the swapStore to cancel the request for consistency
+			const { swapStore } = await import('$lib/stores/swaps');
+			await swapStore.cancelSwapRequest(existingSwapRequest.id);
 			existingSwapRequest = null;
 			
 			dispatch('notification', {
@@ -145,57 +147,30 @@ import { SwapStatus } from '$lib/types/swap';
 		}
 	}
 
-	async function handleBookSelection(event: CustomEvent<{ book: Book }>) {
-		const offeredBook = event.detail.book;
+	function handleSwapRequestSuccess() {
+		// Refresh existing request status after successful creation
+		checkForExistingRequest();
 		
-		if (!$user?.id) {
-			dispatch('notification', {
-				type: 'error',
-				message: 'You must be logged in to create swap requests'
-			});
-			return;
-		}
+		dispatch('notification', {
+			type: 'success',
+			message: `Swap request sent for "${book.title}"`
+		});
 
-		isCreatingSwapRequest = true;
-		
-		try {
-			const swapRequest = await SwapService.createSwapRequest(
-				{
-					book_id: book.id,
-					offered_book_id: offeredBook.id,
-					message: `I'd like to swap "${offeredBook.title}" for "${book.title}"`
-				},
-				$user.id
-			);
-
-			dispatch('notification', {
-				type: 'success',
-				message: `Swap request sent! You offered "${offeredBook.title}" for "${book.title}"`
-			});
-
-			// Refresh existing request status after successful creation
-			await checkForExistingRequest();
-
-			dispatch('swapRequested', {
-				requestedBook: book,
-				offeredBook: offeredBook,
-				message: `Swap request created for "${book.title}"`
-			});
-
-		} catch (error) {
-			console.error('Failed to create swap request:', error);
-			dispatch('notification', {
-				type: 'error',
-				message: error instanceof Error ? error.message : 'Failed to create swap request'
-			});
-		} finally {
-			isCreatingSwapRequest = false;
-			showBookSelectionModal = false;
-		}
+		dispatch('swapRequested', {
+			requestedBook: book,
+			message: `Swap request created for "${book.title}"`
+		});
 	}
 
-	function handleModalClose() {
-		showBookSelectionModal = false;
+	function handleSwapRequestError(event: CustomEvent<string>) {
+		dispatch('notification', {
+			type: 'error',
+			message: event.detail
+		});
+	}
+
+	function handleSwapRequestClose() {
+		showSwapRequestDialog = false;
 	}
 
 	function getConditionBadgeClass(condition: string): string {
@@ -240,7 +215,7 @@ import { SwapStatus } from '$lib/types/swap';
 			{/if}
 
 			<div class="condition-section">
-				<ConditionIndicator condition={book.condition} size="small" />
+				<ConditionIndicator condition={book.condition} />
 			</div>
 
 			{#if book.description}
@@ -317,14 +292,13 @@ import { SwapStatus } from '$lib/types/swap';
 	{/if}
 </div>
 
-<!-- Book Selection Modal -->
-<BookSelectionModal 
-	bind:isOpen={showBookSelectionModal}
-	title="Select a Book to Offer"
-	confirmText="Create Swap Request"
-	excludeBookIds={[book.id]}
-	on:select={handleBookSelection}
-	on:close={handleModalClose}
+<!-- Swap Request Dialog -->
+<SwapRequestDialog 
+	targetBook={book}
+	bind:show={showSwapRequestDialog}
+	on:success={handleSwapRequestSuccess}
+	on:error={handleSwapRequestError}
+	on:close={handleSwapRequestClose}
 />
 
 
