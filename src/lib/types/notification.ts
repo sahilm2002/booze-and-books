@@ -5,7 +5,10 @@ export enum NotificationType {
 	SWAP_CANCELLED = 'SWAP_CANCELLED',
 	SWAP_COMPLETED = 'SWAP_COMPLETED',
 	SWAP_APPROVED = 'swap_approved',
-	COUNTER_OFFER_RECEIVED = 'counter_offer_received'
+	COUNTER_OFFER_RECEIVED = 'counter_offer_received',
+	DAILY_REMINDER_PENDING_SWAPS = 'daily_reminder_pending_swaps',
+	DAILY_REMINDER_COUNTER_OFFERS = 'daily_reminder_counter_offers',
+	DAILY_REMINDER_ACCEPTED_SWAPS = 'daily_reminder_accepted_swaps'
 }
 
 export interface Notification {
@@ -34,7 +37,8 @@ export type NotificationData =
 	| SwapCancelledNotificationData
 	| SwapCompletedNotificationData
 	| SwapApprovedNotificationData
-	| CounterOfferReceivedNotificationData;
+	| CounterOfferReceivedNotificationData
+	| DailyReminderNotificationData;
 
 export interface SwapRequestNotificationData {
 	swap_request_id: string;
@@ -74,4 +78,10 @@ export interface SwapApprovedNotificationData {
 
 export interface CounterOfferReceivedNotificationData {
 	swap_request_id: string;
+}
+
+export interface DailyReminderNotificationData {
+	swap_count: number;
+	swap_request_ids: string[];
+	reminder_type: 'pending_swaps' | 'counter_offers' | 'accepted_swaps';
 }
