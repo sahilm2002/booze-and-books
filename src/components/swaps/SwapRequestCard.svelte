@@ -4,6 +4,7 @@
 	import { profile } from '$lib/stores/profile';
 	import { swapStore } from '$lib/stores/swaps';
 	import ConditionIndicator from '../books/ConditionIndicator.svelte';
+	import SwapBookCard from './SwapBookCard.svelte';
 	import type { SwapRequestWithDetails } from '$lib/types/swap';
 	import { 
 		SwapStatus,
@@ -213,34 +214,15 @@
 
 		<!-- Books Exchange -->
 		<div class="books-section">
-			{#if (swapRequest.status === SwapStatus.COUNTER_OFFER || (swapRequest.status === SwapStatus.ACCEPTED && swapRequest.counter_offered_book)) && swapRequest.counter_offered_book}
+			{#if (swapRequest.status === SwapStatus.COUNTER_OFFER || (swapRequest.status === SwapStatus.ACCEPTED && (swapRequest.counter_offered_book || swapRequest.counter_offered_book_id))) && (swapRequest.counter_offered_book || swapRequest.counter_offered_book_id)}
 				<!-- Counter-Offer: Show 3-book flow -->
 				<div class="counter-offer-flow">
 					<!-- Book 1: What they want -->
-					<div class="book-item">
-						<h5>{isIncoming ? 'They want' : 'You want'}</h5>
-						<div class="book-card">
-							{#if swapRequest.book.google_volume_id}
-							<div class="book-image">
-								<img 
-									src="https://books.google.com/books/content?id={swapRequest.book.google_volume_id}&printsec=frontcover&img=1&zoom=1&source=gbs_api"
-									alt="{swapRequest.book.title} cover"
-									class="book-cover"
-									loading="lazy"
-								/>
-							</div>
-							{/if}
-							<div class="book-info">
-								<h6>{swapRequest.book.title}</h6>
-								<p class="book-author">
-									{Array.isArray(swapRequest.book.authors) 
-										? swapRequest.book.authors.join(', ') 
-										: swapRequest.book.authors}
-								</p>
-								<ConditionIndicator condition={swapRequest.book.condition} />
-							</div>
-						</div>
-					</div>
+					<SwapBookCard 
+						book={swapRequest.book}
+						label={isIncoming ? 'Your book' : 'Their book'}
+						{isIncoming}
+					/>
 
 					<div class="exchange-arrow">
 						<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -250,30 +232,12 @@
 
 					<!-- Book 2: What they originally offered (declined) -->
 					{#if swapRequest.offered_book}
-					<div class="book-item declined-book">
-						<h5>{isIncoming ? 'They offered' : 'You offered'} <span class="declined-label">(declined)</span></h5>
-						<div class="book-card declined">
-							{#if swapRequest.offered_book.google_volume_id}
-							<div class="book-image">
-								<img 
-									src="https://books.google.com/books/content?id={swapRequest.offered_book.google_volume_id}&printsec=frontcover&img=1&zoom=1&source=gbs_api"
-									alt="{swapRequest.offered_book.title} cover"
-									class="book-cover"
-									loading="lazy"
-								/>
-							</div>
-							{/if}
-							<div class="book-info">
-								<h6>{swapRequest.offered_book.title}</h6>
-								<p class="book-author">
-									{Array.isArray(swapRequest.offered_book.authors) 
-										? swapRequest.offered_book.authors.join(', ') 
-										: swapRequest.offered_book.authors}
-								</p>
-								<ConditionIndicator condition={swapRequest.offered_book.condition} />
-							</div>
-						</div>
-					</div>
+					<SwapBookCard 
+						book={swapRequest.offered_book}
+						label={isIncoming ? 'Their book (you declined)' : 'Your book (they declined)'}
+						isDeclined={true}
+						{isIncoming}
+					/>
 
 					<div class="exchange-arrow">
 						<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -283,59 +247,34 @@
 					{/if}
 
 					<!-- Book 3: Counter-offered book (new offer) -->
+					{#if swapRequest.counter_offered_book}
+					<SwapBookCard 
+						book={swapRequest.counter_offered_book}
+						label={isIncoming ? 'Your counter-offer' : 'Their counter-offer'}
+						isCounterOffer={true}
+						{isIncoming}
+					/>
+					{:else}
 					<div class="book-item counter-offer-book">
-						<h5>{isIncoming ? 'Their counter-offer' : 'Your counter-offer'} <span class="counter-offer-label">(new)</span></h5>
+						<h5>{isIncoming ? 'Your counter-offer' : 'Their counter-offer'} <span class="counter-offer-label">(new)</span></h5>
 						<div class="book-card counter-offer">
-							{#if swapRequest.counter_offered_book.google_volume_id}
-							<div class="book-image">
-								<img 
-									src="https://books.google.com/books/content?id={swapRequest.counter_offered_book.google_volume_id}&printsec=frontcover&img=1&zoom=1&source=gbs_api"
-									alt="{swapRequest.counter_offered_book.title} cover"
-									class="book-cover"
-									loading="lazy"
-								/>
-							</div>
-							{/if}
 							<div class="book-info">
-								<h6>{swapRequest.counter_offered_book.title}</h6>
-								<p class="book-author">
-									{Array.isArray(swapRequest.counter_offered_book.authors) 
-										? swapRequest.counter_offered_book.authors.join(', ') 
-										: swapRequest.counter_offered_book.authors}
-								</p>
-								<ConditionIndicator condition={swapRequest.counter_offered_book.condition} />
+								<h6>Counter-offer book details loading...</h6>
+								<p class="book-author">Book ID: {swapRequest.counter_offered_book_id}</p>
 							</div>
 						</div>
 					</div>
+					{/if}
 				</div>
 			{:else}
 				<!-- Regular swap: Show 2-book flow -->
 				<div class="book-exchange">
 					<!-- Requested Book (what they want) -->
-					<div class="book-item">
-						<h5>{isIncoming ? 'They want' : 'You want'}</h5>
-						<div class="book-card">
-							{#if actualRequestedBook.google_volume_id}
-							<div class="book-image">
-								<img 
-									src="https://books.google.com/books/content?id={actualRequestedBook.google_volume_id}&printsec=frontcover&img=1&zoom=1&source=gbs_api"
-									alt="{actualRequestedBook.title} cover"
-									class="book-cover"
-									loading="lazy"
-								/>
-							</div>
-							{/if}
-							<div class="book-info">
-								<h6>{actualRequestedBook.title}</h6>
-								<p class="book-author">
-									{Array.isArray(actualRequestedBook.authors) 
-										? actualRequestedBook.authors.join(', ') 
-										: actualRequestedBook.authors}
-								</p>
-								<ConditionIndicator condition={actualRequestedBook.condition} />
-							</div>
-						</div>
-					</div>
+					<SwapBookCard 
+						book={actualRequestedBook}
+						label={isIncoming ? 'Your book' : 'Their book'}
+						{isIncoming}
+					/>
 
 					<div class="exchange-arrow">
 						<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -345,30 +284,11 @@
 
 					<!-- Offered Book (what they're giving) - Only show if exists -->
 					{#if swapRequest.offered_book}
-					<div class="book-item">
-						<h5>{isIncoming ? 'They offer' : 'You offer'}</h5>
-						<div class="book-card">
-							{#if swapRequest.offered_book.google_volume_id}
-							<div class="book-image">
-								<img 
-									src="https://books.google.com/books/content?id={swapRequest.offered_book.google_volume_id}&printsec=frontcover&img=1&zoom=1&source=gbs_api"
-									alt="{swapRequest.offered_book.title} cover"
-									class="book-cover"
-									loading="lazy"
-								/>
-							</div>
-							{/if}
-							<div class="book-info">
-								<h6>{swapRequest.offered_book.title}</h6>
-								<p class="book-author">
-									{Array.isArray(swapRequest.offered_book.authors) 
-										? swapRequest.offered_book.authors.join(', ') 
-										: swapRequest.offered_book.authors}
-								</p>
-								<ConditionIndicator condition={swapRequest.offered_book.condition} />
-							</div>
-						</div>
-					</div>
+					<SwapBookCard 
+						book={swapRequest.offered_book}
+						label={isIncoming ? 'Their book' : 'Your book'}
+						{isIncoming}
+					/>
 					{:else}
 					<!-- Simple swap request - no offered book in current schema -->
 					<div class="book-item">
@@ -883,30 +803,6 @@
 		align-items: center;
 	}
 
-	.declined-label {
-		color: #dc2626;
-		font-weight: 500;
-		font-size: 0.75rem;
-	}
-
-	.counter-offer-label {
-		color: #059669;
-		font-weight: 500;
-		font-size: 0.75rem;
-	}
-
-	.book-card.declined {
-		background: #fef2f2;
-		border-color: #fecaca;
-		opacity: 0.8;
-	}
-
-	.book-card.counter-offer {
-		background: #f0fdf4;
-		border-color: #bbf7d0;
-		box-shadow: 0 0 0 1px #10b981;
-	}
-
 	.book-item h5 {
 		margin: 0 0 0.75rem 0;
 		font-size: 0.875rem;
@@ -916,6 +812,12 @@
 		letter-spacing: 0.05em;
 	}
 
+	.counter-offer-label {
+		color: #059669;
+		font-weight: 500;
+		font-size: 0.75rem;
+	}
+
 	.book-card {
 		display: flex;
 		gap: 0.75rem;
@@ -923,6 +825,12 @@
 		border: 1px solid #e2e8f0;
 		border-radius: 8px;
 		background: #f8fafc;
+	}
+
+	.book-card.counter-offer {
+		background: #f0fdf4;
+		border-color: #bbf7d0;
+		box-shadow: 0 0 0 1px #10b981;
 	}
 
 	.book-cover {
