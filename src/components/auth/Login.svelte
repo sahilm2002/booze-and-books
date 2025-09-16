@@ -32,8 +32,16 @@
 				error = authError.message || 'Login failed';
 			} else if (data.user) {
 				console.log('Login successful:', data.user.email);
-				// Simple direct redirect - don't rely on auth store events
-				window.location.href = '/app';
+				// Use SvelteKit navigation with small delay to ensure auth state updates
+				setTimeout(async () => {
+					try {
+						await goto('/app', { replaceState: true });
+					} catch (navError) {
+						console.error('Navigation error:', navError);
+						// Fallback to hard redirect if SvelteKit navigation fails
+						window.location.href = '/app';
+					}
+				}, 200);
 				return; // Exit early to prevent loading state change
 			} else {
 				error = 'Login failed - no user returned';
