@@ -10,7 +10,7 @@ const config = {
 	kit: {
 		// Using Vercel adapter for production deployment
 		adapter: adapter({
-			runtime: 'nodejs22.x'
+			runtime: 'nodejs20.x'
 		})
 	}
 };
