@@ -61,7 +61,7 @@ export interface CounterOfferInput {
 
 // Input for completing swaps
 export interface SwapCompletion {
-	rating: number; // 1-5 stars
+	rating?: number; // 1-5 stars (optional - user ratings removed)
 	feedback?: string;
 }
 
