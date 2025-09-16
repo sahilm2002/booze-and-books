@@ -1,6 +1,7 @@
 <script lang="ts">
 	import ProfileCard from '../../../components/profile/ProfileCard.svelte';
 	import ProfileEditForm from '../../../components/profile/ProfileEditForm.svelte';
+	import UserRating from '../../../components/profile/UserRating.svelte';
 	import { profile } from '$lib/stores/profile';
 	import { swapStatistics } from '$lib/stores/swaps';
 
@@ -242,6 +243,21 @@
 		</div>
 
 		<div class="profile-sidebar">
+			<!-- User Rating Section -->
+			{#if $swapStatistics}
+				<div class="stats-card">
+					<div class="card-header">
+						<h3 class="card-title">User Rating</h3>
+					</div>
+					<div class="card-content">
+						<UserRating 
+							rating={$swapStatistics.average_rating || 0} 
+							size="medium"
+						/>
+					</div>
+				</div>
+			{/if}
+
 			<div class="stats-card">
 				<div class="card-header">
 					<h3 class="card-title">Account Stats</h3>
