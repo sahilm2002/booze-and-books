@@ -174,9 +174,9 @@
 		<div class="sidebar">
 			<div class="profile-section">
 				<div class="profile-card-wrapper card">
-					<!-- Temporarily remove ProfileCard to debug infinite loading -->
+					
 					<div style="padding: 1rem; text-align: center; color: #666;">
-						Profile loading disabled for debugging
+					<ProfileCard />
 					</div>
 				</div>
 			</div>
