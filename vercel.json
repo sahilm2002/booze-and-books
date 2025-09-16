@@ -1,11 +1,10 @@
 {
-  "framework": "sveltekit",
-  "buildCommand": "npm run build",
-  "devCommand": "npm run dev",
-  "installCommand": "npm install",
-  "outputDirectory": "build",
-  "env": {
-    "PUBLIC_SUPABASE_URL": "@public_supabase_url",
-    "PUBLIC_SUPABASE_ANON_KEY": "@public_supabase_anon_key"
+  "functions": {
+    "src/routes/**/*.ts": {
+      "runtime": "nodejs20.x"
+    },
+    "src/routes/**/*.js": {
+      "runtime": "nodejs20.x"
+    }
   }
 }
