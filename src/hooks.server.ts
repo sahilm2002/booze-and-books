@@ -63,23 +63,28 @@ export const handle: Handle = async ({ event, resolve }) => {
 	const url = new URL(event.request.url);
 	const pathname = url.pathname;
 
-	// Protected routes that require authentication
-	const protectedMatchers = [/^\/app(\/|$)/, /^\/dashboard(\/|$)/];
-	const isProtectedRoute = protectedMatchers.some((re) => re.test(pathname));
+	// Skip protection for SvelteKit internal requests and API routes
+	const isInternalRequest = pathname.includes('__data.json') || pathname.startsWith('/api/');
+	
+	if (!isInternalRequest) {
+		// Protected routes that require authentication
+		const protectedMatchers = [/^\/app(\/|$)/, /^\/dashboard(\/|$)/];
+		const isProtectedRoute = protectedMatchers.some((re) => re.test(pathname));
 
-	// Auth routes that should redirect if already authenticated
-	const authRoutes = ['/auth/login', '/auth/signup'];
-	const isAuthRoute = authRoutes.includes(pathname);
+		// Auth routes that should redirect if already authenticated
+		const authRoutes = ['/auth/login', '/auth/signup'];
+		const isAuthRoute = authRoutes.includes(pathname);
 
-	// Redirect unauthenticated users away from protected routes
-	if (isProtectedRoute && !session) {
-		const returnTo = encodeURIComponent(url.pathname + url.search);
-		throw redirect(303, `/auth/login?redirectTo=${returnTo}`);
-	}
+		// Redirect unauthenticated users away from protected routes
+		if (isProtectedRoute && !session) {
+			const returnTo = encodeURIComponent(url.pathname + url.search);
+			throw redirect(303, `/auth/login?redirectTo=${returnTo}`);
+		}
 
-	// Redirect authenticated users away from auth pages to dashboard
-	if (isAuthRoute && session) {
-		throw redirect(303, '/app');
+		// Redirect authenticated users away from auth pages to dashboard
+		if (isAuthRoute && session) {
+			throw redirect(303, '/app');
+		}
 	}
 
 	return resolve(event, {
