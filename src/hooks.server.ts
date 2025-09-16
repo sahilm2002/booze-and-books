@@ -24,31 +24,12 @@ export const handle: Handle = async ({ event, resolve }) => {
 	});
 
 	/**
-	 * Enhanced authentication with custom JWT validation
-	 * Supports both Supabase sessions and custom JWT tokens
+	 * Simplified authentication using only Supabase
+	 * Removed custom JWT to avoid serverless issues
 	 */
 	event.locals.safeGetSession = async () => {
 		try {
-			// First, check for custom JWT token in cookies
-			const customToken = event.cookies.get('custom-auth-token');
-			if (customToken) {
-				// Dynamically import to avoid server startup issues
-				const { validateCustomSession } = await import('$lib/auth/customAuth');
-				const customSession = await validateCustomSession(customToken);
-				
-				if (customSession) {
-					return { 
-						session: {
-							access_token: customSession.customToken,
-							user: customSession.user,
-							expires_at: customSession.payload.exp,
-						}, 
-						user: customSession.user 
-					};
-				}
-			}
-
-			// Fallback to standard Supabase authentication
+			// Use standard Supabase authentication only
 			const { data: { user }, error } = await event.locals.supabase.auth.getUser();
 			
 			if (error) {
