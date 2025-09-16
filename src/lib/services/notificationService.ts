@@ -46,6 +46,12 @@ export class NotificationService {
 
 	// Mark a notification as read
 	static async markAsRead(notificationId: string): Promise<Notification> {
+		// Ensure we have an authenticated session
+		const { data: { session } } = await supabase.auth.getSession();
+		if (!session) {
+			throw new Error('User not authenticated');
+		}
+
 		const { data, error } = await supabase
 			.from('notifications')
 			.update({ is_read: true })
@@ -62,6 +68,12 @@ export class NotificationService {
 
 	// Mark all notifications as read for a user (last 180 days only)
 	static async markAllAsRead(userId: string): Promise<void> {
+		// Ensure we have an authenticated session
+		const { data: { session } } = await supabase.auth.getSession();
+		if (!session) {
+			throw new Error('User not authenticated');
+		}
+
 		const retentionDate = new Date();
 		retentionDate.setDate(retentionDate.getDate() - NOTIFICATION_RETENTION_DAYS);
 
