@@ -267,7 +267,8 @@ export class SwapService {
 		completion: SwapCompletion
 	): Promise<SwapRequest> {
 		try {
-			if (!isValidRating(completion.rating)) {
+			// Rating is now optional - only validate if provided
+			if (completion.rating !== undefined && !isValidRating(completion.rating)) {
 				throw new Error('Rating must be between 1 and 5');
 			}
 
@@ -291,11 +292,11 @@ export class SwapService {
 
 			if (request.requester_id === userId) {
 				updateData.requester_completed_at = new Date().toISOString();
-				updateData.requester_rating = completion.rating;
+				updateData.requester_rating = completion.rating || null;
 				updateData.requester_feedback = completion.feedback || null;
 			} else {
 				updateData.owner_completed_at = new Date().toISOString();
-				updateData.owner_rating = completion.rating;
+				updateData.owner_rating = completion.rating || null;
 				updateData.owner_feedback = completion.feedback || null;
 			}
 
