@@ -3,14 +3,10 @@ import { type Handle, redirect } from '@sveltejs/kit';
 import { PUBLIC_SUPABASE_URL, PUBLIC_SUPABASE_ANON_KEY } from '$env/static/public';
 
 export const handle: Handle = async ({ event, resolve }) => {
-	/**
-	 * Creates a Supabase client specific to this server request.
-	 * 
-	 * The Supabase client is configured to:
-	 * - Use cookies for session management
-	 * - Allow session refreshing
-	 * - Handle authentication state server-side
-	 */
+	console.log('hooks.server.ts - handle called for:', event.url.pathname);
+
+	// TEMPORARILY DISABLE ALL AUTHENTICATION TO TEST INFINITE LOADING
+	// Create minimal supabase client but don't use it
 	event.locals.supabase = createServerClient(PUBLIC_SUPABASE_URL, PUBLIC_SUPABASE_ANON_KEY, {
 		cookies: {
 			get: (key) => event.cookies.get(key),
@@ -21,78 +17,33 @@ export const handle: Handle = async ({ event, resolve }) => {
 				event.cookies.delete(key, { ...options, path: '/' });
 			},
 		},
-	});
+	}) as any; // Bypass TypeScript error for debugging
 
-	/**
-	 * Simplified authentication using only Supabase
-	 * Removed custom JWT to avoid serverless issues
-	 */
-	event.locals.safeGetSession = async () => {
-		try {
-			// Use standard Supabase authentication only
-			const { data: { user }, error } = await event.locals.supabase.auth.getUser();
-			
-			if (error) {
-				console.error('Error getting user:', error);
-				return { session: null, user: null };
-			}
-
-			// If user exists, get the session for additional data
-			if (user) {
-				const { data: { session }, error: sessionError } = await event.locals.supabase.auth.getSession();
-				if (sessionError) {
-					console.error('Error getting session after user verification:', sessionError);
-					return { session: null, user };
-				}
-				return { session, user };
-			}
-
-			return { session: null, user: null };
-		} catch (error) {
-			console.error('Error in safeGetSession:', error);
-			return { session: null, user: null };
+	// Set fake user to bypass authentication
+	event.locals.session = {
+		access_token: 'fake',
+		refresh_token: 'fake',
+		expires_in: 3600,
+		expires_at: Date.now() + 3600000,
+		token_type: 'bearer',
+		user: {
+			id: 'fake-user-id',
+			email: 'test@example.com',
+			aud: 'authenticated',
+			role: 'authenticated',
+			created_at: new Date().toISOString(),
+			updated_at: new Date().toISOString(),
+			app_metadata: {},
+			user_metadata: {}
 		}
 	};
-
-	// Get the current session and user
-	const { session, user } = await event.locals.safeGetSession();
-	event.locals.session = session;
-	event.locals.user = user;
-
-	// Route protection logic
-	const url = new URL(event.request.url);
-	const pathname = url.pathname;
-
-	// Skip protection for SvelteKit internal requests and API routes
-	const isInternalRequest = pathname.includes('__data.json') || pathname.startsWith('/api/');
 	
-	if (!isInternalRequest) {
-		// Protected routes that require authentication
-		const protectedMatchers = [/^\/app(\/|$)/, /^\/dashboard(\/|$)/];
-		const isProtectedRoute = protectedMatchers.some((re) => re.test(pathname));
+	event.locals.user = event.locals.session.user;
 
-		// Auth routes that should redirect if already authenticated
-		const authRoutes = ['/auth/login', '/auth/signup'];
-		const isAuthRoute = authRoutes.includes(pathname);
-
-		// Redirect unauthenticated users away from protected routes
-		if (isProtectedRoute && !session) {
-			const returnTo = encodeURIComponent(url.pathname + url.search);
-			throw redirect(303, `/auth/login?redirectTo=${returnTo}`);
-		}
-
-		// Redirect authenticated users away from auth pages to dashboard
-		if (isAuthRoute && session) {
-			throw redirect(303, '/app');
-		}
-	}
+	console.log('hooks.server.ts - bypassing all auth, returning resolve');
 
 	return resolve(event, {
 		filterSerializedResponseHeaders(name) {
-			/**
-			 * Supabase libraries use the `content-range` and `x-supabase-api-version`
-			 * headers, so we need to tell SvelteKit to pass it through.
-			 */
 			return name === 'content-range' || name === 'x-supabase-api-version';
 		},
 	});
