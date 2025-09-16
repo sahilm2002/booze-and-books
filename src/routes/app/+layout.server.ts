@@ -6,8 +6,8 @@ import { NotificationServiceServer } from '$lib/services/notificationServiceServ
 import type { Book } from '$lib/types/book';
 import type { LayoutServerLoad } from './$types';
 
-// Helper function to add timeout to promises
-const withTimeout = <T>(promise: Promise<T>, timeoutMs: number = 5000): Promise<T> => {
+// Helper function to add timeout to promises with shorter timeouts for faster loading
+const withTimeout = <T>(promise: Promise<T>, timeoutMs: number = 2000): Promise<T> => {
 	return Promise.race([
 		promise,
 		new Promise<T>((_, reject) => 
@@ -37,7 +37,7 @@ export const load: LayoutServerLoad = async ({ locals }) => {
 	try {
 		profile = await withTimeout(
 			ProfileServiceServer.getProfile(locals.supabase, locals.user.id),
-			3000
+			1500
 		);
 		
 		if (!profile) {
@@ -47,7 +47,7 @@ export const load: LayoutServerLoad = async ({ locals }) => {
 					username: sanitizedUsername,
 					full_name: locals.user.email || ''
 				}),
-				3000
+				1500
 			);
 		}
 	} catch (profileError) {
@@ -58,7 +58,7 @@ export const load: LayoutServerLoad = async ({ locals }) => {
 	try {
 		const stats = await withTimeout(
 			BookServiceServer.getBookStats(locals.supabase, locals.user.id),
-			3000
+			1500
 		);
 		bookStats = stats;
 	} catch (bookError) {
@@ -69,7 +69,7 @@ export const load: LayoutServerLoad = async ({ locals }) => {
 	try {
 		swapCounts = await withTimeout(
 			SwapServiceServer.getSwapRequestCounts(locals.supabase, locals.user.id),
-			3000
+			1500
 		);
 	} catch (swapCountError) {
 		console.error('Failed to load swap counts:', swapCountError);
@@ -79,7 +79,7 @@ export const load: LayoutServerLoad = async ({ locals }) => {
 	try {
 		unreadNotificationCount = await withTimeout(
 			NotificationServiceServer.getUnreadCount(locals.supabase, locals.user.id),
-			3000
+			1500
 		);
 	} catch (notificationError) {
 		console.error('Failed to load notification count:', notificationError);
@@ -89,7 +89,7 @@ export const load: LayoutServerLoad = async ({ locals }) => {
 	try {
 		swapStatistics = await withTimeout(
 			SwapServiceServer.getSwapStatistics(locals.supabase, locals.user.id),
-			3000
+			1500
 		);
 	} catch (swapStatsError) {
 		console.error('Failed to load swap statistics:', swapStatsError);
