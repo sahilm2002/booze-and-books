@@ -46,46 +46,35 @@ export class NotificationService {
 
 	// Mark a notification as read
 	static async markAsRead(notificationId: string): Promise<Notification> {
-		// Ensure we have an authenticated session
-		const { data: { session } } = await supabase.auth.getSession();
-		if (!session) {
-			throw new Error('User not authenticated');
+		const response = await fetch('/api/notifications/mark-read', {
+			method: 'POST',
+			headers: {
+				'Content-Type': 'application/json',
+			},
+			body: JSON.stringify({ notificationId }),
+		});
+
+		if (!response.ok) {
+			const error = await response.json();
+			throw new Error(error.error || 'Failed to mark notification as read');
 		}
 
-		const { data, error } = await supabase
-			.from('notifications')
-			.update({ is_read: true })
-			.eq('id', notificationId)
-			.select()
-			.single();
-
-		if (error) {
-			throw new Error(`Failed to mark notification as read: ${error.message}`);
-		}
-
-		return data;
+		const result = await response.json();
+		return result.notification;
 	}
 
 	// Mark all notifications as read for a user (last 180 days only)
 	static async markAllAsRead(userId: string): Promise<void> {
-		// Ensure we have an authenticated session
-		const { data: { session } } = await supabase.auth.getSession();
-		if (!session) {
-			throw new Error('User not authenticated');
-		}
+		const response = await fetch('/api/notifications/mark-all-read', {
+			method: 'POST',
+			headers: {
+				'Content-Type': 'application/json',
+			},
+		});
 
-		const retentionDate = new Date();
-		retentionDate.setDate(retentionDate.getDate() - NOTIFICATION_RETENTION_DAYS);
-
-		const { error } = await supabase
-			.from('notifications')
-			.update({ is_read: true })
-			.eq('user_id', userId)
-			.eq('is_read', false)
-			.gte('created_at', retentionDate.toISOString());
-
-		if (error) {
-			throw new Error(`Failed to mark all notifications as read: ${error.message}`);
+		if (!response.ok) {
+			const error = await response.json();
+			throw new Error(error.error || 'Failed to mark all notifications as read');
 		}
 	}
 
