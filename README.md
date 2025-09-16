@@ -178,3 +178,4 @@ Having issues or suggestions? We'd love to hear from you:
 
 *Happy Reading & Happy Swapping! 📚✨*
 # Trigger Vercel redeploy with vercel.json fix
+# Force deployment from main branch - Mon Sep 15 17:12:12 PDT 2025
