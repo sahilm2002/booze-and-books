@@ -18,41 +18,41 @@ export const handle: Handle = async ({ event, resolve }) => {
 		},
 	}) as any;
 
-	// COMPLETELY BYPASS SUPABASE AUTH CALLS - use cookie-based session only
+	// Implement working authentication with proper error handling
 	event.locals.safeGetSession = async () => {
-		console.log('safeGetSession - bypassing Supabase calls entirely');
-		return { session: null, user: null };
+		try {
+			console.log('Getting session with improved error handling...');
+			
+			// Try to get session with a more aggressive timeout and better error handling
+			const controller = new AbortController();
+			const timeoutId = setTimeout(() => controller.abort(), 3000); // 3 second timeout
+			
+			try {
+				const { data: { session }, error } = await event.locals.supabase.auth.getSession();
+				clearTimeout(timeoutId);
+				
+				if (error) {
+					console.error('Session error:', error);
+					return { session: null, user: null };
+				}
+				
+				console.log('Session retrieved successfully:', !!session);
+				return { session, user: session?.user || null };
+			} catch (authError) {
+				clearTimeout(timeoutId);
+				console.error('Auth call failed:', authError);
+				return { session: null, user: null };
+			}
+		} catch (error) {
+			console.error('Error in safeGetSession:', error);
+			return { session: null, user: null };
+		}
 	};
 
-	// Check for existing session cookie instead of calling Supabase
-	const sessionCookie = event.cookies.get('sb-access-token') || event.cookies.get('supabase-auth-token');
-	
-	if (sessionCookie) {
-		console.log('Found session cookie, creating minimal user object');
-		// Create minimal user object from cookie presence
-		event.locals.session = {
-			access_token: sessionCookie,
-			refresh_token: 'cookie-based',
-			expires_in: 3600,
-			expires_at: Date.now() + 3600000,
-			token_type: 'bearer',
-			user: {
-				id: 'cookie-user-' + Math.random().toString(36).substr(2, 9),
-				email: 'user@example.com',
-				aud: 'authenticated',
-				role: 'authenticated',
-				created_at: new Date().toISOString(),
-				updated_at: new Date().toISOString(),
-				app_metadata: {},
-				user_metadata: {}
-			}
-		} as any;
-		event.locals.user = event.locals.session.user;
-	} else {
-		console.log('No session cookie found');
-		event.locals.session = null;
-		event.locals.user = null;
-	}
+	// Get the current session and user
+	const { session, user } = await event.locals.safeGetSession();
+	event.locals.session = session;
+	event.locals.user = user;
 
 	// Route protection logic
 	const url = new URL(event.request.url);
@@ -71,14 +71,14 @@ export const handle: Handle = async ({ event, resolve }) => {
 		const isAuthRoute = authRoutes.includes(pathname);
 
 		// Redirect unauthenticated users away from protected routes
-		if (isProtectedRoute && !event.locals.session) {
+		if (isProtectedRoute && !session) {
 			console.log('Redirecting unauthenticated user to login');
 			const returnTo = encodeURIComponent(url.pathname + url.search);
 			throw redirect(303, `/auth/login?redirectTo=${returnTo}`);
 		}
 
 		// Redirect authenticated users away from auth pages to dashboard
-		if (isAuthRoute && event.locals.session && event.locals.user) {
+		if (isAuthRoute && session) {
 			console.log('Redirecting authenticated user to app');
 			throw redirect(303, '/app');
 		}
