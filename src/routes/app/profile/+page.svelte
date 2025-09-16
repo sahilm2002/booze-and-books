@@ -3,9 +3,23 @@
 	import ProfileEditForm from '../../../components/profile/ProfileEditForm.svelte';
 	import UserRating from '../../../components/profile/UserRating.svelte';
 	import { profile } from '$lib/stores/profile';
-	import { swapStatistics } from '$lib/stores/swaps';
+	import { swapStatistics, swapStore } from '$lib/stores/swaps';
+	import { onMount } from 'svelte';
+	import type { PageData } from './$types';
+
+	export let data: PageData;
 
 	let editMode = false;
+
+	// Initialize stores with server-loaded data
+	onMount(() => {
+		if (data.profile) {
+			profile.set(data.profile);
+		}
+	});
+
+	// Use server data for statistics, fallback to store
+	$: displayStatistics = data.swapStatistics || $swapStatistics;
 
 	function handleEdit() {
 		editMode = true;
@@ -244,14 +258,14 @@
 
 		<div class="profile-sidebar">
 			<!-- User Rating Section -->
-			{#if $swapStatistics}
+			{#if displayStatistics}
 				<div class="stats-card">
 					<div class="card-header">
 						<h3 class="card-title">User Rating</h3>
 					</div>
 					<div class="card-content">
 						<UserRating 
-							rating={$swapStatistics.average_rating || 0} 
+							rating={displayStatistics.average_rating || 0} 
 							size="medium"
 						/>
 					</div>
@@ -275,11 +289,11 @@
 					</div>
 					<div class="stat-item">
 						<span class="stat-label">Total swaps</span>
-						<span class="stat-value">{$swapStatistics?.total_swaps || 0}</span>
+						<span class="stat-value">{displayStatistics?.total_swaps || 0}</span>
 					</div>
 					<div class="stat-item">
 						<span class="stat-label">Completion rate</span>
-						<span class="stat-value">{$swapStatistics ? Math.round($swapStatistics.completion_rate) : 0}%</span>
+						<span class="stat-value">{displayStatistics ? Math.round(displayStatistics.completion_rate) : 0}%</span>
 					</div>
 				</div>
 			</div>

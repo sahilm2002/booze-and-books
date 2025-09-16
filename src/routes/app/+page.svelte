@@ -174,10 +174,7 @@
 		<div class="sidebar">
 			<div class="profile-section">
 				<div class="profile-card-wrapper card">
-					
-					<div style="padding: 1rem; text-align: center; color: #666;">
 					<ProfileCard />
-					</div>
 				</div>
 			</div>
 		</div>
