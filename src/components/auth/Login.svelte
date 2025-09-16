@@ -32,8 +32,9 @@
 				error = authError.message || 'Login failed';
 			} else if (data.user) {
 				console.log('Login successful:', data.user.email);
-				// Auth store will handle redirect via onAuthStateChange SIGNED_IN event
-				// No need to redirect here
+				// Simple direct redirect - don't rely on auth store events
+				window.location.href = '/app';
+				return; // Exit early to prevent loading state change
 			} else {
 				error = 'Login failed - no user returned';
 			}

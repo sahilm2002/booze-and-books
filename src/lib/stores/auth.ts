@@ -113,18 +113,11 @@ function createAuthStore() {
 						await goto('/auth/login', { replaceState: true });
 					}
 					
-					// Handle sign in - start activity tracking and redirect
+					// Handle sign in - start activity tracking only (no redirect)
 					if (event === 'SIGNED_IN') {
 						initializeActivityService();
 						await invalidateAll();
-						
-						// Redirect to dashboard after successful sign in
-						const currentPath = window.location.pathname;
-						if (currentPath === '/auth/login' || currentPath === '/auth/signup') {
-							console.log('Redirecting to dashboard after sign in');
-							// Use hard redirect instead of SvelteKit goto
-							window.location.href = '/app';
-						}
+						// Login component handles redirect directly - no redirect here
 					}
 					
 					// Handle token refresh
