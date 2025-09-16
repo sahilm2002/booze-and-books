@@ -19,7 +19,7 @@ export const handle: Handle = async ({ event, resolve }) => {
 		},
 	}) as any; // Bypass TypeScript error for debugging
 
-	// Set fake user to bypass authentication
+	// Set fake user to bypass authentication (using valid UUID format)
 	event.locals.session = {
 		access_token: 'fake',
 		refresh_token: 'fake',
@@ -27,7 +27,7 @@ export const handle: Handle = async ({ event, resolve }) => {
 		expires_at: Date.now() + 3600000,
 		token_type: 'bearer',
 		user: {
-			id: 'fake-user-id',
+			id: '00000000-0000-0000-0000-000000000000', // Valid UUID format
 			email: 'test@example.com',
 			aud: 'authenticated',
 			role: 'authenticated',
