@@ -35,7 +35,6 @@
 	let counterOfferMessage = '';
 	let userBooks: any[] = [];
 	let loadingUserBooks = false;
-	let completionRating = 5;
 	let completionFeedback = '';
 
 	$: currentUser = $auth.user;
@@ -110,11 +109,9 @@
 		loading = true;
 		try {
 			await swapStore.completeSwapRequest(swapRequest.id, {
-				rating: completionRating,
 				feedback: completionFeedback || undefined
 			});
 			showCompletionDialog = false;
-			completionRating = 5;
 			completionFeedback = '';
 			dispatch('updated', swapRequest);
 		} catch (error) {
@@ -452,31 +449,15 @@
 			</div>
 		{/if}
 
-		<!-- Ratings (for completed swaps) -->
-		{#if swapRequest.status === SwapStatus.COMPLETED}
-			<div class="ratings-section">
-				<h5>Swap Ratings</h5>
-				<div class="ratings-grid">
-					{#if swapRequest.requester_rating}
-						<div class="rating-item">
-							<span>Requester Rating: {swapRequest.requester_rating}/5</span>
-						</div>
-					{/if}
-					{#if swapRequest.owner_rating}
-						<div class="rating-item">
-							<span>Owner Rating: {swapRequest.owner_rating}/5</span>
-						</div>
-					{/if}
-				</div>
-				{#if swapRequest.requester_feedback || swapRequest.owner_feedback}
-					<div class="feedback-section">
-						{#if swapRequest.requester_feedback}
-							<p><strong>Requester:</strong> {swapRequest.requester_feedback}</p>
-						{/if}
-						{#if swapRequest.owner_feedback}
-							<p><strong>Owner:</strong> {swapRequest.owner_feedback}</p>
-						{/if}
-					</div>
+		<!-- Feedback (for completed swaps) -->
+		{#if swapRequest.status === SwapStatus.COMPLETED && (swapRequest.requester_feedback || swapRequest.owner_feedback)}
+			<div class="feedback-section">
+				<h5>Swap Feedback</h5>
+				{#if swapRequest.requester_feedback}
+					<p><strong>Requester:</strong> {swapRequest.requester_feedback}</p>
+				{/if}
+				{#if swapRequest.owner_feedback}
+					<p><strong>Owner:</strong> {swapRequest.owner_feedback}</p>
 				{/if}
 			</div>
 		{/if}
@@ -741,17 +722,6 @@
 			<p>Confirm that you've received your book from {otherUser.username} and rate your experience.</p>
 			
 			<form on:submit|preventDefault={handleComplete}>
-				<div class="form-group">
-					<label for="rating">Rating (1-5 stars):</label>
-					<select bind:value={completionRating} required>
-						<option value={5}>5 Stars - Excellent</option>
-						<option value={4}>4 Stars - Good</option>
-						<option value={3}>3 Stars - Average</option>
-						<option value={2}>2 Stars - Poor</option>
-						<option value={1}>1 Star - Terrible</option>
-					</select>
-				</div>
-
 				<div class="form-group">
 					<label for="feedback">Message for {otherUser.username} (optional):</label>
 					<textarea 

@@ -84,6 +84,7 @@
 						</div>
 					</div>
 					
+					<!-- Temporarily remove ratings card to debug infinite loading -->
 					<div class="stat-card">
 						<div class="stat-icon">
 							<svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -91,13 +92,8 @@
 							</svg>
 						</div>
 						<div class="stat-content">
-							{#if data.swapStatistics.average_rating > 0}
-								<p class="stat-number">{data.swapStatistics.average_rating.toFixed(1)}</p>
-								<p class="stat-label">Average Rating</p>
-							{:else}
-								<p class="stat-number">--</p>
-								<p class="stat-label">No Ratings Yet</p>
-							{/if}
+							<p class="stat-number">--</p>
+							<p class="stat-label">Rating Disabled</p>
 						</div>
 					</div>
 				</div>
