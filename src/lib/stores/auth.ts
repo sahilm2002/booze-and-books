@@ -113,8 +113,21 @@ function createAuthStore() {
 						await goto('/auth/login', { replaceState: true });
 					}
 					
-					// Handle sign in - start activity tracking
-					if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+					// Handle sign in - start activity tracking and redirect
+					if (event === 'SIGNED_IN') {
+						initializeActivityService();
+						await invalidateAll();
+						
+						// Redirect to dashboard after successful sign in
+						const currentPath = window.location.pathname;
+						if (currentPath === '/auth/login' || currentPath === '/auth/signup') {
+							console.log('Redirecting to dashboard after sign in');
+							await goto('/app', { replaceState: true });
+						}
+					}
+					
+					// Handle token refresh
+					if (event === 'TOKEN_REFRESHED') {
 						initializeActivityService();
 						await invalidateAll();
 					}
