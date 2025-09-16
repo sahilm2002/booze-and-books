@@ -21,88 +21,37 @@ export const load: LayoutServerLoad = async ({ locals }) => {
 		throw redirect(303, '/auth/login');
 	}
 
-	// Initialize default values
-	let profile = null;
-	let bookStats: { bookCount: number; recentBooks: Book[] } = { bookCount: 0, recentBooks: [] };
-	let swapCounts = { incomingPending: 0, outgoingPending: 0 };
-	let unreadNotificationCount = 0;
-	let swapStatistics = {
-		total_completed: 0,
-		average_rating: 0,
-		completion_rate: 0,
-		total_swaps: 0
+	console.log('Layout server load starting for user:', locals.user.id);
+
+	// Return minimal data to test if service calls are causing the hang
+	// Temporarily disable all service calls to isolate the issue
+	const profile = {
+		id: locals.user.id,
+		username: locals.user.email?.split('@')[0] || 'user',
+		full_name: locals.user.email || 'User',
+		email: locals.user.email || null,
+		avatar_url: null,
+		location: null,
+		bio: null,
+		created_at: new Date().toISOString(),
+		updated_at: new Date().toISOString()
 	};
 
-	// Try to load profile first with timeout
-	try {
-		profile = await withTimeout(
-			ProfileServiceServer.getProfile(locals.supabase, locals.user.id),
-			1500
-		);
-		
-		if (!profile) {
-			const sanitizedUsername = ProfileServiceServer.sanitizeUsername(locals.user.email || '');
-			profile = await withTimeout(
-				ProfileServiceServer.createProfile(locals.supabase, locals.user.id, {
-					username: sanitizedUsername,
-					full_name: locals.user.email || ''
-				}),
-				1500
-			);
-		}
-	} catch (profileError) {
-		console.error('Failed to load/create profile:', profileError);
-	}
-
-	// Try to load book statistics with timeout
-	try {
-		const stats = await withTimeout(
-			BookServiceServer.getBookStats(locals.supabase, locals.user.id),
-			1500
-		);
-		bookStats = stats;
-	} catch (bookError) {
-		console.error('Failed to load book stats:', bookError);
-	}
-
-	// Try to load swap request counts with timeout
-	try {
-		swapCounts = await withTimeout(
-			SwapServiceServer.getSwapRequestCounts(locals.supabase, locals.user.id),
-			1500
-		);
-	} catch (swapCountError) {
-		console.error('Failed to load swap counts:', swapCountError);
-	}
-
-	// Try to load unread notification count with timeout
-	try {
-		unreadNotificationCount = await withTimeout(
-			NotificationServiceServer.getUnreadCount(locals.supabase, locals.user.id),
-			1500
-		);
-	} catch (notificationError) {
-		console.error('Failed to load notification count:', notificationError);
-	}
-
-	// Try to load swap statistics with timeout
-	try {
-		swapStatistics = await withTimeout(
-			SwapServiceServer.getSwapStatistics(locals.supabase, locals.user.id),
-			1500
-		);
-	} catch (swapStatsError) {
-		console.error('Failed to load swap statistics:', swapStatsError);
-	}
+	console.log('Layout server load completing with minimal data');
 
 	return {
 		profile,
 		user: locals.user,
-		bookCount: bookStats.bookCount,
-		recentBooks: bookStats.recentBooks,
-		incomingSwapCount: swapCounts.incomingPending,
-		outgoingSwapCount: swapCounts.outgoingPending,
-		unreadNotificationCount,
-		swapStatistics
+		bookCount: 0,
+		recentBooks: [],
+		incomingSwapCount: 0,
+		outgoingSwapCount: 0,
+		unreadNotificationCount: 0,
+		swapStatistics: {
+			total_completed: 0,
+			average_rating: 0,
+			completion_rate: 0,
+			total_swaps: 0
+		}
 	};
 };
