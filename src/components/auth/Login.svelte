@@ -32,8 +32,10 @@
 				error = authError.message || 'Login failed';
 			} else if (data.user) {
 				console.log('Login successful:', data.user.email);
-				// Successful login - redirect to intended destination
-				await goto(redirectTo, { replaceState: true });
+				// Give a small delay to let auth state update, then redirect
+				setTimeout(async () => {
+					await goto(redirectTo, { replaceState: true });
+				}, 100);
 			} else {
 				error = 'Login failed - no user returned';
 			}
