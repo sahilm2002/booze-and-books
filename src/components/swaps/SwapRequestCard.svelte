@@ -173,8 +173,21 @@
 		
 		try {
 			// Import SwapService for this specific method since it's not in the store
-			const { SwapService } = await import('$lib/services/swapService');
-			userBooks = await SwapService.getUserAvailableBooksForOffering(currentUser.id);
+			// Wrap the dynamic import in a timeout to prevent infinite loading
+			const importPromise = import('$lib/services/swapService');
+			const timeoutPromise = new Promise((_, reject) => 
+				setTimeout(() => reject(new Error('Import timeout - SwapService took too long to load')), 5000)
+			);
+			
+			const { SwapService } = await Promise.race([importPromise, timeoutPromise]) as { SwapService: any };
+			
+			// Also add timeout to the service call itself
+			const booksPromise = SwapService.getUserAvailableBooksForOffering(currentUser.id);
+			const serviceTimeoutPromise = new Promise((_, reject) => 
+				setTimeout(() => reject(new Error('Service timeout - getUserAvailableBooksForOffering took too long')), 5000)
+			);
+			
+			userBooks = await Promise.race([booksPromise, serviceTimeoutPromise]);
 		} catch (error) {
 			// Log the full error for debugging
 			console.error('Error loading SwapService or user books:', error);
@@ -184,7 +197,9 @@
 			
 			// Determine user-friendly error message based on error type
 			if (error instanceof Error) {
-				if (error.message.includes('Failed to resolve module') || 
+				if (error.message.includes('Import timeout') || error.message.includes('Service timeout')) {
+					swapServiceErrorMessage = 'Loading is taking longer than expected. Please try again or refresh the page.';
+				} else if (error.message.includes('Failed to resolve module') || 
 					error.message.includes('import') || 
 					error.message.includes('module')) {
 					swapServiceErrorMessage = 'Unable to load swap functionality. Please refresh the page and try again.';
