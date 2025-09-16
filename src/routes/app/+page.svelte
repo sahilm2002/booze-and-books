@@ -1,114 +1,58 @@
-<script lang="ts">
-	import type { PageData } from './$types';
-
-	export let data: PageData;
-</script>
-
 <svelte:head>
 	<title>Dashboard - Booze and Books</title>
-	<meta name="description" content="Your personal book swap dashboard" />
 </svelte:head>
 
 <div class="container">
-	<h1>📚 Your Dashboard</h1>
-	<p>Welcome back! (Minimal debugging mode)</p>
+	<h1>📚 Dashboard Test</h1>
+	<p>Static page - no server data, no stores, no components</p>
 	
-	<div class="stats">
-		<div class="stat-card">
-			<h3>Books Listed</h3>
-			<p class="stat-number">{data.bookCount || 0}</p>
-		</div>
-		
-		<div class="stat-card">
-			<h3>Completed Swaps</h3>
-			<p class="stat-number">{data.swapStatistics?.total_completed || 0}</p>
-		</div>
-		
-		<div class="stat-card">
-			<h3>Completion Rate</h3>
-			<p class="stat-number">{Math.round(data.swapStatistics?.completion_rate || 0)}%</p>
-		</div>
-	</div>
-	
-	<div class="debug-info">
-		<h2>Debug Information</h2>
-		<p>If you can see this page, the infinite loading issue is resolved!</p>
-		<p>Data loaded successfully from server.</p>
+	<div class="test-info">
+		<h2>Infinite Loading Debug Test</h2>
+		<p>✅ If you can see this page, the issue is in server data loading</p>
+		<p>❌ If this page still hangs, the issue is in SvelteKit framework or authentication</p>
+		<p>🔍 This page uses ZERO server data and ZERO reactive functionality</p>
 	</div>
 </div>
 
 <style>
 	.container {
-		max-width: 1200px;
+		max-width: 800px;
 		margin: 0 auto;
 		padding: 2rem;
+		font-family: system-ui, sans-serif;
 	}
 
 	h1 {
 		color: #2d3748;
-		font-size: 2.5rem;
-		font-weight: 700;
-		margin-bottom: 0.5rem;
+		font-size: 2rem;
 		text-align: center;
+		margin-bottom: 1rem;
 	}
 
 	p {
 		color: #718096;
-		font-size: 1.1rem;
-		margin: 0 0 2rem 0;
+		font-size: 1rem;
 		text-align: center;
-	}
-
-	.stats {
-		display: grid;
-		grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-		gap: 1rem;
 		margin-bottom: 2rem;
 	}
 
-	.stat-card {
-		background: white;
-		border: 1px solid #e2e8f0;
-		border-radius: 12px;
-		padding: 1.5rem;
-		text-align: center;
-		box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-	}
-
-	.stat-card h3 {
-		color: #718096;
-		font-size: 0.875rem;
-		font-weight: 500;
-		margin: 0 0 0.5rem 0;
-		text-transform: uppercase;
-		letter-spacing: 0.05em;
-	}
-
-	.stat-number {
-		color: #2d3748;
-		font-size: 1.75rem;
-		font-weight: 700;
-		margin: 0;
-		line-height: 1;
-	}
-
-	.debug-info {
+	.test-info {
 		background: #f0fdf4;
-		border: 1px solid #bbf7d0;
+		border: 2px solid #22c55e;
 		border-radius: 8px;
-		padding: 1.5rem;
-		margin-top: 2rem;
+		padding: 2rem;
+		text-align: center;
 	}
 
-	.debug-info h2 {
+	.test-info h2 {
 		color: #15803d;
-		font-size: 1.25rem;
+		font-size: 1.5rem;
 		margin: 0 0 1rem 0;
 	}
 
-	.debug-info p {
+	.test-info p {
 		color: #166534;
-		font-size: 0.95rem;
+		font-size: 1rem;
 		margin: 0.5rem 0;
 		text-align: left;
 	}
