@@ -177,3 +177,4 @@ Having issues or suggestions? We'd love to hear from you:
 **Join the Booze & Books community today and transform the way you discover, share, and enjoy books!**
 
 *Happy Reading & Happy Swapping! 📚✨*
+# Trigger Vercel redeploy with vercel.json fix
