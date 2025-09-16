@@ -122,7 +122,8 @@ function createAuthStore() {
 						const currentPath = window.location.pathname;
 						if (currentPath === '/auth/login' || currentPath === '/auth/signup') {
 							console.log('Redirecting to dashboard after sign in');
-							await goto('/app', { replaceState: true });
+							// Use hard redirect instead of SvelteKit goto
+							window.location.href = '/app';
 						}
 					}
 					
