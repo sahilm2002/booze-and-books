@@ -1,9 +1,10 @@
 /**
- * Custom JWT Authentication - Login Endpoint
+ * Standard Supabase Authentication - Login Endpoint
  */
 
 import { json, type RequestEvent } from '@sveltejs/kit';
-import { signInWithCustomAuth } from '$lib/auth/customAuth';
+import { createServerClient } from '@supabase/ssr';
+import { PUBLIC_SUPABASE_URL, PUBLIC_SUPABASE_ANON_KEY } from '$env/static/public';
 
 export async function POST({ request, cookies }: RequestEvent) {
   try {
@@ -16,31 +17,45 @@ export async function POST({ request, cookies }: RequestEvent) {
       );
     }
 
-    // Authenticate with custom JWT
-    const result = await signInWithCustomAuth(email, password);
+    // Create Supabase client
+    const supabase = createServerClient(PUBLIC_SUPABASE_URL, PUBLIC_SUPABASE_ANON_KEY, {
+      cookies: {
+        get: (key) => cookies.get(key),
+        set: (key, value, options) => {
+          cookies.set(key, value, { ...options, path: '/' });
+        },
+        remove: (key, options) => {
+          cookies.delete(key, { ...options, path: '/' });
+        },
+      },
+    });
 
-    if (!result.success) {
+    // Authenticate with Supabase
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
+
+    if (error) {
       return json(
-        { error: result.error || 'Authentication failed' },
+        { error: error.message },
         { status: 401 }
       );
     }
 
-    // Set secure HTTP-only cookie with custom token
-    cookies.set('custom-auth-token', result.token!, {
-      path: '/',
-      httpOnly: true,
-      secure: true,
-      sameSite: 'strict',
-      maxAge: 60 * 60 * 24, // 24 hours
-    });
+    if (!data.user) {
+      return json(
+        { error: 'Authentication failed' },
+        { status: 401 }
+      );
+    }
 
     return json({
       success: true,
       user: {
-        id: result.user!.id,
-        email: result.user!.email,
-        user_metadata: result.user!.user_metadata,
+        id: data.user.id,
+        email: data.user.email,
+        user_metadata: data.user.user_metadata,
       },
     });
   } catch (error) {
