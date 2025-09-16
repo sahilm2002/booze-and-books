@@ -8,18 +8,9 @@
 	onMount(() => {
 		console.log('App layout mounted - initializing auth');
 		auth.initialize();
-
-		// Check if user is authenticated, redirect if not
-		const unsubscribe = auth.subscribe(async (authState) => {
-			if (!authState.loading && !authState.user) {
-				console.log('No authenticated user, redirecting to login');
-				await goto('/auth/login', { replaceState: true });
-			}
-		});
-
-		return () => {
-			unsubscribe();
-		};
+		
+		// Don't redirect here - let the auth store handle all redirects
+		// This prevents redirect loops between layout and auth store
 	});
 </script>
 
