@@ -1,9 +1,9 @@
 {
   "functions": {
-    "src/routes/**/*.ts": {
+    "**/*.ts": {
       "runtime": "nodejs20.x"
     },
-    "src/routes/**/*.js": {
+    "**/*.js": {
       "runtime": "nodejs20.x"
     }
   }
