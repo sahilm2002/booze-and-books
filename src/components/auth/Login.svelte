@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
+	import { supabase } from '$lib/supabase';
 
 	export let redirectTo: string = '/app';
 
@@ -18,30 +19,27 @@
 		error = '';
 
 		try {
-			// Use custom JWT authentication endpoint
-			const response = await fetch('/api/auth/login', {
-				method: 'POST',
-				headers: {
-					'Content-Type': 'application/json',
-				},
-				body: JSON.stringify({
-					email: email.trim(),
-					password
-				})
+			console.log('Attempting client-side login...');
+			
+			// Use direct client-side Supabase authentication instead of API endpoint
+			const { data, error: authError } = await supabase.auth.signInWithPassword({
+				email: email.trim(),
+				password
 			});
 
-			const result = await response.json();
-
-			if (!response.ok || !result.success) {
-				error = result.error || 'Login failed';
-			} else {
+			if (authError) {
+				console.error('Login error:', authError);
+				error = authError.message || 'Login failed';
+			} else if (data.user) {
+				console.log('Login successful:', data.user.email);
 				// Successful login - redirect to intended destination
-				// The secure cookie is automatically set by the server
 				await goto(redirectTo, { replaceState: true });
+			} else {
+				error = 'Login failed - no user returned';
 			}
 		} catch (err) {
+			console.error('Login exception:', err);
 			error = 'An unexpected error occurred';
-			console.error('Login error:', err);
 		} finally {
 			loading = false;
 		}

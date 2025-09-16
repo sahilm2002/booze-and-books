@@ -1,9 +1,34 @@
 <script lang="ts">
+	import { onMount } from 'svelte';
+	import { goto } from '$app/navigation';
 	import DashboardNav from '../../components/dashboard/DashboardNav.svelte';
 	import { auth } from '$lib/stores/auth';
+
+	// Initialize auth store on mount
+	onMount(() => {
+		console.log('App layout mounted - initializing auth');
+		auth.initialize();
+
+		// Check if user is authenticated, redirect if not
+		const unsubscribe = auth.subscribe(async (authState) => {
+			if (!authState.loading && !authState.user) {
+				console.log('No authenticated user, redirecting to login');
+				await goto('/auth/login', { replaceState: true });
+			}
+		});
+
+		return () => {
+			unsubscribe();
+		};
+	});
 </script>
 
-{#if $auth.user}
+{#if $auth.loading}
+	<div class="loading-screen">
+		<div class="loading-spinner"></div>
+		<p class="loading-text">Loading your dashboard...</p>
+	</div>
+{:else if $auth.user}
 	<div class="app-layout">
 		<DashboardNav />
 		<main class="main-content">
@@ -13,6 +38,7 @@
 {:else}
 	<div class="loading-screen">
 		<div class="loading-spinner"></div>
+		<p class="loading-text">Checking authentication...</p>
 	</div>
 {/if}
 
@@ -44,8 +70,10 @@
 		min-height: 100vh;
 		background: linear-gradient(135deg, var(--parchment) 0%, var(--light-cream) 50%, var(--accent-cream) 100%);
 		display: flex;
+		flex-direction: column;
 		align-items: center;
 		justify-content: center;
+		gap: 1rem;
 	}
 
 	.loading-spinner {
@@ -55,6 +83,12 @@
 		border-top: 3px solid var(--primary-burgundy);
 		border-radius: 50%;
 		animation: spin 1s linear infinite;
+	}
+
+	.loading-text {
+		color: var(--warm-brown);
+		font-size: 1rem;
+		margin: 0;
 	}
 
 	@keyframes spin {
