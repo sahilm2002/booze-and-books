@@ -139,10 +139,11 @@ class ProfileStore {
 
 export const profileStore = ProfileStore.getInstance();
 
-auth.subscribe(({ user: currentUser }) => {
-	if (currentUser) {
-		profileStore.loadProfile(currentUser.id);
-	} else {
-		profileStore.clearProfile();
-	}
-});
+// Temporarily disable automatic profile loading to debug infinite loading issue
+// auth.subscribe(({ user: currentUser }) => {
+// 	if (currentUser) {
+// 		profileStore.loadProfile(currentUser.id);
+// 	} else {
+// 		profileStore.clearProfile();
+// 	}
+// });
