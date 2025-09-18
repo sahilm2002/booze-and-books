@@ -71,11 +71,11 @@ export class NotificationServiceServer {
 			throw new Error(`Failed to mark notifications as read: ${notificationError.message}`);
 		}
 
-		// Mark chat messages as read (where user is the recipient)
+		// Mark chat messages as read (where user is either sender or recipient)
 		const { error: chatError } = await supabase
 			.from('notifications')
 			.update({ is_read: true })
-			.eq('recipient_id', userId)
+			.or(`sender_id.eq.${userId},recipient_id.eq.${userId}`)
 			.eq('is_read', false)
 			.eq('message_type', 'chat_message');
 
