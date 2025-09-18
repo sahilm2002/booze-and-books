@@ -29,11 +29,13 @@ $$ LANGUAGE plpgsql;
 
 -- Create chat-attachments storage bucket
 INSERT INTO storage.buckets (id, name, public)
-VALUES ('chat-attachments', 'chat-attachments', false);
+VALUES ('chat-attachments', 'chat-attachments', false)
+ON CONFLICT (id) DO NOTHING;
 
 -- RLS policies for chat-attachments bucket
 -- Object keys must follow pattern: conversations/<conversation_id>/filename
 -- Users can only upload/view attachments in conversations they participate in
+DROP POLICY IF EXISTS "Users can upload chat attachments" ON storage.objects;
 CREATE POLICY "Users can upload chat attachments" ON storage.objects
 FOR INSERT WITH CHECK (
   bucket_id = 'chat-attachments' AND auth.uid() IS NOT NULL AND
@@ -47,6 +49,7 @@ FOR INSERT WITH CHECK (
 );
 
 -- Allow users to view attachments in conversations they participate in
+DROP POLICY IF EXISTS "Users can view chat attachments" ON storage.objects;
 CREATE POLICY "Users can view chat attachments" ON storage.objects
 FOR SELECT USING (
   bucket_id = 'chat-attachments' AND auth.uid() IS NOT NULL AND
