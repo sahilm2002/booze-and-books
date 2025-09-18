@@ -89,13 +89,13 @@ FOR SELECT USING (
 );
 
 -- Policy for inserting chat messages
+DROP POLICY IF EXISTS "Users can send chat messages" ON notifications;
 CREATE POLICY "Users can send chat messages" ON notifications
 FOR INSERT WITH CHECK (
   auth.uid() IS NOT NULL AND
   message_type = 'chat_message' AND
   sender_id = auth.uid() AND
-  recipient_id IS NOT NULL AND
-  conversation_id IS NOT NULL
+  recipient_id IS NOT NULL
 );
 
 -- Policy for updating chat messages (marking as read)
