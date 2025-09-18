@@ -38,7 +38,7 @@ export class NotificationServiceServer {
 		return count || 0;
 	}
 
-	// Mark a notification as read
+	// Mark a notification or chat message as read
 	static async markAsRead(
 		supabase: SupabaseClient,
 		notificationId: string
@@ -57,16 +57,30 @@ export class NotificationServiceServer {
 		return data;
 	}
 
-	// Mark all notifications as read for a user
+	// Mark all notifications and chat messages as read for a user
 	static async markAllAsRead(supabase: SupabaseClient, userId: string): Promise<void> {
-		const { error } = await supabase
+		// Mark traditional notifications as read
+		const { error: notificationError } = await supabase
 			.from('notifications')
 			.update({ is_read: true })
 			.eq('user_id', userId)
-			.eq('is_read', false);
+			.eq('is_read', false)
+			.eq('message_type', 'notification');
 
-		if (error) {
-			throw new Error(`Failed to mark all notifications as read: ${error.message}`);
+		if (notificationError) {
+			throw new Error(`Failed to mark notifications as read: ${notificationError.message}`);
+		}
+
+		// Mark chat messages as read (where user is the recipient)
+		const { error: chatError } = await supabase
+			.from('notifications')
+			.update({ is_read: true })
+			.eq('recipient_id', userId)
+			.eq('is_read', false)
+			.eq('message_type', 'chat_message');
+
+		if (chatError) {
+			throw new Error(`Failed to mark chat messages as read: ${chatError.message}`);
 		}
 	}
 
