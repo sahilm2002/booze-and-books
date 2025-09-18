@@ -23,19 +23,33 @@ export class NotificationServiceServer {
 		return data || [];
 	}
 
-	// Get unread notifications count
+	// Get unread notifications and chat messages count
 	static async getUnreadCount(supabase: SupabaseClient, userId: string): Promise<number> {
-		const { count, error } = await supabase
+		// Count unread traditional notifications
+		const { count: notificationCount, error: notificationError } = await supabase
 			.from('notifications')
 			.select('id', { count: 'exact', head: true })
 			.eq('user_id', userId)
-			.eq('is_read', false);
+			.eq('is_read', false)
+			.eq('message_type', 'notification');
 
-		if (error) {
-			throw new Error(`Failed to count unread notifications: ${error.message}`);
+		if (notificationError) {
+			throw new Error(`Failed to count unread notifications: ${notificationError.message}`);
 		}
 
-		return count || 0;
+		// Count unread chat messages (where user is recipient)
+		const { count: chatCount, error: chatError } = await supabase
+			.from('notifications')
+			.select('id', { count: 'exact', head: true })
+			.eq('recipient_id', userId)
+			.eq('is_read', false)
+			.eq('message_type', 'chat_message');
+
+		if (chatError) {
+			throw new Error(`Failed to count unread chat messages: ${chatError.message}`);
+		}
+
+		return (notificationCount || 0) + (chatCount || 0);
 	}
 
 	// Mark a notification or chat message as read
@@ -71,11 +85,11 @@ export class NotificationServiceServer {
 			throw new Error(`Failed to mark notifications as read: ${notificationError.message}`);
 		}
 
-		// Mark chat messages as read (where user is either sender or recipient)
+		// Mark chat messages as read (only where user is the recipient)
 		const { error: chatError } = await supabase
 			.from('notifications')
 			.update({ is_read: true })
-			.or(`sender_id.eq.${userId},recipient_id.eq.${userId}`)
+			.eq('recipient_id', userId)
 			.eq('is_read', false)
 			.eq('message_type', 'chat_message');
 
