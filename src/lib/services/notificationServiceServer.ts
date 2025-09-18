@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Notification, NotificationInput } from '../types/notification.js';
+import { MessageType } from '../types/notification.js';
 
 export class NotificationServiceServer {
 	// Get notifications for a user
@@ -31,7 +32,7 @@ export class NotificationServiceServer {
 			.select('id', { count: 'exact', head: true })
 			.eq('user_id', userId)
 			.eq('is_read', false)
-			.eq('message_type', 'notification');
+			.eq('message_type', MessageType.NOTIFICATION);
 
 		if (notificationError) {
 			throw new Error(`Failed to count unread notifications: ${notificationError.message}`);
@@ -43,7 +44,7 @@ export class NotificationServiceServer {
 			.select('id', { count: 'exact', head: true })
 			.eq('recipient_id', userId)
 			.eq('is_read', false)
-			.eq('message_type', 'chat_message');
+			.eq('message_type', MessageType.CHAT_MESSAGE);
 
 		if (chatError) {
 			throw new Error(`Failed to count unread chat messages: ${chatError.message}`);
@@ -79,7 +80,7 @@ export class NotificationServiceServer {
 			.update({ is_read: true })
 			.eq('user_id', userId)
 			.eq('is_read', false)
-			.eq('message_type', 'notification');
+			.eq('message_type', MessageType.NOTIFICATION);
 
 		if (notificationError) {
 			throw new Error(`Failed to mark notifications as read: ${notificationError.message}`);
@@ -91,7 +92,7 @@ export class NotificationServiceServer {
 			.update({ is_read: true })
 			.eq('recipient_id', userId)
 			.eq('is_read', false)
-			.eq('message_type', 'chat_message');
+			.eq('message_type', MessageType.CHAT_MESSAGE);
 
 		if (chatError) {
 			throw new Error(`Failed to mark chat messages as read: ${chatError.message}`);
