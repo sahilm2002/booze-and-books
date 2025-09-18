@@ -134,6 +134,7 @@ BEGIN
     INSERT INTO notifications (
       user_id,
       type,
+      title,
       message,
       data,
       message_type,
@@ -141,6 +142,7 @@ BEGIN
     ) VALUES (
       NEW.recipient_id,
       'CHAT_MESSAGE_RECEIVED',
+      'New Chat Message',
       'You have a new message from ' || (
         SELECT username FROM profiles WHERE id = NEW.sender_id
       ),
