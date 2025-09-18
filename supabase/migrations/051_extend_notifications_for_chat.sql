@@ -11,8 +11,8 @@ ADD COLUMN conversation_id TEXT,
 ADD COLUMN attachment_url TEXT,
 ADD COLUMN attachment_type TEXT,
 ADD COLUMN attachment_size BIGINT,
-ADD COLUMN sender_id UUID REFERENCES auth.users(id),
-ADD COLUMN recipient_id UUID REFERENCES auth.users(id);
+ADD COLUMN sender_id UUID REFERENCES auth.users(id) ON DELETE SET NULL,
+ADD COLUMN recipient_id UUID REFERENCES auth.users(id) ON DELETE SET NULL;
 
 -- Create function to generate deterministic conversation IDs
 CREATE OR REPLACE FUNCTION generate_conversation_id(user1_id UUID, user2_id UUID)
