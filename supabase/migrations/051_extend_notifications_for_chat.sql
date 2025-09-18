@@ -32,27 +32,30 @@ INSERT INTO storage.buckets (id, name, public)
 VALUES ('chat-attachments', 'chat-attachments', false);
 
 -- RLS policies for chat-attachments bucket
--- Allow users to upload attachments to conversations they participate in
+-- Object keys must follow pattern: conversations/<conversation_id>/filename
+-- Users can only upload/view attachments in conversations they participate in
 CREATE POLICY "Users can upload chat attachments" ON storage.objects
 FOR INSERT WITH CHECK (
-  bucket_id = 'chat-attachments' AND
-  auth.uid() IS NOT NULL AND
-  -- Check if user is part of the conversation (extracted from path)
-  (
-    auth.uid()::TEXT = split_part(name, '/', 1) OR
-    auth.uid()::TEXT = split_part(name, '/', 2)
+  bucket_id = 'chat-attachments' AND auth.uid() IS NOT NULL AND
+  split_part(name, '/', 1) = 'conversations' AND
+  EXISTS (
+    SELECT 1 FROM public.notifications n
+    WHERE n.message_type = 'chat_message'
+      AND n.conversation_id = split_part(name, '/', 2)
+      AND (n.sender_id = auth.uid() OR n.recipient_id = auth.uid())
   )
 );
 
 -- Allow users to view attachments in conversations they participate in
 CREATE POLICY "Users can view chat attachments" ON storage.objects
 FOR SELECT USING (
-  bucket_id = 'chat-attachments' AND
-  auth.uid() IS NOT NULL AND
-  -- Check if user is part of the conversation (extracted from path)
-  (
-    auth.uid()::TEXT = split_part(name, '/', 1) OR
-    auth.uid()::TEXT = split_part(name, '/', 2)
+  bucket_id = 'chat-attachments' AND auth.uid() IS NOT NULL AND
+  split_part(name, '/', 1) = 'conversations' AND
+  EXISTS (
+    SELECT 1 FROM public.notifications n
+    WHERE n.message_type = 'chat_message'
+      AND n.conversation_id = split_part(name, '/', 2)
+      AND (n.sender_id = auth.uid() OR n.recipient_id = auth.uid())
   )
 );
 
