@@ -129,9 +129,12 @@ CREATE TRIGGER trigger_set_conversation_id
 CREATE OR REPLACE FUNCTION create_chat_notification()
 RETURNS TRIGGER AS $$
 BEGIN
+  -- Set search_path to trusted schemas for security
+  PERFORM set_config('search_path', 'pg_catalog,public', true);
+  
   IF NEW.message_type = 'chat_message' THEN
     -- Create a notification for the recipient about the new chat message
-    INSERT INTO notifications (
+    INSERT INTO public.notifications (
       user_id,
       type,
       title,
@@ -144,7 +147,7 @@ BEGIN
       'CHAT_MESSAGE_RECEIVED',
       'New Chat Message',
       'You have a new message from ' || (
-        SELECT username FROM profiles WHERE id = NEW.sender_id
+        SELECT username FROM public.profiles WHERE id = NEW.sender_id
       ),
       jsonb_build_object(
         'sender_id', NEW.sender_id,
@@ -157,7 +160,7 @@ BEGIN
   END IF;
   RETURN NEW;
 END;
-$$ LANGUAGE plpgsql;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
 
 CREATE TRIGGER trigger_create_chat_notification
   AFTER INSERT ON notifications
