@@ -2,7 +2,6 @@
 	import { createEventDispatcher, onMount } from 'svelte';
 	import { NotificationServiceServer } from '$lib/services/notificationServiceServer';
 	import { ChatService } from '$lib/services/chatService';
-	import { NotificationType } from '$lib/types/notification';
 	import type { Notification, Conversation } from '$lib/types/notification';
 	import type { SupabaseClient } from '@supabase/supabase-js';
 
@@ -15,6 +14,12 @@
 	let notifications: Notification[] = [];
 	let conversations: Conversation[] = [];
 	let loading = false;
+
+	onMount(async () => {
+		if (isOpen) {
+			await loadNotificationsAndChats();
+		}
+	});
 
 	$: if (isOpen) {
 		loadNotificationsAndChats();
@@ -30,7 +35,6 @@
 				.select('*')
 				.eq('user_id', userId)
 				.eq('message_type', 'notification')
-				.eq('is_read', false)
 				.order('created_at', { ascending: false })
 				.limit(10);
 
@@ -108,28 +112,18 @@
 		}
 	}
 
-	function getNotificationIcon(type: NotificationType) {
+	function getNotificationIcon(type: string) {
 		switch (type) {
-			case NotificationType.SWAP_ACCEPTED:
+			case 'SWAP_ACCEPTED':
 				return '✅';
-			case NotificationType.SWAP_COMPLETED:
+			case 'SWAP_DECLINED':
+				return '❌';
+			case 'SWAP_COMPLETED':
 				return '🎉';
-			case NotificationType.SWAP_CANCELLED:
+			case 'SWAP_CANCELLED':
 				return '🚫';
-			case NotificationType.SWAP_COUNTER_OFFER:
-			case NotificationType.COUNTER_OFFER_RECEIVED:
+			case 'COUNTER_OFFER_RECEIVED':
 				return '🔄';
-			case NotificationType.SWAP_REQUEST:
-				return '📩';
-			case NotificationType.SWAP_APPROVED:
-				return '👍';
-			case NotificationType.DAILY_REMINDER_PENDING_SWAPS:
-			case NotificationType.DAILY_REMINDER_COUNTER_OFFERS:
-			case NotificationType.DAILY_REMINDER_ACCEPTED_SWAPS:
-				return '⏰';
-			case NotificationType.CHAT_MESSAGE:
-			case NotificationType.CHAT_MESSAGE_RECEIVED:
-				return '💬';
 			default:
 				return '📢';
 		}
@@ -168,19 +162,10 @@
 					{#if conversations.length > 0}
 						<div class="section">
 							<h4>Messages</h4>
-							{#each conversations as conversation (conversation.id)}
+							{#each conversations as conversation}
 								<div 
 									class="notification-item chat-item" 
-									tabindex="0"
-									role="button"
-									aria-label="Open chat with {conversation.other_participant?.full_name || conversation.other_participant?.username || 'Unknown User'}"
 									on:click={() => handleChatClick(conversation)}
-									on:keydown={(event) => {
-										if (event.key === 'Enter' || event.key === ' ' || event.key === 'Spacebar') {
-											event.preventDefault();
-											handleChatClick(conversation);
-										}
-									}}
 								>
 									<div class="item-icon">
 										{#if conversation.other_participant?.avatar_url}
@@ -222,19 +207,10 @@
 					{#if notifications.length > 0}
 						<div class="section">
 							<h4>System Notifications</h4>
-							{#each notifications as notification (notification.id)}
+							{#each notifications as notification}
 								<div 
 									class="notification-item system-item" 
-									tabindex="0"
-									role="button"
-									aria-label="Mark notification as read: {notification.title}"
 									on:click={() => markNotificationAsRead(notification)}
-									on:keydown={(event) => {
-										if (event.key === 'Enter' || event.key === ' ' || event.key === 'Spacebar') {
-											event.preventDefault();
-											markNotificationAsRead(notification);
-										}
-									}}
 									class:unread={!notification.is_read}
 								>
 									<div class="item-icon">
@@ -278,9 +254,9 @@
 	.dropdown-content {
 		position: absolute;
 		top: 60px;
-		right: 2rem;
+		right: 1rem;
 		width: 380px;
-		max-width: calc(100vw - 4rem);
+		max-width: calc(100vw - 2rem);
 		background: white;
 		border-radius: 12px;
 		box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
@@ -391,22 +367,15 @@
 		transition: background-color 0.15s ease;
 	}
 
-	.notification-item:hover,
-	.notification-item:focus {
+	.notification-item:hover {
 		background: #f9fafb;
-		outline: none;
-	}
-
-	.notification-item:focus {
-		box-shadow: 0 0 0 2px #6366f1;
 	}
 
 	.notification-item.unread {
 		background: #f0f9ff;
 	}
 
-	.notification-item.unread:hover,
-	.notification-item.unread:focus {
+	.notification-item.unread:hover {
 		background: #e0f2fe;
 	}
 

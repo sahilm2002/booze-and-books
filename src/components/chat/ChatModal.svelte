@@ -1,8 +1,6 @@
 <script lang="ts">
-	import { createEventDispatcher, onMount, afterUpdate, onDestroy } from 'svelte';
-	import { goto } from '$app/navigation';
+	import { createEventDispatcher, onMount, afterUpdate } from 'svelte';
 	import { ChatService } from '$lib/services/chatService';
-	import { onlineStatusService, OnlineStatusService } from '$lib/services/onlineStatusService';
 	import type { ChatMessage, ChatMessageInput } from '$lib/types/notification';
 	import type { PublicProfile } from '$lib/types/profile';
 
@@ -10,8 +8,6 @@
 	export let conversationId: string;
 	export let otherUser: PublicProfile;
 	export let currentUserId: string;
-
-	let otherUserOnlineStatus: { is_online: boolean; last_seen_at: string | null; first_login_at: string | null } | null = null;
 
 	const dispatch = createEventDispatcher();
 
@@ -22,30 +18,10 @@
 	let chatContainer: HTMLElement;
 	let fileInput: HTMLInputElement;
 	let selectedFile: File | null = null;
-	let fileError: string = '';
-	let realtimeInterval: NodeJS.Timeout | null = null;
-	let statusInterval: NodeJS.Timeout | null = null;
 
-	// File validation constants
-	const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB in bytes
-	const ALLOWED_MIME_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'application/pdf'];
-	const ALLOWED_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.gif', '.pdf'];
-
-	// Tracking via conversationId guard; no reactive token needed
-
-	onMount(() => {
-		// Initial mount - reactive statement will handle loading
-	});
-
-	onDestroy(() => {
-		// Clean up intervals when component is destroyed
-		if (realtimeInterval) {
-			clearInterval(realtimeInterval);
-			realtimeInterval = null;
-		}
-		if (statusInterval) {
-			clearInterval(statusInterval);
-			statusInterval = null;
+	onMount(async () => {
+		if (isOpen && conversationId) {
+			await loadChatHistory();
 		}
 	});
 
@@ -56,121 +32,18 @@
 		}
 	});
 
-	// Function to navigate to user profile
-	async function goToProfile(username: string) {
-		closeModal();
-		await goto(`/app/profile/${username}`);
-	}
-
-	// Function to refresh messages for real-time updates
-	async function refreshMessages() {
-		if (!isOpen || !conversationId) return;
-		
+	async function loadChatHistory() {
 		try {
-			const updatedHistory = await ChatService.getChatHistory(conversationId);
-			const currentMessageCount = messages.length;
-			const newMessageCount = updatedHistory.length;
-			
-			// Only update if there are new messages
-			if (newMessageCount > currentMessageCount) {
-				messages = updatedHistory;
-				// Mark new messages as read
-				if (currentUserId && currentUserId.trim()) {
-					await ChatService.markMessagesAsRead(conversationId, currentUserId);
-				}
-			}
+			loading = true;
+			messages = await ChatService.getChatHistory(conversationId);
+			// Mark messages as read when chat is opened
+			await ChatService.markMessagesAsRead(conversationId, currentUserId);
 		} catch (error) {
-			console.error('Failed to refresh messages:', error);
+			console.error('Failed to load chat history:', error);
+		} finally {
+			loading = false;
 		}
 	}
-
-	// Function to refresh online status
-	async function refreshOnlineStatus() {
-		if (!isOpen || !otherUser?.id) return;
-		
-		try {
-			const status = await onlineStatusService.getUserOnlineStatus(otherUser.id);
-			otherUserOnlineStatus = status;
-		} catch (error) {
-			console.error('Failed to refresh online status:', error);
-		}
-	}
-
-	// Reactive watcher: Load chat history when modal opens or conversation changes
-	$: if (isOpen && conversationId) {
-		(async () => {
-			const cid = conversationId;
-			try {
-				loading = true;
-				// Clear messages immediately when switching conversations to prevent showing wrong history
-				messages = [];
-				// Load history for the specific conversation
-				const history = await ChatService.getChatHistory(cid);
-				// Only apply results if still on the same conversation and modal is open
-				if (isOpen && cid === conversationId) {
-					messages = history;
-					// Only mark messages as read if we have a valid currentUserId
-					if (currentUserId && currentUserId.trim()) {
-						await ChatService.markMessagesAsRead(cid, currentUserId);
-					}
-				}
-			} catch (error) {
-				if (cid === conversationId) {
-					console.error('Failed to load chat history:', error);
-				}
-			} finally {
-				if (cid === conversationId) {
-					loading = false;
-				}
-			}
-		})();
-	} else if (!isOpen) {
-		// Clear messages when modal is closed to ensure clean state
-		messages = [];
-		loading = false;
-		otherUserOnlineStatus = null;
-	}
-
-	// Fetch other user's online status when modal opens
-	$: if (isOpen && otherUser?.id) {
-		(async () => {
-			try {
-				const status = await onlineStatusService.getUserOnlineStatus(otherUser.id);
-				otherUserOnlineStatus = status;
-			} catch (error) {
-				console.error('Failed to fetch user online status:', error);
-			}
-		})();
-	}
-
-	// Start real-time polling when modal opens
-	$: if (isOpen && conversationId) {
-		// Clear any existing intervals
-		if (realtimeInterval) {
-			clearInterval(realtimeInterval);
-		}
-		if (statusInterval) {
-			clearInterval(statusInterval);
-		}
-		
-		// Start polling for new messages every 3 seconds
-		realtimeInterval = setInterval(refreshMessages, 3000);
-		
-		// Start polling for online status every 10 seconds
-		statusInterval = setInterval(refreshOnlineStatus, 10000);
-	} else if (!isOpen) {
-		// Stop polling when modal closes
-		if (realtimeInterval) {
-			clearInterval(realtimeInterval);
-			realtimeInterval = null;
-		}
-		if (statusInterval) {
-			clearInterval(statusInterval);
-			statusInterval = null;
-		}
-	}
-
-	// loadChatHistory no longer needed; reactive statement handles loading
 
 	async function sendMessage() {
 		if (!newMessage.trim() && !selectedFile) return;
@@ -195,10 +68,7 @@
 			};
 
 			const sentMessage = await ChatService.sendMessage(messageInput);
-			
-			// Refresh chat history to get the complete message with profile data
-			const updatedHistory = await ChatService.getChatHistory(conversationId);
-			messages = updatedHistory;
+			messages = [...messages, sentMessage];
 			
 			newMessage = '';
 			selectedFile = null;
@@ -222,54 +92,13 @@
 
 	function handleFileSelect(event: Event) {
 		const target = event.target as HTMLInputElement;
-		fileError = ''; // Clear previous errors
-		
-		if (!target.files || !target.files[0]) {
-			selectedFile = null;
-			return;
+		if (target.files && target.files[0]) {
+			selectedFile = target.files[0];
 		}
-
-		const file = target.files[0];
-		
-		// Validate file size
-		if (file.size > MAX_FILE_SIZE) {
-			fileError = `File size exceeds 10MB limit (${(file.size / (1024 * 1024)).toFixed(1)}MB)`;
-			selectedFile = null;
-			target.value = '';
-			return;
-		}
-
-		// Get file extension from name
-		const fileName = file.name.toLowerCase();
-		const fileExtension = fileName.includes('.') ? '.' + fileName.split('.').pop() : '';
-		
-		// Validate file type using MIME type and extension
-		const isValidMimeType = ALLOWED_MIME_TYPES.includes(file.type);
-		const isValidExtension = fileExtension && ALLOWED_EXTENSIONS.includes(fileExtension);
-		
-		// Reject immediately if MIME type is present and explicitly not allowed
-		if (file.type && !isValidMimeType) {
-			fileError = 'Unsupported file type. Please select an image (JPEG, PNG, GIF) or PDF file.';
-			selectedFile = null;
-			target.value = '';
-			return;
-		}
-		
-		// Accept if either MIME type OR extension is valid
-		if (!isValidMimeType && !isValidExtension) {
-			fileError = 'Unsupported file type. Please select an image (JPEG, PNG, GIF) or PDF file.';
-			selectedFile = null;
-			target.value = '';
-			return;
-		}
-
-		// File passed all validation
-		selectedFile = file;
 	}
 
 	function removeSelectedFile() {
 		selectedFile = null;
-		fileError = '';
 		if (fileInput) fileInput.value = '';
 	}
 
@@ -320,7 +149,7 @@
 		<div class="modal-content" on:click|stopPropagation>
 			<!-- Header -->
 			<div class="modal-header">
-				<div class="user-info clickable" on:click={() => goToProfile(otherUser.username)}>
+				<div class="user-info">
 					{#if otherUser.avatar_url}
 						<img src={otherUser.avatar_url} alt={otherUser.username} class="avatar" />
 					{:else}
@@ -330,29 +159,11 @@
 					{/if}
 					<div>
 						<h3>{otherUser.full_name || otherUser.username}</h3>
-						<div class="user-status">
-							<p class="username">@{otherUser.username}</p>
-							{#if otherUserOnlineStatus}
-								<div class="online-status">
-									<span class="status-indicator {otherUserOnlineStatus.is_online ? 'online' : 'offline'}"></span>
-									<span class="status-text">
-										{OnlineStatusService.formatLastSeen(otherUserOnlineStatus.last_seen_at, otherUserOnlineStatus.is_online)}
-									</span>
-								</div>
-							{/if}
-						</div>
+						<p class="username">@{otherUser.username}</p>
 					</div>
 				</div>
 				<button class="close-btn" on:click={closeModal}>×</button>
 			</div>
-
-			<!-- Offline notification -->
-			{#if otherUserOnlineStatus && !otherUserOnlineStatus.is_online}
-				<div class="offline-notification">
-					<span class="offline-icon">💤</span>
-					<span>{otherUser.username} is not available right now. They will see your message when they log in.</span>
-				</div>
-			{/if}
 
 			<!-- Messages -->
 			<div class="messages-container" bind:this={chatContainer}>
@@ -369,49 +180,24 @@
 						</div>
 						{#each dayMessages as message}
 							<div class="message {message.sender_id === currentUserId ? 'sent' : 'received'}">
-								<!-- Show sender info for received messages -->
-								{#if message.sender_id !== currentUserId}
-									<div class="message-sender">
-										{#if message.sender_profile?.avatar_url}
-											<img src={message.sender_profile.avatar_url} alt={message.sender_profile.username} class="sender-avatar" />
-										{:else}
-											<div class="sender-avatar-placeholder">
-												{(message.sender_profile?.username || 'U').charAt(0).toUpperCase()}
-											</div>
-										{/if}
-										<span class="sender-name">{message.sender_profile?.username || 'Unknown'}</span>
-									</div>
-								{/if}
-								
 								<div class="message-content">
 									{#if message.message}
 										<p>{message.message}</p>
-
-										{#if (message.data as any)?.auto_generated && (message.data as any)?.swap_request_id}
-											<p class="auto-link">
-												<a href={"/app/swaps#swap-" + (message.data as any).swap_request_id} class="swap-link">Book Swap Details</a>
-											</p>
-										{/if}
 									{/if}
 									{#if message.attachment_url}
 										<div class="attachment">
 											{#if isImageAttachment(message.attachment_url, message.attachment_type || '')}
 												<img src={message.attachment_url} alt="Attachment" class="attachment-image" />
 											{:else}
-											<a href={message.attachment_url} target="_blank" rel="noopener noreferrer" class="attachment-link">
-												📎 View Attachment
-											</a>
+												<a href={message.attachment_url} target="_blank" class="attachment-link">
+													📎 View Attachment
+												</a>
 											{/if}
 										</div>
 									{/if}
 								</div>
-								
 								<div class="message-time">
-									{#if message.sender_id === currentUserId}
-										You • {formatTime(message.created_at)}
-									{:else}
-										{message.sender_profile?.username || 'Unknown'} • {formatTime(message.created_at)}
-									{/if}
+									{formatTime(message.created_at)}
 								</div>
 							</div>
 						{/each}
@@ -421,11 +207,6 @@
 
 			<!-- Message Input -->
 			<div class="message-input-container">
-				{#if fileError}
-					<div class="file-error">
-						<span>❌ {fileError}</span>
-					</div>
-				{/if}
 				{#if selectedFile}
 					<div class="selected-file">
 						<span>📎 {selectedFile.name}</span>
@@ -459,7 +240,7 @@
 						type="button" 
 						class="send-btn" 
 						on:click={sendMessage}
-						disabled={sending || (!newMessage.trim() && !selectedFile) || !!fileError}
+						disabled={sending || (!newMessage.trim() && !selectedFile)}
 					>
 						{sending ? '...' : 'Send'}
 					</button>
@@ -509,17 +290,6 @@
 		gap: 0.75rem;
 	}
 
-	.user-info.clickable {
-		cursor: pointer;
-		border-radius: 8px;
-		padding: 0.25rem;
-		transition: background-color 0.2s;
-	}
-
-	.user-info.clickable:hover {
-		background-color: #f3f4f6;
-	}
-
 	.avatar {
 		width: 40px;
 		height: 40px;
@@ -545,42 +315,9 @@
 		font-weight: 600;
 	}
 
-	.user-status {
-		display: flex;
-		flex-direction: column;
-		gap: 0.25rem;
-	}
-
 	.username {
 		margin: 0;
 		font-size: 0.875rem;
-		color: #6b7280;
-	}
-
-	.online-status {
-		display: flex;
-		align-items: center;
-		gap: 0.25rem;
-	}
-
-	.status-indicator {
-		width: 6px;
-		height: 6px;
-		border-radius: 50%;
-		display: inline-block;
-	}
-
-	.status-indicator.online {
-		background-color: #10b981;
-		box-shadow: 0 0 0 1px rgba(16, 185, 129, 0.2);
-	}
-
-	.status-indicator.offline {
-		background-color: #6b7280;
-	}
-
-	.status-text {
-		font-size: 0.75rem;
 		color: #6b7280;
 	}
 
@@ -595,22 +332,6 @@
 
 	.close-btn:hover {
 		color: #374151;
-	}
-
-	.offline-notification {
-		background: #fef3c7;
-		border: 1px solid #f59e0b;
-		color: #92400e;
-		padding: 0.75rem 1rem;
-		display: flex;
-		align-items: center;
-		gap: 0.5rem;
-		font-size: 0.875rem;
-		border-bottom: 1px solid #e5e7eb;
-	}
-
-	.offline-icon {
-		font-size: 1rem;
 	}
 
 	.messages-container {
@@ -694,40 +415,6 @@
 		text-decoration: underline;
 	}
 
-	.message-sender {
-		display: flex;
-		align-items: center;
-		gap: 0.5rem;
-		margin-bottom: 0.25rem;
-		padding: 0 0.75rem;
-	}
-
-	.sender-avatar {
-		width: 20px;
-		height: 20px;
-		border-radius: 50%;
-		object-fit: cover;
-	}
-
-	.sender-avatar-placeholder {
-		width: 20px;
-		height: 20px;
-		border-radius: 50%;
-		background: #6366f1;
-		color: white;
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		font-size: 0.75rem;
-		font-weight: 600;
-	}
-
-	.sender-name {
-		font-size: 0.75rem;
-		font-weight: 600;
-		color: #6b7280;
-	}
-
 	.message-time {
 		font-size: 0.75rem;
 		color: #9ca3af;
@@ -757,24 +444,6 @@
 		cursor: pointer;
 		color: #6b7280;
 		font-size: 1.2rem;
-	}
-
-	.file-error {
-		display: flex;
-		align-items: center;
-		background: #fef2f2;
-		border: 1px solid #fecaca;
-		color: #dc2626;
-		padding: 0.5rem;
-		border-radius: 8px;
-		margin-bottom: 0.5rem;
-		font-size: 0.875rem;
-	}
-
-	.file-error span {
-		display: flex;
-		align-items: center;
-		gap: 0.5rem;
 	}
 
 	.input-row {
