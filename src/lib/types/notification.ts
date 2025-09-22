@@ -124,6 +124,7 @@ export interface Conversation {
 	last_message?: ChatMessage;
 	unread_count: number;
 	updated_at: string;
+	other_participant?: any; // Profile info of the other participant
 }
 
 export interface ChatAttachment {

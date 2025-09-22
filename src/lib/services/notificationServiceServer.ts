@@ -24,33 +24,46 @@ export class NotificationServiceServer {
 		return data || [];
 	}
 
-	// Get unread notifications and chat messages count
-	static async getUnreadCount(supabase: SupabaseClient, userId: string): Promise<number> {
-		// Count unread traditional notifications
-		const { count: notificationCount, error: notificationError } = await supabase
+	// Get unread system notifications count (excluding chat messages)
+	static async getUnreadNotificationsCount(supabase: SupabaseClient, userId: string): Promise<number> {
+		const { count, error } = await supabase
 			.from('notifications')
 			.select('id', { count: 'exact', head: true })
 			.eq('user_id', userId)
 			.eq('is_read', false)
-			.eq('message_type', MessageType.NOTIFICATION);
+			.eq('message_type', 'notification');
 
-		if (notificationError) {
-			throw new Error(`Failed to count unread notifications: ${notificationError.message}`);
+		if (error) {
+			throw new Error(`Failed to count unread notifications: ${error.message}`);
 		}
 
-		// Count unread chat messages (where user is recipient)
-		const { count: chatCount, error: chatError } = await supabase
+		return count || 0;
+	}
+
+	// Get unread chat messages count
+	static async getUnreadChatCount(supabase: SupabaseClient, userId: string): Promise<number> {
+		const { count, error } = await supabase
 			.from('notifications')
 			.select('id', { count: 'exact', head: true })
 			.eq('recipient_id', userId)
 			.eq('is_read', false)
-			.eq('message_type', MessageType.CHAT_MESSAGE);
+			.eq('message_type', 'chat_message');
 
-		if (chatError) {
-			throw new Error(`Failed to count unread chat messages: ${chatError.message}`);
+		if (error) {
+			throw new Error(`Failed to count unread chat messages: ${error.message}`);
 		}
 
-		return (notificationCount || 0) + (chatCount || 0);
+		return count || 0;
+	}
+
+	// Get combined unread count for notification bell
+	static async getTotalUnreadCount(supabase: SupabaseClient, userId: string): Promise<number> {
+		const [notificationCount, chatCount] = await Promise.all([
+			this.getUnreadNotificationsCount(supabase, userId),
+			this.getUnreadChatCount(supabase, userId)
+		]);
+
+		return notificationCount + chatCount;
 	}
 
 	// Mark a notification or chat message as read
