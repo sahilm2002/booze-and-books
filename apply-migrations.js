@@ -75,9 +75,15 @@ async function applyMigration(migrationFile) {
 }
 
 async function main() {
-  // List of migrations that need to be applied (the ones we modified)
+  // List of migrations that need to be applied (the new chat migrations)
   const migrationsToApply = [
-    '036_rebuild_swap_system.sql'
+    '051_extend_notifications_for_chat.sql',
+    '052_remove_duplicate_notifications.sql',
+    '053_fix_chat_message_rls_policy.sql',
+    '054_fix_message_type_column.sql',
+    '055_force_schema_refresh.sql',
+    '056_fix_foreign_keys_and_schema.sql',
+    '057_add_conversation_id_column.sql'
   ];
 
   console.log('Starting migration application...');
