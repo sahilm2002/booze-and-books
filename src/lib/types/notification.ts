@@ -85,3 +85,65 @@ export interface DailyReminderNotificationData {
 	swap_request_ids: string[];
 	reminder_type: 'pending_swaps' | 'counter_offers' | 'accepted_swaps';
 }
+
+// Chat-specific interfaces
+export interface ChatMessage extends Notification {
+	message_type: MessageType.CHAT_MESSAGE;
+	conversation_id: string;
+	sender_id: string;
+	recipient_id: string;
+}
+
+export interface ChatMessageInput {
+	recipient_id: string;
+	message: string;
+	attachment_url?: string;
+	attachment_type?: string;
+	attachment_size?: number;
+}
+
+export interface Conversation {
+	id: string;
+	participants: string[];
+	last_message?: ChatMessage;
+	unread_count: number;
+	updated_at: string;
+	other_participant?: any; // Profile info of the other participant
+}
+
+export interface ChatAttachment {
+	url: string;
+	type: string;
+	size: number;
+	name: string;
+}
+
+export interface ChatMessageNotificationData {
+	sender_id: string;
+	conversation_id: string;
+	has_attachment: boolean;
+}
+
+export interface ChatMessageReceivedNotificationData {
+	sender_id: string;
+	conversation_id: string;
+	has_attachment: boolean;
+}
+
+// Utility types
+export type ConversationParticipants = [string, string];
+
+export interface AttachmentValidation {
+	maxSize: number;
+	allowedTypes: string[];
+}
+
+export type ChatMessageFilter = {
+	conversation_id?: string;
+	sender_id?: string;
+	recipient_id?: string;
+	has_attachment?: boolean;
+	before?: string;
+	after?: string;
+	limit?: number;
+};

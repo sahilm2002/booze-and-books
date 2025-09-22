@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { createEventDispatcher } from 'svelte';
+	import { goto } from '$app/navigation';
 	import { auth } from '$lib/stores/auth';
 	import { profile } from '$lib/stores/profile';
 	import { swapStore } from '$lib/stores/swaps';
@@ -204,7 +205,15 @@
 				</div>
 			{/if}
 			<div class="user-details">
-				<h4>{otherUser.username || 'Unknown User'}</h4>
+				<h4>
+					<button 
+						class="username-link"
+						on:click={() => goto(`/app/profile/${otherUser.username}`)}
+						disabled={!otherUser.username}
+					>
+						{otherUser.username || 'Unknown User'}
+					</button>
+				</h4>
 				<div class="user-role">
 					{isIncoming ? 'Requesting your book' : 'Book owner'}
 				</div>
@@ -778,6 +787,28 @@
 		margin: 0 0 0.25rem 0;
 		font-size: 1.125rem;
 		font-weight: 600;
+	}
+
+	.username-link {
+		background: none;
+		border: none;
+		color: #3b82f6;
+		font-size: inherit;
+		font-weight: inherit;
+		cursor: pointer;
+		padding: 0;
+		text-decoration: none;
+		transition: color 0.2s ease;
+	}
+
+	.username-link:hover:not(:disabled) {
+		color: #2563eb;
+		text-decoration: underline;
+	}
+
+	.username-link:disabled {
+		color: inherit;
+		cursor: default;
 	}
 
 	.user-role {

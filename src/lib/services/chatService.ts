@@ -6,44 +6,13 @@ import { MessageType } from '../types/notification.js';
 export class ChatService {
 	// Send a chat message
 	static async sendMessage(input: ChatMessageInput): Promise<ChatMessage> {
-		// Fetch and validate the authenticated user
-		const auth = await supabase.auth.getUser();
-		if (!auth.data.user) {
-			throw new Error('Unauthenticated');
-		}
-		
-		const senderId = auth.data.user.id;
-
-		// Validate message content
-		const trimmedMessage = input.message?.trim() || '';
-		const hasValidMessage = trimmedMessage.length > 0;
-		const hasValidAttachment = input.attachment_url && input.attachment_url.trim().length > 0;
-
-		// Require either valid message or valid attachment
-		if (!hasValidMessage && !hasValidAttachment) {
-			throw new Error('Message content or attachment is required');
-		}
-
-		// Validate message length if message exists
-		if (hasValidMessage && trimmedMessage.length > 10000) {
-			throw new Error('Message exceeds maximum length of 10,000 characters');
-		}
-
-		// Generate deterministic conversation ID from participant pair
-		const conversationId = senderId < input.recipient_id 
-			? `${senderId}_${input.recipient_id}` 
-			: `${input.recipient_id}_${senderId}`;
-
 		const { data, error } = await supabase
 			.from('notifications')
 			.insert({
-				user_id: input.recipient_id, // Only recipient gets notification
-				type: 'CHAT_MESSAGE',
 				message_type: MessageType.CHAT_MESSAGE,
-				sender_id: senderId,
+				sender_id: (await supabase.auth.getUser()).data.user?.id,
 				recipient_id: input.recipient_id,
-				conversation_id: conversationId,
-				title: 'New Chat Message',
+				title: 'Chat Message',
 				message: input.message,
 				attachment_url: input.attachment_url,
 				attachment_type: input.attachment_type,
@@ -66,12 +35,10 @@ export class ChatService {
 		const { data, error } = await supabase
 			.from('notifications')
 			.select(`
-				id,
 				conversation_id,
 				sender_id,
 				recipient_id,
 				message,
-				message_type,
 				created_at,
 				is_read
 			`)
@@ -89,15 +56,6 @@ export class ChatService {
 		
 		data?.forEach(message => {
 			const conversationId = message.conversation_id;
-			
-			// Skip messages with missing conversation_id to avoid collapsing under "undefined" key
-			if (!conversationId) {
-				// Still collect user IDs for profile lookup even if conversation_id is missing
-				if (message.sender_id) userIds.add(message.sender_id);
-				if (message.recipient_id) userIds.add(message.recipient_id);
-				return;
-			}
-			
 			if (!conversationMap.has(conversationId) || 
 				new Date(message.created_at) > new Date(conversationMap.get(conversationId).created_at)) {
 				conversationMap.set(conversationId, message);
@@ -108,57 +66,28 @@ export class ChatService {
 		});
 
 		// Get profiles for all users in separate query
-		let profiles: any[] = [];
-		if (userIds.size > 0) {
-			const { data } = await supabase
-				.from('profiles')
-				.select('id, username, full_name, avatar_url')
-				.in('id', Array.from(userIds));
-			profiles = data || [];
-		}
+		const { data: profiles } = await supabase
+			.from('profiles')
+			.select('id, username, full_name, avatar_url')
+			.in('id', Array.from(userIds));
 
 		const profileMap = new Map();
-		profiles.forEach(profile => {
+		profiles?.forEach(profile => {
 			profileMap.set(profile.id, profile);
 		});
-
-		// Get unread counts for all conversations in a single query using SQL COUNT
-		const conversationIds = Array.from(conversationMap.keys());
-		const unreadCountMap = new Map<string, number>();
-		
-		if (conversationIds.length > 0) {
-			// Use a more efficient approach with SQL aggregation
-			let unreadCounts: any[] | null = null;
-			// RPC disabled: use fallback aggregation to avoid 404s when the function is not deployed
-			// unreadCounts remains null to trigger the fallback code path below
-
-			// If RPC function doesn't exist, fall back to the current approach but optimized
-			if (!unreadCounts) {
-				const { data: unreadMessages } = await supabase
-					.from('notifications')
-					.select('conversation_id')
-					.in('conversation_id', conversationIds)
-					.eq('recipient_id', userId)
-					.eq('is_read', false)
-					.eq('message_type', MessageType.CHAT_MESSAGE);
-
-				// Build a map of conversation_id -> count (ensure array type)
-				const unreadRows: Array<{ conversation_id: string }> = Array.isArray(unreadMessages) ? (unreadMessages as Array<{ conversation_id: string }>) : [];
-				unreadRows.forEach((row) => {
-					const count = unreadCountMap.get(row.conversation_id) || 0;
-					unreadCountMap.set(row.conversation_id, count + 1);
-				});
-			} else {
-				// Use the RPC results
-				unreadCounts.forEach((row: any) => {
-					unreadCountMap.set(row.conversation_id, row.unread_count);
-				});
-			}
-		}
 
 		// Convert to Conversation objects
 		const conversations: Conversation[] = [];
 		for (const [conversationId, lastMessage] of conversationMap) {
+			// Count unread messages for this conversation
+			const { count: unreadCount } = await supabase
+				.from('notifications')
+				.select('id', { count: 'exact', head: true })
+				.eq('conversation_id', conversationId)
+				.eq('recipient_id', userId)
+				.eq('is_read', false)
+				.eq('message_type', MessageType.CHAT_MESSAGE);
+
 			// Determine the other participant
 			const otherParticipantId = lastMessage.sender_id === userId 
 				? lastMessage.recipient_id 
@@ -169,7 +98,7 @@ export class ChatService {
 				id: conversationId,
 				participants: [lastMessage.sender_id, lastMessage.recipient_id],
 				last_message: lastMessage as ChatMessage,
-				unread_count: unreadCountMap.get(conversationId) || 0,
+				unread_count: unreadCount || 0,
 				updated_at: lastMessage.created_at,
 				other_participant: otherParticipant
 			});
@@ -212,17 +141,13 @@ export class ChatService {
 		});
 
 		// Get profiles in separate query
-		let profiles: any[] = [];
-		if (userIds.size > 0) {
-			const { data } = await supabase
-				.from('profiles')
-				.select('id, username, full_name, avatar_url')
-				.in('id', Array.from(userIds));
-			profiles = data || [];
-		}
+		const { data: profiles } = await supabase
+			.from('profiles')
+			.select('id, username, full_name, avatar_url')
+			.in('id', Array.from(userIds));
 
 		const profileMap = new Map();
-		profiles.forEach(profile => {
+		profiles?.forEach(profile => {
 			profileMap.set(profile.id, profile);
 		});
 
@@ -261,12 +186,6 @@ export class ChatService {
 
 	// Mark chat messages as read
 	static async markMessagesAsRead(conversationId: string, userId: string): Promise<void> {
-		// Validate inputs to prevent UUID errors - return early instead of throwing
-		if (!conversationId || !conversationId.trim() || !userId || !userId.trim()) {
-			console.warn('Invalid conversation ID or user ID provided to markMessagesAsRead, skipping operation');
-			return;
-		}
-
 		const { error } = await supabase
 			.from('notifications')
 			.update({ is_read: true })
@@ -301,34 +220,13 @@ export class ChatService {
 		conversationId: string,
 		file: File
 	): Promise<ChatAttachment> {
-		// Validate file size (e.g., 10MB limit)
-		const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
-		if (file.size > MAX_FILE_SIZE) {
-			throw new Error('File size exceeds 10MB limit');
-		}
-
-		// Validate file type (customize as needed)
-		const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'application/pdf'];
-		if (!ALLOWED_TYPES.includes(file.type)) {
-			throw new Error('File type not allowed. Allowed: JPEG, PNG, GIF, PDF.');
-		}
-
-		// Derive safe extension; fall back to MIME
-		const mimeToExt: Record<string, string> = {
-			'image/jpeg': 'jpg',
-			'image/png': 'png',
-			'image/gif': 'gif',
-			'application/pdf': 'pdf'
-		};
-		const parts = file.name.split('.');
-		const extFromName = parts.length > 1 ? parts.pop()!.toLowerCase() : null;
-		const fileExt = extFromName && extFromName.length <= 10 ? extFromName : (mimeToExt[file.type] ?? 'bin');
-		const fileName = `${(globalThis.crypto?.randomUUID?.() ?? Date.now())}.${fileExt}`;
+		const fileExt = file.name.split('.').pop();
+		const fileName = `${Date.now()}.${fileExt}`;
 		const filePath = `conversations/${conversationId}/${fileName}`;
 
 		const { data, error } = await supabase.storage
 			.from('chat-attachments')
-			.upload(filePath, file, { contentType: file.type, upsert: false });
+			.upload(filePath, file);
 
 		if (error) {
 			throw new Error(`Failed to upload attachment: ${error.message}`);
@@ -342,8 +240,7 @@ export class ChatService {
 			url: publicUrl,
 			type: file.type,
 			size: file.size,
-			name: file.name,
-			path: filePath
+			name: file.name
 		};
 	}
 
@@ -359,13 +256,7 @@ export class ChatService {
 	}
 
 	// Get chat participants info
-	static async getChatParticipants(conversationId: string): Promise<Array<{
-		id: string;
-		username: string;
-		full_name: string;
-		avatar_url: string;
-		email: string;
-	}>> {
+	static async getChatParticipants(conversationId: string): Promise<any[]> {
 		const { data, error } = await supabase
 			.from('notifications')
 			.select(`
@@ -387,13 +278,7 @@ export class ChatService {
 		}
 
 		const message = data[0];
-		return [message.sender_profile, message.recipient_profile].filter(Boolean) as unknown as Array<{
-			id: string;
-			username: string;
-			full_name: string;
-			avatar_url: string;
-			email: string;
-		}>;
+		return [message.sender_profile, message.recipient_profile];
 	}
 }
 
@@ -404,52 +289,12 @@ export class ChatServiceServer {
 		senderId: string,
 		input: ChatMessageInput
 	): Promise<ChatMessage> {
-		// Validate input parameters
-		if (typeof senderId !== 'string' || !senderId.trim()) {
-			throw new Error('Invalid sender ID');
-		}
-		
-		if (!input || typeof input !== 'object') {
-			throw new Error('Invalid input object');
-		}
-		
-		if (typeof input.recipient_id !== 'string' || !input.recipient_id.trim()) {
-			throw new Error('Invalid recipient ID');
-		}
-		
-		if (input.recipient_id === senderId) {
-			throw new Error('Cannot send message to yourself');
-		}
-
-		// Validate message content
-		const trimmedMessage = input.message?.trim() || '';
-		const hasValidMessage = trimmedMessage.length > 0;
-		const hasValidAttachment = input.attachment_url && input.attachment_url.trim().length > 0;
-
-		// Require either valid message or valid attachment
-		if (!hasValidMessage && !hasValidAttachment) {
-			throw new Error('Message content or attachment is required');
-		}
-
-		// Validate message length if message exists
-		if (hasValidMessage && trimmedMessage.length > 10000) {
-			throw new Error('Message exceeds maximum length of 10,000 characters');
-		}
-
-		// Generate deterministic conversation ID from participant pair
-		const conversationId = senderId < input.recipient_id 
-			? `${senderId}_${input.recipient_id}` 
-			: `${input.recipient_id}_${senderId}`;
-
 		const { data, error } = await supabase
 			.from('notifications')
 			.insert({
-				user_id: input.recipient_id, // Set user_id to recipient for chat messages
-				type: 'CHAT_MESSAGE', // Add required type field
 				message_type: MessageType.CHAT_MESSAGE,
 				sender_id: senderId,
 				recipient_id: input.recipient_id,
-				conversation_id: conversationId,
 				title: 'Chat Message',
 				message: input.message,
 				attachment_url: input.attachment_url,
@@ -474,12 +319,10 @@ export class ChatServiceServer {
 		const { data, error } = await supabase
 			.from('notifications')
 			.select(`
-				id,
 				conversation_id,
 				sender_id,
 				recipient_id,
 				message,
-				message_type,
 				created_at,
 				is_read,
 				sender_profile:profiles!notifications_sender_id_fkey(username, full_name, avatar_url),
@@ -515,36 +358,23 @@ export class ChatServiceServer {
 			}
 		});
 
-		// Get unread counts for all conversations in a single query
-		const conversationIds = Array.from(conversationMap.keys());
-		const unreadCountMap = new Map<string, number>();
-		
-		// Guard against empty array to prevent PostgREST 400/406 errors
-		if (conversationIds.length > 0) {
-			const { data: unreadCounts } = await supabase
+		// Convert to Conversation objects
+		const conversations: Conversation[] = [];
+		for (const [conversationId, lastMessage] of conversationMap) {
+			// Count unread messages for this conversation
+			const { count: unreadCount } = await supabase
 				.from('notifications')
-				.select('conversation_id')
-				.in('conversation_id', conversationIds)
+				.select('id', { count: 'exact', head: true })
+				.eq('conversation_id', conversationId)
 				.eq('recipient_id', userId)
 				.eq('is_read', false)
 				.eq('message_type', MessageType.CHAT_MESSAGE);
 
-			// Build a map of conversation_id -> count (ensure array type)
-			const unreadRows: Array<{ conversation_id: string }> = Array.isArray(unreadCounts) ? (unreadCounts as Array<{ conversation_id: string }>) : [];
-			unreadRows.forEach((row) => {
-				const count = unreadCountMap.get(row.conversation_id) || 0;
-				unreadCountMap.set(row.conversation_id, count + 1);
-			});
-		}
-
-		// Convert to Conversation objects
-		const conversations: Conversation[] = [];
-		for (const [conversationId, lastMessage] of conversationMap) {
 			conversations.push({
 				id: conversationId,
 				participants: [lastMessage.sender_id, lastMessage.recipient_id],
 				last_message: lastMessage as ChatMessage,
-				unread_count: unreadCountMap.get(conversationId) || 0,
+				unread_count: unreadCount || 0,
 				updated_at: lastMessage.created_at,
 				other_participant: lastMessage.other_participant
 			});
@@ -559,30 +389,9 @@ export class ChatServiceServer {
 	static async getChatHistory(
 		supabase: SupabaseClient,
 		conversationId: string,
-		userId: string,
 		limit = 50,
 		offset = 0
 	): Promise<ChatMessage[]> {
-		// First verify that the user is a participant in this conversation
-		// by checking if they are either sender or recipient in any message
-		const { data: authCheck, error: authError } = await supabase
-			.from('notifications')
-			.select('sender_id, recipient_id')
-			.eq('conversation_id', conversationId)
-			.eq('message_type', MessageType.CHAT_MESSAGE)
-			.or(`sender_id.eq.${userId},recipient_id.eq.${userId}`)
-			.limit(1);
-
-		if (authError) {
-			throw new Error(`Failed to verify conversation access: ${authError.message}`);
-		}
-
-		// If no messages found where user is participant, deny access
-		if (!authCheck || authCheck.length === 0) {
-			throw new Error('Unauthorized: You are not a participant in this conversation');
-		}
-
-		// User is authorized, fetch the chat history
 		const { data, error } = await supabase
 			.from('notifications')
 			.select(`
@@ -592,7 +401,6 @@ export class ChatServiceServer {
 			`)
 			.eq('conversation_id', conversationId)
 			.eq('message_type', MessageType.CHAT_MESSAGE)
-			.or(`sender_id.eq.${userId},recipient_id.eq.${userId}`)
 			.order('created_at', { ascending: false })
 			.range(offset, offset + limit - 1);
 

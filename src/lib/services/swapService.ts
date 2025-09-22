@@ -63,6 +63,68 @@ export class SwapService {
 				throw new Error(`Failed to create swap request: ${error.message}`);
 			}
 
+			// Create a chat message for the swap request using the proper chat service
+			try {
+				// Get both book titles for the message
+				const { data: requestedBookData } = await supabase
+					.from('books')
+					.select('title')
+					.eq('id', input.book_id)
+					.single();
+
+				const requestedBookTitle = requestedBookData?.title || 'a book';
+				
+				let chatMessage = '';
+				
+				if (input.offered_book_id) {
+					// Get the offered book title
+					const { data: offeredBookData } = await supabase
+						.from('books')
+						.select('title')
+						.eq('id', input.offered_book_id)
+						.single();
+					
+					const offeredBookTitle = offeredBookData?.title || 'my book';
+					
+					// Create message with both book titles
+					chatMessage = input.message 
+						? `Hi! I'm interested in swapping your book, "${requestedBookTitle}", in return for my book "${offeredBookTitle}". ${input.message}`
+						: `Hi! I'm interested in swapping your book, "${requestedBookTitle}", in return for my book "${offeredBookTitle}".`;
+				} else {
+					// Fallback for when no specific book is offered
+					chatMessage = input.message 
+						? `Hi! I'm interested in swapping for "${requestedBookTitle}". ${input.message}`
+						: `Hi! I'm interested in swapping for "${requestedBookTitle}".`;
+				}
+
+				// Generate conversation ID
+				const conversationId = requesterId < requestedBook.owner_id 
+					? `${requesterId}_${requestedBook.owner_id}` 
+					: `${requestedBook.owner_id}_${requesterId}`;
+
+				// Create chat message using proper structure
+				await supabase
+					.from('notifications')
+					.insert({
+						user_id: requestedBook.owner_id, // Required field for notifications table
+						type: 'CHAT_MESSAGE',
+						message_type: 'chat_message',
+						sender_id: requesterId,
+						recipient_id: requestedBook.owner_id,
+						conversation_id: conversationId,
+						title: 'Chat Message',
+						message: chatMessage,
+						data: {
+							swap_request_id: data.id,
+							book_id: input.book_id,
+							book_title: requestedBookTitle
+						}
+					});
+			} catch (chatError) {
+				console.error('Failed to create chat message for swap request:', chatError);
+				// Don't fail the entire swap request if chat message creation fails
+			}
+
 			return data;
 		} catch (error) {
 			console.error('Error creating swap request:', error);
