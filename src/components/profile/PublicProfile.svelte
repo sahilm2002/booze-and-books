@@ -2,7 +2,6 @@
 	import { createEventDispatcher } from 'svelte';
 	import type { ProfilePageData } from '$lib/types/profile';
 	import type { SwapHistoryItem } from '$lib/types/profile';
-	import { OnlineStatusService } from '$lib/services/onlineStatusService';
 
 	export let profileData: ProfilePageData;
 	export let currentUserId: string;
@@ -75,14 +74,6 @@
 				{/if}
 				
 				<div class="profile-meta">
-					<!-- Online Status -->
-					<div class="meta-item online-status">
-						<span class="status-indicator {profileData.profile.is_online ? 'online' : 'offline'}"></span>
-						<span class="status-text">
-							{OnlineStatusService.formatLastSeen(profileData.profile.last_seen_at || null, profileData.profile.is_online || false)}
-						</span>
-					</div>
-					
 					{#if profileData.profile.location}
 						<div class="meta-item">
 							<span class="meta-icon">📍</span>
@@ -90,19 +81,17 @@
 						</div>
 					{/if}
 					
-					<!-- Email removed for privacy - should only be shown with explicit user consent -->
+					{#if profileData.profile.email}
+						<div class="meta-item">
+							<span class="meta-icon">✉️</span>
+							<span>{profileData.profile.email}</span>
+						</div>
+					{/if}
 					
 					<div class="meta-item">
 						<span class="meta-icon">📅</span>
 						<span>Joined {formatDate(profileData.profile.created_at)}</span>
 					</div>
-					
-					{#if !OnlineStatusService.hasEverLoggedIn(profileData.profile.first_login_at || null)}
-						<div class="meta-item never-logged-in">
-							<span class="meta-icon">⚠️</span>
-							<span>Has never logged in</span>
-						</div>
-					{/if}
 				</div>
 			</div>
 		</div>
@@ -256,37 +245,6 @@
 
 	.meta-icon {
 		font-size: 1rem;
-	}
-
-	/* Online Status Styles */
-	.online-status {
-		font-weight: 500;
-	}
-
-	.status-indicator {
-		width: 8px;
-		height: 8px;
-		border-radius: 50%;
-		display: inline-block;
-		margin-right: 0.25rem;
-	}
-
-	.status-indicator.online {
-		background-color: #10b981;
-		box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.2);
-	}
-
-	.status-indicator.offline {
-		background-color: #6b7280;
-	}
-
-	.status-text {
-		color: #374151;
-	}
-
-	.never-logged-in {
-		color: #f59e0b;
-		font-weight: 500;
 	}
 
 	.profile-actions {
