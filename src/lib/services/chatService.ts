@@ -70,6 +70,15 @@ export class ChatService {
 		
 		data?.forEach(message => {
 			const conversationId = message.conversation_id;
+			
+			// Skip messages with missing conversation_id to avoid collapsing under "undefined" key
+			if (!conversationId) {
+				// Still collect user IDs for profile lookup even if conversation_id is missing
+				if (message.sender_id) userIds.add(message.sender_id);
+				if (message.recipient_id) userIds.add(message.recipient_id);
+				return;
+			}
+			
 			if (!conversationMap.has(conversationId) || 
 				new Date(message.created_at) > new Date(conversationMap.get(conversationId).created_at)) {
 				conversationMap.set(conversationId, message);
