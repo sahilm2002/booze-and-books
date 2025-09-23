@@ -81,12 +81,7 @@
 						</div>
 					{/if}
 					
-					{#if profileData.profile.email}
-						<div class="meta-item">
-							<span class="meta-icon">✉️</span>
-							<span>{profileData.profile.email}</span>
-						</div>
-					{/if}
+					<!-- Email removed for privacy - should only be shown with explicit user consent -->
 					
 					<div class="meta-item">
 						<span class="meta-icon">📅</span>
