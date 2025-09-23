@@ -132,6 +132,7 @@ export interface ChatAttachment {
 	type: string;
 	size: number;
 	name: string;
+	path?: string; // storage path to enable deletion by path
 }
 
 export interface ChatMessageNotificationData {

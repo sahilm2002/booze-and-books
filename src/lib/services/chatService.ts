@@ -286,16 +286,25 @@ export class ChatService {
 		// Validate file type (customize as needed)
 		const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'application/pdf'];
 		if (!ALLOWED_TYPES.includes(file.type)) {
-			throw new Error('File type not allowed');
+			throw new Error('File type not allowed. Allowed: JPEG, PNG, GIF, PDF.');
 		}
 
-		const fileExt = file.name.split('.').pop() || 'bin';
-		const fileName = `${Date.now()}.${fileExt}`;
+		// Derive safe extension; fall back to MIME
+		const mimeToExt: Record<string, string> = {
+			'image/jpeg': 'jpg',
+			'image/png': 'png',
+			'image/gif': 'gif',
+			'application/pdf': 'pdf'
+		};
+		const parts = file.name.split('.');
+		const extFromName = parts.length > 1 ? parts.pop()!.toLowerCase() : null;
+		const fileExt = extFromName && extFromName.length <= 10 ? extFromName : (mimeToExt[file.type] ?? 'bin');
+		const fileName = `${(globalThis.crypto?.randomUUID?.() ?? Date.now())}.${fileExt}`;
 		const filePath = `conversations/${conversationId}/${fileName}`;
 
 		const { data, error } = await supabase.storage
 			.from('chat-attachments')
-			.upload(filePath, file);
+			.upload(filePath, file, { contentType: file.type, upsert: false });
 
 		if (error) {
 			throw new Error(`Failed to upload attachment: ${error.message}`);
@@ -309,7 +318,8 @@ export class ChatService {
 			url: publicUrl,
 			type: file.type,
 			size: file.size,
-			name: file.name
+			name: file.name,
+			path: filePath
 		};
 	}
 
