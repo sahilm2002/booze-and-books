@@ -45,6 +45,9 @@ Imagine having access to a vast library of books owned by fellow readers in your
 - **Real-Time Updates**: Instant notifications for all swap status changes
 
 #### **Seamless Communication**
+- **Real-Time Chat System**: Direct messaging between users for swap discussions
+- **Chat Notifications**: Instant notifications for new messages with conversation previews
+- **Secure File Sharing**: Share images and documents (up to 10MB) in chat conversations
 - **Contact Information Sharing**: When both parties agree to a swap, contact details are automatically shared
 - **Email Notifications**: Stay updated on swap requests, approvals, and counter-offers
 - **In-App Notifications**: Real-time updates with book covers and detailed information
