@@ -238,9 +238,9 @@
 											{#if isImageAttachment(message.attachment_url, message.attachment_type || '')}
 												<img src={message.attachment_url} alt="Attachment" class="attachment-image" />
 											{:else}
-												<a href={message.attachment_url} target="_blank" class="attachment-link">
-													📎 View Attachment
-												</a>
+											<a href={message.attachment_url} target="_blank" rel="noopener noreferrer" class="attachment-link">
+												📎 View Attachment
+											</a>
 											{/if}
 										</div>
 									{/if}
