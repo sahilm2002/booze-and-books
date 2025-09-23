@@ -35,7 +35,19 @@ function testFileValidation(file) {
     }
 
     // Handle files without extensions safely
-    const fileExt = file.name.split('.').pop() || 'bin';
+    const lastDotIndex = file.name.lastIndexOf('.');
+    let fileExt;
+    
+    // Only treat text after dot as extension if:
+    // 1. A dot exists (lastDotIndex !== -1)
+    // 2. The dot is not the first character (lastDotIndex > 0)
+    // 3. There's text after the dot (lastDotIndex < file.name.length - 1)
+    if (lastDotIndex > 0 && lastDotIndex < file.name.length - 1) {
+      fileExt = file.name.substring(lastDotIndex + 1);
+    } else {
+      fileExt = 'bin'; // Default extension for files without valid extensions
+    }
+    
     const fileName = `${Date.now()}.${fileExt}`;
     
     console.log('✅ Validation passed, generated filename:', fileName);
