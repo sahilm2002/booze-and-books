@@ -14,7 +14,7 @@ export const load = async ({ params, locals }: { params: any; locals: any }) => 
 		// Get the profile by username
 		const { data: profile, error: profileError } = await supabase
 			.from('profiles')
-			.select('*')
+			.select('id, username, full_name, avatar_url, bio, location, created_at, updated_at')
 			.eq('username', username)
 			.single();
 
