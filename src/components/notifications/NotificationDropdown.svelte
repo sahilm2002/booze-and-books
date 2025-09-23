@@ -2,6 +2,7 @@
 	import { createEventDispatcher, onMount } from 'svelte';
 	import { NotificationServiceServer } from '$lib/services/notificationServiceServer';
 	import { ChatService } from '$lib/services/chatService';
+	import { NotificationType } from '$lib/types/notification';
 	import type { Notification, Conversation } from '$lib/types/notification';
 	import type { SupabaseClient } from '@supabase/supabase-js';
 
@@ -112,18 +113,28 @@
 		}
 	}
 
-	function getNotificationIcon(type: string) {
+	function getNotificationIcon(type: NotificationType) {
 		switch (type) {
-			case 'SWAP_ACCEPTED':
+			case NotificationType.SWAP_ACCEPTED:
 				return '✅';
-			case 'SWAP_DECLINED':
-				return '❌';
-			case 'SWAP_COMPLETED':
+			case NotificationType.SWAP_COMPLETED:
 				return '🎉';
-			case 'SWAP_CANCELLED':
+			case NotificationType.SWAP_CANCELLED:
 				return '🚫';
-			case 'COUNTER_OFFER_RECEIVED':
+			case NotificationType.SWAP_COUNTER_OFFER:
+			case NotificationType.COUNTER_OFFER_RECEIVED:
 				return '🔄';
+			case NotificationType.SWAP_REQUEST:
+				return '📩';
+			case NotificationType.SWAP_APPROVED:
+				return '👍';
+			case NotificationType.DAILY_REMINDER_PENDING_SWAPS:
+			case NotificationType.DAILY_REMINDER_COUNTER_OFFERS:
+			case NotificationType.DAILY_REMINDER_ACCEPTED_SWAPS:
+				return '⏰';
+			case NotificationType.CHAT_MESSAGE:
+			case NotificationType.CHAT_MESSAGE_RECEIVED:
+				return '💬';
 			default:
 				return '📢';
 		}
