@@ -14,12 +14,18 @@ export class ChatService {
 		
 		const senderId = auth.data.user.id;
 
+		// Generate deterministic conversation ID from participant pair
+		const conversationId = senderId < input.recipient_id 
+			? `${senderId}_${input.recipient_id}` 
+			: `${input.recipient_id}_${senderId}`;
+
 		const { data, error } = await supabase
 			.from('notifications')
 			.insert({
 				message_type: MessageType.CHAT_MESSAGE,
 				sender_id: senderId,
 				recipient_id: input.recipient_id,
+				conversation_id: conversationId,
 				title: 'Chat Message',
 				message: input.message,
 				attachment_url: input.attachment_url,
@@ -347,12 +353,18 @@ export class ChatServiceServer {
 		senderId: string,
 		input: ChatMessageInput
 	): Promise<ChatMessage> {
+		// Generate deterministic conversation ID from participant pair
+		const conversationId = senderId < input.recipient_id 
+			? `${senderId}_${input.recipient_id}` 
+			: `${input.recipient_id}_${senderId}`;
+
 		const { data, error } = await supabase
 			.from('notifications')
 			.insert({
 				message_type: MessageType.CHAT_MESSAGE,
 				sender_id: senderId,
 				recipient_id: input.recipient_id,
+				conversation_id: conversationId,
 				title: 'Chat Message',
 				message: input.message,
 				attachment_url: input.attachment_url,
