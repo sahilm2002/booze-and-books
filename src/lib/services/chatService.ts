@@ -89,13 +89,17 @@ export class ChatService {
 		});
 
 		// Get profiles for all users in separate query
-		const { data: profiles } = await supabase
-			.from('profiles')
-			.select('id, username, full_name, avatar_url')
-			.in('id', Array.from(userIds));
+		let profiles: any[] = [];
+		if (userIds.size > 0) {
+			const { data } = await supabase
+				.from('profiles')
+				.select('id, username, full_name, avatar_url')
+				.in('id', Array.from(userIds));
+			profiles = data || [];
+		}
 
 		const profileMap = new Map();
-		profiles?.forEach(profile => {
+		profiles.forEach(profile => {
 			profileMap.set(profile.id, profile);
 		});
 
@@ -190,13 +194,17 @@ export class ChatService {
 		});
 
 		// Get profiles in separate query
-		const { data: profiles } = await supabase
-			.from('profiles')
-			.select('id, username, full_name, avatar_url')
-			.in('id', Array.from(userIds));
+		let profiles: any[] = [];
+		if (userIds.size > 0) {
+			const { data } = await supabase
+				.from('profiles')
+				.select('id, username, full_name, avatar_url')
+				.in('id', Array.from(userIds));
+			profiles = data || [];
+		}
 
 		const profileMap = new Map();
-		profiles?.forEach(profile => {
+		profiles.forEach(profile => {
 			profileMap.set(profile.id, profile);
 		});
 
