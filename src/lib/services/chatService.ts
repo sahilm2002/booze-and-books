@@ -6,11 +6,19 @@ import { MessageType } from '../types/notification.js';
 export class ChatService {
 	// Send a chat message
 	static async sendMessage(input: ChatMessageInput): Promise<ChatMessage> {
+		// Fetch and validate the authenticated user
+		const auth = await supabase.auth.getUser();
+		if (!auth.data.user) {
+			throw new Error('Unauthenticated');
+		}
+		
+		const senderId = auth.data.user.id;
+
 		const { data, error } = await supabase
 			.from('notifications')
 			.insert({
 				message_type: MessageType.CHAT_MESSAGE,
-				sender_id: (await supabase.auth.getUser()).data.user?.id,
+				sender_id: senderId,
 				recipient_id: input.recipient_id,
 				title: 'Chat Message',
 				message: input.message,
@@ -76,18 +84,44 @@ export class ChatService {
 			profileMap.set(profile.id, profile);
 		});
 
+		// Get unread counts for all conversations in a single query using SQL COUNT
+		const conversationIds = Array.from(conversationMap.keys());
+		const unreadCountMap = new Map<string, number>();
+		
+		if (conversationIds.length > 0) {
+			// Use a more efficient approach with SQL aggregation
+			const { data: unreadCounts } = await supabase
+				.rpc('get_unread_counts_by_conversation', {
+					conversation_ids: conversationIds,
+					user_id: userId
+				});
+
+			// If RPC function doesn't exist, fall back to the current approach but optimized
+			if (!unreadCounts) {
+				const { data: unreadMessages } = await supabase
+					.from('notifications')
+					.select('conversation_id')
+					.in('conversation_id', conversationIds)
+					.eq('recipient_id', userId)
+					.eq('is_read', false)
+					.eq('message_type', MessageType.CHAT_MESSAGE);
+
+				// Build a map of conversation_id -> count
+				unreadMessages?.forEach(row => {
+					const count = unreadCountMap.get(row.conversation_id) || 0;
+					unreadCountMap.set(row.conversation_id, count + 1);
+				});
+			} else {
+				// Use the RPC results
+				unreadCounts.forEach((row: any) => {
+					unreadCountMap.set(row.conversation_id, row.unread_count);
+				});
+			}
+		}
+
 		// Convert to Conversation objects
 		const conversations: Conversation[] = [];
 		for (const [conversationId, lastMessage] of conversationMap) {
-			// Count unread messages for this conversation
-			const { count: unreadCount } = await supabase
-				.from('notifications')
-				.select('id', { count: 'exact', head: true })
-				.eq('conversation_id', conversationId)
-				.eq('recipient_id', userId)
-				.eq('is_read', false)
-				.eq('message_type', MessageType.CHAT_MESSAGE);
-
 			// Determine the other participant
 			const otherParticipantId = lastMessage.sender_id === userId 
 				? lastMessage.recipient_id 
@@ -98,7 +132,7 @@ export class ChatService {
 				id: conversationId,
 				participants: [lastMessage.sender_id, lastMessage.recipient_id],
 				last_message: lastMessage as ChatMessage,
-				unread_count: unreadCount || 0,
+				unread_count: unreadCountMap.get(conversationId) || 0,
 				updated_at: lastMessage.created_at,
 				other_participant: otherParticipant
 			});
@@ -220,7 +254,19 @@ export class ChatService {
 		conversationId: string,
 		file: File
 	): Promise<ChatAttachment> {
-		const fileExt = file.name.split('.').pop();
+		// Validate file size (e.g., 10MB limit)
+		const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
+		if (file.size > MAX_FILE_SIZE) {
+			throw new Error('File size exceeds 10MB limit');
+		}
+
+		// Validate file type (customize as needed)
+		const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'application/pdf'];
+		if (!ALLOWED_TYPES.includes(file.type)) {
+			throw new Error('File type not allowed');
+		}
+
+		const fileExt = file.name.split('.').pop() || 'bin';
 		const fileName = `${Date.now()}.${fileExt}`;
 		const filePath = `conversations/${conversationId}/${fileName}`;
 
@@ -256,7 +302,13 @@ export class ChatService {
 	}
 
 	// Get chat participants info
-	static async getChatParticipants(conversationId: string): Promise<any[]> {
+	static async getChatParticipants(conversationId: string): Promise<Array<{
+		id: string;
+		username: string;
+		full_name: string;
+		avatar_url: string;
+		email: string;
+	}>> {
 		const { data, error } = await supabase
 			.from('notifications')
 			.select(`
@@ -278,7 +330,13 @@ export class ChatService {
 		}
 
 		const message = data[0];
-		return [message.sender_profile, message.recipient_profile];
+		return [message.sender_profile, message.recipient_profile].filter(Boolean) as unknown as Array<{
+			id: string;
+			username: string;
+			full_name: string;
+			avatar_url: string;
+			email: string;
+		}>;
 	}
 }
 
@@ -358,23 +416,31 @@ export class ChatServiceServer {
 			}
 		});
 
+		// Get unread counts for all conversations in a single query
+		const conversationIds = Array.from(conversationMap.keys());
+		const { data: unreadCounts } = await supabase
+			.from('notifications')
+			.select('conversation_id')
+			.in('conversation_id', conversationIds)
+			.eq('recipient_id', userId)
+			.eq('is_read', false)
+			.eq('message_type', MessageType.CHAT_MESSAGE);
+
+		// Build a map of conversation_id -> count
+		const unreadCountMap = new Map<string, number>();
+		unreadCounts?.forEach(row => {
+			const count = unreadCountMap.get(row.conversation_id) || 0;
+			unreadCountMap.set(row.conversation_id, count + 1);
+		});
+
 		// Convert to Conversation objects
 		const conversations: Conversation[] = [];
 		for (const [conversationId, lastMessage] of conversationMap) {
-			// Count unread messages for this conversation
-			const { count: unreadCount } = await supabase
-				.from('notifications')
-				.select('id', { count: 'exact', head: true })
-				.eq('conversation_id', conversationId)
-				.eq('recipient_id', userId)
-				.eq('is_read', false)
-				.eq('message_type', MessageType.CHAT_MESSAGE);
-
 			conversations.push({
 				id: conversationId,
 				participants: [lastMessage.sender_id, lastMessage.recipient_id],
 				last_message: lastMessage as ChatMessage,
-				unread_count: unreadCount || 0,
+				unread_count: unreadCountMap.get(conversationId) || 0,
 				updated_at: lastMessage.created_at,
 				other_participant: lastMessage.other_participant
 			});
