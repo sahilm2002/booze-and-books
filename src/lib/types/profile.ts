@@ -2,12 +2,23 @@ export interface PublicProfile {
 	id: string;
 	username: string;
 	full_name?: string;
-	email?: string;
 	bio?: string;
 	location?: string;
 	avatar_url?: string;
 	created_at: string;
 	updated_at: string;
+}
+
+export interface PrivateProfile extends PublicProfile {
+	email?: string;
+}
+
+export interface ProfileUpdate {
+	username?: string;
+	full_name?: string;
+	bio?: string;
+	location?: string;
+	avatar_url?: string;
 }
 
 export interface UserContactInfo {

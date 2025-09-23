@@ -81,7 +81,6 @@ export const load = async ({ params, locals }: { params: any; locals: any }) => 
 				id: profile.id,
 				username: profile.username,
 				full_name: profile.full_name,
-				email: profile.email,
 				bio: profile.bio,
 				location: profile.location,
 				avatar_url: profile.avatar_url,

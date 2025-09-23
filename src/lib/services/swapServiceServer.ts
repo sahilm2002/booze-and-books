@@ -188,7 +188,7 @@ export class SwapServiceServer {
 				.in('id', Array.from(bookIds)),
 			supabase
 				.from('profiles')
-				.select('id, username, full_name, avatar_url, email, location')
+				.select('id, username, full_name, avatar_url, location')
 				.in('id', Array.from(userIds))
 		]);
 
@@ -397,14 +397,12 @@ export class SwapServiceServer {
 				requester_profile:profiles!swap_requests_requester_id_profiles_fkey (
 					username,
 					full_name,
-					avatar_url,
-					email
+					avatar_url
 				),
 				owner_profile:profiles!swap_requests_owner_id_profiles_fkey (
 					username,
 					full_name,
-					avatar_url,
-					email
+					avatar_url
 				)
 			`)
 			.eq('id', requestId)
@@ -636,14 +634,12 @@ export class SwapServiceServer {
 				requester_profile:profiles!swap_requests_requester_id_profiles_fkey (
 					username,
 					full_name,
-					avatar_url,
-					email
+					avatar_url
 				),
 				owner_profile:profiles!swap_requests_owner_id_profiles_fkey (
 					username,
 					full_name,
-					avatar_url,
-					email
+					avatar_url
 				)
 			`)
 			.eq('status', SwapStatus.COMPLETED)

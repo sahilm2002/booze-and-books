@@ -422,13 +422,9 @@
 						{#if otherUser.location}
 							<p><strong>Location:</strong> {otherUser.location}</p>
 						{/if}
-						{#if otherUser.email}
-							<p><strong>Email:</strong> {otherUser.email}</p>
-						{:else}
-							<p class="contact-note-small">
-								<strong>Email:</strong> Contact {otherUser.username} directly to exchange email addresses
-							</p>
-						{/if}
+						<p class="contact-note-small">
+							<strong>Email:</strong> Contact {otherUser.username} directly to exchange email addresses
+						</p>
 					</div>
 					
 					<div class="contact-user">
