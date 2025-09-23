@@ -18,6 +18,12 @@
 	let chatContainer: HTMLElement;
 	let fileInput: HTMLInputElement;
 	let selectedFile: File | null = null;
+	let fileError: string = '';
+
+	// File validation constants
+	const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB in bytes
+	const ALLOWED_MIME_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'application/pdf'];
+	const ALLOWED_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.gif', '.pdf'];
 
 	onMount(async () => {
 		if (isOpen && conversationId) {
@@ -92,13 +98,56 @@
 
 	function handleFileSelect(event: Event) {
 		const target = event.target as HTMLInputElement;
-		if (target.files && target.files[0]) {
-			selectedFile = target.files[0];
+		fileError = ''; // Clear previous errors
+		
+		if (!target.files || !target.files[0]) {
+			selectedFile = null;
+			return;
 		}
+
+		const file = target.files[0];
+		
+		// Validate file size
+		if (file.size > MAX_FILE_SIZE) {
+			fileError = `File size exceeds 10MB limit (${(file.size / (1024 * 1024)).toFixed(1)}MB)`;
+			selectedFile = null;
+			target.value = '';
+			return;
+		}
+
+		// Get file extension from name
+		const fileName = file.name.toLowerCase();
+		const fileExtension = fileName.includes('.') ? '.' + fileName.split('.').pop() : '';
+		
+		// Validate file type using both MIME type and extension
+		const isValidMimeType = ALLOWED_MIME_TYPES.includes(file.type);
+		const isValidExtension = fileExtension && ALLOWED_EXTENSIONS.includes(fileExtension);
+		
+		// If no extension, fall back to MIME type validation
+		if (!fileExtension) {
+			if (!isValidMimeType) {
+				fileError = 'Unsupported file type. Please select an image (JPEG, PNG, GIF) or PDF file.';
+				selectedFile = null;
+				target.value = '';
+				return;
+			}
+		} else {
+			// If extension exists, validate both extension and MIME type
+			if (!isValidExtension || !isValidMimeType) {
+				fileError = 'Unsupported file type. Please select an image (JPEG, PNG, GIF) or PDF file.';
+				selectedFile = null;
+				target.value = '';
+				return;
+			}
+		}
+
+		// File passed all validation
+		selectedFile = file;
 	}
 
 	function removeSelectedFile() {
 		selectedFile = null;
+		fileError = '';
 		if (fileInput) fileInput.value = '';
 	}
 
@@ -207,6 +256,11 @@
 
 			<!-- Message Input -->
 			<div class="message-input-container">
+				{#if fileError}
+					<div class="file-error">
+						<span>❌ {fileError}</span>
+					</div>
+				{/if}
 				{#if selectedFile}
 					<div class="selected-file">
 						<span>📎 {selectedFile.name}</span>
@@ -240,7 +294,7 @@
 						type="button" 
 						class="send-btn" 
 						on:click={sendMessage}
-						disabled={sending || (!newMessage.trim() && !selectedFile)}
+						disabled={sending || (!newMessage.trim() && !selectedFile) || !!fileError}
 					>
 						{sending ? '...' : 'Send'}
 					</button>
@@ -444,6 +498,24 @@
 		cursor: pointer;
 		color: #6b7280;
 		font-size: 1.2rem;
+	}
+
+	.file-error {
+		display: flex;
+		align-items: center;
+		background: #fef2f2;
+		border: 1px solid #fecaca;
+		color: #dc2626;
+		padding: 0.5rem;
+		border-radius: 8px;
+		margin-bottom: 0.5rem;
+		font-size: 0.875rem;
+	}
+
+	.file-error span {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
 	}
 
 	.input-row {
