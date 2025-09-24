@@ -63,7 +63,7 @@ export const GET: RequestHandler = async ({ url, locals }) => {
 				if (!conversationId) {
 					return json({ error: 'Conversation ID is required' }, { status: 400 });
 				}
-				const messages = await ChatServiceServer.getChatHistory(supabase, conversationId, limit, offset);
+				const messages = await ChatServiceServer.getChatHistory(supabase, conversationId, session.user.id, limit, offset);
 				return json({ messages });
 			}
 

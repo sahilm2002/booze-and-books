@@ -545,9 +545,30 @@ export class ChatServiceServer {
 	static async getChatHistory(
 		supabase: SupabaseClient,
 		conversationId: string,
+		userId: string,
 		limit = 50,
 		offset = 0
 	): Promise<ChatMessage[]> {
+		// First verify that the user is a participant in this conversation
+		// by checking if they are either sender or recipient in any message
+		const { data: authCheck, error: authError } = await supabase
+			.from('notifications')
+			.select('sender_id, recipient_id')
+			.eq('conversation_id', conversationId)
+			.eq('message_type', MessageType.CHAT_MESSAGE)
+			.or(`sender_id.eq.${userId},recipient_id.eq.${userId}`)
+			.limit(1);
+
+		if (authError) {
+			throw new Error(`Failed to verify conversation access: ${authError.message}`);
+		}
+
+		// If no messages found where user is participant, deny access
+		if (!authCheck || authCheck.length === 0) {
+			throw new Error('Unauthorized: You are not a participant in this conversation');
+		}
+
+		// User is authorized, fetch the chat history
 		const { data, error } = await supabase
 			.from('notifications')
 			.select(`
@@ -557,6 +578,7 @@ export class ChatServiceServer {
 			`)
 			.eq('conversation_id', conversationId)
 			.eq('message_type', MessageType.CHAT_MESSAGE)
+			.or(`sender_id.eq.${userId},recipient_id.eq.${userId}`)
 			.order('created_at', { ascending: false })
 			.range(offset, offset + limit - 1);
 
