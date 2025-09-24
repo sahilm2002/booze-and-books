@@ -51,7 +51,10 @@
 				// Only apply results if still on the same conversation and modal is open
 				if (isOpen && cid === conversationId) {
 					messages = history;
-					await ChatService.markMessagesAsRead(cid, currentUserId);
+					// Only mark messages as read if we have a valid currentUserId
+					if (currentUserId && currentUserId.trim()) {
+						await ChatService.markMessagesAsRead(cid, currentUserId);
+					}
 				}
 			} catch (error) {
 				if (cid === conversationId) {
@@ -94,7 +97,10 @@
 			};
 
 			const sentMessage = await ChatService.sendMessage(messageInput);
-			messages = [...messages, sentMessage];
+			
+			// Refresh chat history to get the complete message with profile data
+			const updatedHistory = await ChatService.getChatHistory(conversationId);
+			messages = updatedHistory;
 			
 			newMessage = '';
 			selectedFile = null;
@@ -247,6 +253,20 @@
 						</div>
 						{#each dayMessages as message}
 							<div class="message {message.sender_id === currentUserId ? 'sent' : 'received'}">
+								<!-- Show sender info for received messages -->
+								{#if message.sender_id !== currentUserId}
+									<div class="message-sender">
+										{#if message.sender_profile?.avatar_url}
+											<img src={message.sender_profile.avatar_url} alt={message.sender_profile.username} class="sender-avatar" />
+										{:else}
+											<div class="sender-avatar-placeholder">
+												{(message.sender_profile?.username || 'U').charAt(0).toUpperCase()}
+											</div>
+										{/if}
+										<span class="sender-name">{message.sender_profile?.username || 'Unknown'}</span>
+									</div>
+								{/if}
+								
 								<div class="message-content">
 									{#if message.message}
 										<p>{message.message}</p>
@@ -263,8 +283,13 @@
 										</div>
 									{/if}
 								</div>
+								
 								<div class="message-time">
-									{formatTime(message.created_at)}
+									{#if message.sender_id === currentUserId}
+										You • {formatTime(message.created_at)}
+									{:else}
+										{message.sender_profile?.username || 'Unknown'} • {formatTime(message.created_at)}
+									{/if}
 								</div>
 							</div>
 						{/each}
@@ -485,6 +510,40 @@
 	.attachment-link {
 		color: inherit;
 		text-decoration: underline;
+	}
+
+	.message-sender {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+		margin-bottom: 0.25rem;
+		padding: 0 0.75rem;
+	}
+
+	.sender-avatar {
+		width: 20px;
+		height: 20px;
+		border-radius: 50%;
+		object-fit: cover;
+	}
+
+	.sender-avatar-placeholder {
+		width: 20px;
+		height: 20px;
+		border-radius: 50%;
+		background: #6366f1;
+		color: white;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		font-size: 0.75rem;
+		font-weight: 600;
+	}
+
+	.sender-name {
+		font-size: 0.75rem;
+		font-weight: 600;
+		color: #6b7280;
 	}
 
 	.message-time {

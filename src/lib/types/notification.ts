@@ -108,6 +108,18 @@ export interface ChatMessage extends Notification {
 	conversation_id: string;
 	sender_id: string;
 	recipient_id: string;
+	sender_profile?: {
+		id: string;
+		username: string;
+		full_name: string;
+		avatar_url: string;
+	};
+	recipient_profile?: {
+		id: string;
+		username: string;
+		full_name: string;
+		avatar_url: string;
+	};
 }
 
 export interface ChatMessageInput {
