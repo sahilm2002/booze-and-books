@@ -16,12 +16,6 @@
 	let conversations: Conversation[] = [];
 	let loading = false;
 
-	onMount(async () => {
-		if (isOpen) {
-			await loadNotificationsAndChats();
-		}
-	});
-
 	$: if (isOpen) {
 		loadNotificationsAndChats();
 	}
@@ -173,10 +167,19 @@
 					{#if conversations.length > 0}
 						<div class="section">
 							<h4>Messages</h4>
-							{#each conversations as conversation}
+							{#each conversations as conversation (conversation.id)}
 								<div 
 									class="notification-item chat-item" 
+									tabindex="0"
+									role="button"
+									aria-label="Open chat with {conversation.other_participant?.full_name || conversation.other_participant?.username || 'Unknown User'}"
 									on:click={() => handleChatClick(conversation)}
+									on:keydown={(event) => {
+										if (event.key === 'Enter' || event.key === ' ' || event.key === 'Spacebar') {
+											event.preventDefault();
+											handleChatClick(conversation);
+										}
+									}}
 								>
 									<div class="item-icon">
 										{#if conversation.other_participant?.avatar_url}
@@ -218,10 +221,19 @@
 					{#if notifications.length > 0}
 						<div class="section">
 							<h4>System Notifications</h4>
-							{#each notifications as notification}
+							{#each notifications as notification (notification.id)}
 								<div 
 									class="notification-item system-item" 
+									tabindex="0"
+									role="button"
+									aria-label="Mark notification as read: {notification.title}"
 									on:click={() => markNotificationAsRead(notification)}
+									on:keydown={(event) => {
+										if (event.key === 'Enter' || event.key === ' ' || event.key === 'Spacebar') {
+											event.preventDefault();
+											markNotificationAsRead(notification);
+										}
+									}}
 									class:unread={!notification.is_read}
 								>
 									<div class="item-icon">
@@ -378,15 +390,22 @@
 		transition: background-color 0.15s ease;
 	}
 
-	.notification-item:hover {
+	.notification-item:hover,
+	.notification-item:focus {
 		background: #f9fafb;
+		outline: none;
+	}
+
+	.notification-item:focus {
+		box-shadow: 0 0 0 2px #6366f1;
 	}
 
 	.notification-item.unread {
 		background: #f0f9ff;
 	}
 
-	.notification-item.unread:hover {
+	.notification-item.unread:hover,
+	.notification-item.unread:focus {
 		background: #e0f2fe;
 	}
 
