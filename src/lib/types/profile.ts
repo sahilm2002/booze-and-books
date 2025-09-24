@@ -34,7 +34,7 @@ export interface SwapHistoryItem {
 	id: string;
 	book_title: string;
 	book_id: string;
-	status: 'PENDING' | 'ACCEPTED' | 'DECLINED' | 'COMPLETED' | 'CANCELLED';
+	status: 'PENDING' | 'ACCEPTED' | 'COUNTER_OFFER' | 'COMPLETED' | 'CANCELLED';
 	created_at: string;
 	completed_at?: string;
 	user_role: 'requester' | 'owner';
