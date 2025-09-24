@@ -14,6 +14,21 @@ export class ChatService {
 		
 		const senderId = auth.data.user.id;
 
+		// Validate message content
+		const trimmedMessage = input.message?.trim() || '';
+		const hasValidMessage = trimmedMessage.length > 0;
+		const hasValidAttachment = input.attachment_url && input.attachment_url.trim().length > 0;
+
+		// Require either valid message or valid attachment
+		if (!hasValidMessage && !hasValidAttachment) {
+			throw new Error('Message content or attachment is required');
+		}
+
+		// Validate message length if message exists
+		if (hasValidMessage && trimmedMessage.length > 10000) {
+			throw new Error('Message exceeds maximum length of 10,000 characters');
+		}
+
 		// Generate deterministic conversation ID from participant pair
 		const conversationId = senderId < input.recipient_id 
 			? `${senderId}_${input.recipient_id}` 
@@ -49,10 +64,12 @@ export class ChatService {
 		const { data, error } = await supabase
 			.from('notifications')
 			.select(`
+				id,
 				conversation_id,
 				sender_id,
 				recipient_id,
 				message,
+				message_type,
 				created_at,
 				is_read
 			`)
@@ -380,6 +397,38 @@ export class ChatServiceServer {
 		senderId: string,
 		input: ChatMessageInput
 	): Promise<ChatMessage> {
+		// Validate input parameters
+		if (typeof senderId !== 'string' || !senderId.trim()) {
+			throw new Error('Invalid sender ID');
+		}
+		
+		if (!input || typeof input !== 'object') {
+			throw new Error('Invalid input object');
+		}
+		
+		if (typeof input.recipient_id !== 'string' || !input.recipient_id.trim()) {
+			throw new Error('Invalid recipient ID');
+		}
+		
+		if (input.recipient_id === senderId) {
+			throw new Error('Cannot send message to yourself');
+		}
+
+		// Validate message content
+		const trimmedMessage = input.message?.trim() || '';
+		const hasValidMessage = trimmedMessage.length > 0;
+		const hasValidAttachment = input.attachment_url && input.attachment_url.trim().length > 0;
+
+		// Require either valid message or valid attachment
+		if (!hasValidMessage && !hasValidAttachment) {
+			throw new Error('Message content or attachment is required');
+		}
+
+		// Validate message length if message exists
+		if (hasValidMessage && trimmedMessage.length > 10000) {
+			throw new Error('Message exceeds maximum length of 10,000 characters');
+		}
+
 		// Generate deterministic conversation ID from participant pair
 		const conversationId = senderId < input.recipient_id 
 			? `${senderId}_${input.recipient_id}` 
@@ -416,10 +465,12 @@ export class ChatServiceServer {
 		const { data, error } = await supabase
 			.from('notifications')
 			.select(`
+				id,
 				conversation_id,
 				sender_id,
 				recipient_id,
 				message,
+				message_type,
 				created_at,
 				is_read,
 				sender_profile:profiles!notifications_sender_id_fkey(username, full_name, avatar_url),
