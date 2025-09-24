@@ -16,6 +16,7 @@ export const load: LayoutServerLoad = async ({ locals: { session, supabase } }) 
 
 	return {
 		session,
-		profile
+		profile,
+		user: session?.user || null
 	};
 };

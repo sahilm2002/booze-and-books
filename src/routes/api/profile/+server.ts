@@ -12,7 +12,7 @@ export const GET: RequestHandler = async ({ locals }) => {
 		let profile = await ProfileServiceServer.getProfile(locals.supabase, locals.user.id);
 		
 		if (!profile) {
-			const sanitizedUsername = ProfileServiceServer.sanitizeUsername(locals.user.email);
+    const sanitizedUsername = ProfileServiceServer.sanitizeUsername(locals.user?.email || '');
 			profile = await ProfileServiceServer.createProfile(locals.supabase, locals.user.id, {
 				username: sanitizedUsername,
 				full_name: locals.user.email
