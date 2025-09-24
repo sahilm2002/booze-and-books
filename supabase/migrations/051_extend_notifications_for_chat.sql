@@ -76,8 +76,8 @@ CREATE INDEX idx_notifications_created_at_desc ON notifications(created_at DESC)
 ALTER TABLE notifications 
 ADD CONSTRAINT check_chat_message_fields 
 CHECK (
-  (message_type = 'notification' AND sender_id IS NULL AND recipient_id IS NULL) OR
-  (message_type = 'chat_message' AND sender_id IS NOT NULL AND recipient_id IS NOT NULL AND conversation_id IS NOT NULL)
+  (message_type = 'notification' AND sender_id IS NULL AND recipient_id IS NULL AND user_id IS NOT NULL) OR
+  (message_type = 'chat_message' AND sender_id IS NOT NULL AND recipient_id IS NOT NULL AND conversation_id IS NOT NULL AND user_id IS NOT NULL)
 );
 
 -- Update existing RLS policies to handle chat messages
