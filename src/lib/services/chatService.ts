@@ -508,20 +508,24 @@ export class ChatServiceServer {
 
 		// Get unread counts for all conversations in a single query
 		const conversationIds = Array.from(conversationMap.keys());
-		const { data: unreadCounts } = await supabase
-			.from('notifications')
-			.select('conversation_id')
-			.in('conversation_id', conversationIds)
-			.eq('recipient_id', userId)
-			.eq('is_read', false)
-			.eq('message_type', MessageType.CHAT_MESSAGE);
-
-		// Build a map of conversation_id -> count
 		const unreadCountMap = new Map<string, number>();
-		unreadCounts?.forEach(row => {
-			const count = unreadCountMap.get(row.conversation_id) || 0;
-			unreadCountMap.set(row.conversation_id, count + 1);
-		});
+		
+		// Guard against empty array to prevent PostgREST 400/406 errors
+		if (conversationIds.length > 0) {
+			const { data: unreadCounts } = await supabase
+				.from('notifications')
+				.select('conversation_id')
+				.in('conversation_id', conversationIds)
+				.eq('recipient_id', userId)
+				.eq('is_read', false)
+				.eq('message_type', MessageType.CHAT_MESSAGE);
+
+			// Build a map of conversation_id -> count
+			unreadCounts?.forEach(row => {
+				const count = unreadCountMap.get(row.conversation_id) || 0;
+				unreadCountMap.set(row.conversation_id, count + 1);
+			});
+		}
 
 		// Convert to Conversation objects
 		const conversations: Conversation[] = [];
