@@ -25,10 +25,11 @@
 	const ALLOWED_MIME_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'application/pdf'];
 	const ALLOWED_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.gif', '.pdf'];
 
-	onMount(async () => {
-		if (isOpen && conversationId) {
-			await loadChatHistory();
-		}
+	// Track the current load operation to handle rapid changes
+	let currentLoadToken = 0;
+
+	onMount(() => {
+		// Initial mount - reactive statement will handle loading
 	});
 
 	afterUpdate(() => {
@@ -38,16 +39,49 @@
 		}
 	});
 
+	// Reactive watcher: Load chat history when modal opens or conversation changes
+	$: if (isOpen && conversationId) {
+		(async () => {
+			// Generate a unique token for this load operation
+			const loadToken = ++currentLoadToken;
+			
+			try {
+				loading = true;
+				// Clear messages immediately when switching conversations to prevent showing wrong history
+				messages = [];
+				
+				// Load history for the specific conversation
+				const history = await ChatService.getChatHistory(conversationId);
+				
+				// Only apply results if this is still the latest load operation
+				if (loadToken === currentLoadToken) {
+					messages = history;
+					// Mark messages as read when chat is opened
+					await ChatService.markMessagesAsRead(conversationId, currentUserId);
+				}
+			} catch (error) {
+				// Only log error if this is still the latest load operation
+				if (loadToken === currentLoadToken) {
+					console.error('Failed to load chat history:', error);
+				}
+			} finally {
+				// Only update loading state if this is still the latest load operation
+				if (loadToken === currentLoadToken) {
+					loading = false;
+				}
+			}
+		})();
+	} else if (!isOpen) {
+		// Clear messages when modal is closed to ensure clean state
+		messages = [];
+		loading = false;
+	}
+
 	async function loadChatHistory() {
-		try {
-			loading = true;
-			messages = await ChatService.getChatHistory(conversationId);
-			// Mark messages as read when chat is opened
-			await ChatService.markMessagesAsRead(conversationId, currentUserId);
-		} catch (error) {
-			console.error('Failed to load chat history:', error);
-		} finally {
-			loading = false;
+		// This function is kept for backward compatibility but the reactive statement handles loading
+		if (isOpen && conversationId) {
+			// Trigger the reactive statement by updating a dependency
+			currentLoadToken++;
 		}
 	}
 
