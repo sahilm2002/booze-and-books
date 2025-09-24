@@ -139,26 +139,24 @@
 		const fileName = file.name.toLowerCase();
 		const fileExtension = fileName.includes('.') ? '.' + fileName.split('.').pop() : '';
 		
-		// Validate file type using both MIME type and extension
+		// Validate file type using MIME type and extension
 		const isValidMimeType = ALLOWED_MIME_TYPES.includes(file.type);
 		const isValidExtension = fileExtension && ALLOWED_EXTENSIONS.includes(fileExtension);
 		
-		// If no extension, fall back to MIME type validation
-		if (!fileExtension) {
-			if (!isValidMimeType) {
-				fileError = 'Unsupported file type. Please select an image (JPEG, PNG, GIF) or PDF file.';
-				selectedFile = null;
-				target.value = '';
-				return;
-			}
-		} else {
-			// If extension exists, validate both extension and MIME type
-			if (!isValidExtension || !isValidMimeType) {
-				fileError = 'Unsupported file type. Please select an image (JPEG, PNG, GIF) or PDF file.';
-				selectedFile = null;
-				target.value = '';
-				return;
-			}
+		// Reject immediately if MIME type is present and explicitly not allowed
+		if (file.type && !isValidMimeType) {
+			fileError = 'Unsupported file type. Please select an image (JPEG, PNG, GIF) or PDF file.';
+			selectedFile = null;
+			target.value = '';
+			return;
+		}
+		
+		// Accept if either MIME type OR extension is valid
+		if (!isValidMimeType && !isValidExtension) {
+			fileError = 'Unsupported file type. Please select an image (JPEG, PNG, GIF) or PDF file.';
+			selectedFile = null;
+			target.value = '';
+			return;
 		}
 
 		// File passed all validation
