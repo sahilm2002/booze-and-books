@@ -37,6 +37,8 @@ export class ChatService {
 		const { data, error } = await supabase
 			.from('notifications')
 			.insert({
+				user_id: input.recipient_id, // Set user_id to recipient for chat messages
+				type: 'CHAT_MESSAGE', // Add required type field
 				message_type: MessageType.CHAT_MESSAGE,
 				sender_id: senderId,
 				recipient_id: input.recipient_id,
@@ -260,6 +262,12 @@ export class ChatService {
 
 	// Mark chat messages as read
 	static async markMessagesAsRead(conversationId: string, userId: string): Promise<void> {
+		// Validate inputs to prevent UUID errors - return early instead of throwing
+		if (!conversationId || !conversationId.trim() || !userId || !userId.trim()) {
+			console.warn('Invalid conversation ID or user ID provided to markMessagesAsRead, skipping operation');
+			return;
+		}
+
 		const { error } = await supabase
 			.from('notifications')
 			.update({ is_read: true })
@@ -437,6 +445,8 @@ export class ChatServiceServer {
 		const { data, error } = await supabase
 			.from('notifications')
 			.insert({
+				user_id: input.recipient_id, // Set user_id to recipient for chat messages
+				type: 'CHAT_MESSAGE', // Add required type field
 				message_type: MessageType.CHAT_MESSAGE,
 				sender_id: senderId,
 				recipient_id: input.recipient_id,
