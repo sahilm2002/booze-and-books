@@ -4,6 +4,16 @@ import type { Book, BookWithOwner } from '$lib/types/book';
 import type { SwapRequestWithBook } from '$lib/types/swap';
 import type { Notification } from '$lib/types/notification';
 
+// Sanitized user type that excludes sensitive tokens and metadata
+export interface SafeUser {
+	id: string;
+	email?: string;
+	user_metadata?: {
+		full_name?: string;
+		avatar_url?: string;
+	};
+}
+
 // See https://svelte.dev/docs/kit/types#app.d.ts
 // for information about these interfaces
 declare global {
@@ -18,7 +28,7 @@ declare global {
 		interface PageData {
 			session: Session | null;
 			profile: PrivateProfile | null;
-			user: User | null;
+			user: SafeUser | null;
 			bookCount?: number;
 			recentBooks?: Book[];
 			books?: Book[];

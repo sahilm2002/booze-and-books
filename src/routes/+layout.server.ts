@@ -15,8 +15,16 @@ export const load: LayoutServerLoad = async ({ locals: { session, supabase } }) 
 	}
 
 	return {
-		session,
+		session: null, // Never expose raw session with tokens
 		profile,
-		user: session?.user || null
+		user: session?.user ? {
+			id: session.user.id,
+			email: session.user.email,
+			// Only include safe user metadata fields if needed
+			user_metadata: session.user.user_metadata ? {
+				full_name: session.user.user_metadata.full_name,
+				avatar_url: session.user.user_metadata.avatar_url
+			} : {}
+		} : null
 	};
 };

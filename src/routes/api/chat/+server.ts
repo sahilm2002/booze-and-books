@@ -72,9 +72,14 @@ export const GET: RequestHandler = async ({ url, locals }) => {
 			}
 		}
 	} catch (error) {
-		console.error('Chat API error:', error);
+		// Generate error reference ID for support correlation
+		const errorId = `chat-get-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+		console.error(`Chat API GET error [${errorId}]:`, error);
 		return json(
-			{ error: error instanceof Error ? error.message : 'Failed to process chat request' },
+			{ 
+				error: 'Internal server error processing chat request',
+				errorId 
+			},
 			{ status: 500 }
 		);
 	}
@@ -142,9 +147,14 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 			}
 		}
 	} catch (error) {
-		console.error('Chat API error:', error);
+		// Generate error reference ID for support correlation
+		const errorId = `chat-post-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+		console.error(`Chat API POST error [${errorId}]:`, error);
 		return json(
-			{ error: error instanceof Error ? error.message : 'Failed to process chat request' },
+			{ 
+				error: 'Failed to process chat request',
+				errorId 
+			},
 			{ status: 500 }
 		);
 	}
