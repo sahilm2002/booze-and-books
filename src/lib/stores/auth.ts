@@ -24,7 +24,7 @@ function createAuthStore() {
 	const initializeActivityService = () => {
 		activityService.initialize(async () => {
 			console.log('Auto-logout triggered due to inactivity');
-			await auth.signOut();
+			await auth.signOutToHomepage();
 		});
 	};
 
@@ -83,7 +83,10 @@ function createAuthStore() {
 
 					// If we have a session, start activity tracking
 					if (finalSession) {
+						console.log('Initializing activity service for user:', finalSession.user.email);
 						initializeActivityService();
+					} else {
+						console.log('No session found, activity service not initialized');
 					}
 				}).catch(error => {
 					console.error('Error getting initial session:', error);
@@ -109,12 +112,14 @@ function createAuthStore() {
 
 					// Handle sign out
 					if (event === 'SIGNED_OUT') {
+						console.log('User signed out, destroying activity service');
 						activityService.destroy();
 						await goto('/auth/login', { replaceState: true });
 					}
 					
 					// Handle sign in - start activity tracking only (no redirect)
 					if (event === 'SIGNED_IN') {
+						console.log('User signed in, initializing activity service');
 						initializeActivityService();
 						await invalidateAll();
 						// Login component handles redirect directly - no redirect here
@@ -122,6 +127,7 @@ function createAuthStore() {
 					
 					// Handle token refresh
 					if (event === 'TOKEN_REFRESHED') {
+						console.log('Token refreshed, reinitializing activity service');
 						initializeActivityService();
 						await invalidateAll();
 					}
@@ -172,6 +178,43 @@ function createAuthStore() {
 
 				// Redirect to login
 				await goto('/auth/login', { replaceState: true });
+
+				return { error: null };
+			} catch (error) {
+				console.error('Error signing out:', error);
+				update(state => ({ ...state, loading: false }));
+				return { error: error as Error };
+			}
+		},
+
+		/**
+		 * Sign out the current user and redirect to homepage - for auto-logout
+		 */
+		signOutToHomepage: async () => {
+			update(state => ({ ...state, loading: true }));
+			
+			try {
+				// Sign out from Supabase client-side
+				const { error } = await supabase.auth.signOut();
+
+				if (error) {
+					console.error('Error signing out:', error);
+					update(state => ({ ...state, loading: false }));
+					return { error };
+				}
+
+				// Clear auth state
+				set({
+					session: null,
+					user: null,
+					loading: false
+				});
+
+				// Stop activity tracking
+				activityService.destroy();
+
+				// Redirect to homepage instead of login
+				await goto('/', { replaceState: true });
 
 				return { error: null };
 			} catch (error) {
