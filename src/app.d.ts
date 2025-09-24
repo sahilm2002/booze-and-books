@@ -1,5 +1,5 @@
 import type { Session, User, SupabaseClient } from '@supabase/supabase-js';
-import type { Profile } from '$lib/types/profile';
+import type { PrivateProfile } from '$lib/types/profile';
 import type { Book, BookWithOwner } from '$lib/types/book';
 import type { SwapRequestWithBook } from '$lib/types/swap';
 import type { Notification } from '$lib/types/notification';
@@ -17,7 +17,7 @@ declare global {
 		}
 		interface PageData {
 			session: Session | null;
-			profile: Profile | null;
+			profile: PrivateProfile | null;
 			user: User | null;
 			bookCount?: number;
 			recentBooks?: Book[];

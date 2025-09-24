@@ -1,8 +1,8 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
-import type { Profile, ProfileUpdate } from '$lib/types/profile';
+import type { PrivateProfile, ProfileUpdate } from '$lib/types/profile';
 
 export class ProfileServiceServer {
-	static async getProfile(supabase: SupabaseClient, userId: string): Promise<Profile | null> {
+	static async getProfile(supabase: SupabaseClient, userId: string): Promise<PrivateProfile | null> {
 		const { data, error } = await supabase
 			.from('profiles')
 			.select('*')
@@ -19,7 +19,7 @@ export class ProfileServiceServer {
 		return data;
 	}
 
-	static async updateProfile(supabase: SupabaseClient, userId: string, updates: ProfileUpdate): Promise<Profile> {
+	static async updateProfile(supabase: SupabaseClient, userId: string, updates: ProfileUpdate): Promise<PrivateProfile> {
 		const { data, error } = await supabase
 			.from('profiles')
 			.update(updates)
@@ -34,7 +34,7 @@ export class ProfileServiceServer {
 		return data;
 	}
 
-	static async createProfile(supabase: SupabaseClient, userId: string, initialData?: Partial<ProfileUpdate>): Promise<Profile> {
+	static async createProfile(supabase: SupabaseClient, userId: string, initialData?: Partial<ProfileUpdate>): Promise<PrivateProfile> {
 		const profileData = {
 			id: userId,
 			username: initialData?.username || null,
