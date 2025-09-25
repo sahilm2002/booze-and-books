@@ -14,7 +14,7 @@ export const load = async ({ params, locals }: { params: any; locals: any }) => 
 		// Get the profile by username
 		const { data: profile, error: profileError } = await supabase
 			.from('profiles')
-			.select('id, username, full_name, avatar_url, bio, location, created_at, updated_at')
+			.select('id, username, full_name, avatar_url, bio, location, created_at, updated_at, is_online, last_seen_at, first_login_at')
 			.eq('username', username)
 			.single();
 
@@ -85,7 +85,10 @@ export const load = async ({ params, locals }: { params: any; locals: any }) => 
 				location: profile.location,
 				avatar_url: profile.avatar_url,
 				created_at: profile.created_at,
-				updated_at: profile.updated_at
+				updated_at: profile.updated_at,
+				is_online: profile.is_online,
+				last_seen_at: profile.last_seen_at,
+				first_login_at: profile.first_login_at
 			},
 			swap_history_with_current_user: transformedSwapHistory,
 			can_chat: true, // Users can always chat with each other

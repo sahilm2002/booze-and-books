@@ -5,7 +5,7 @@ export class ProfileServiceServer {
 	static async getProfile(supabase: SupabaseClient, userId: string): Promise<PrivateProfile | null> {
 		const { data, error } = await supabase
 			.from('profiles')
-			.select('*')
+			.select('*, is_online, last_seen_at, first_login_at')
 			.eq('id', userId)
 			.single();
 
