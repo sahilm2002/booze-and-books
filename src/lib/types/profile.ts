@@ -7,6 +7,9 @@ export interface PublicProfile {
 	avatar_url?: string;
 	created_at: string;
 	updated_at: string;
+	is_online?: boolean;
+	last_seen_at?: string;
+	first_login_at?: string;
 }
 
 export interface PrivateProfile extends PublicProfile {
