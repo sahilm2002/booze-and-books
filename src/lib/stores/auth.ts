@@ -4,6 +4,7 @@ import { supabase } from '$lib/supabase';
 import { goto, invalidateAll } from '$app/navigation';
 import { browser } from '$app/environment';
 import { activityService } from '$lib/services/activityService';
+import { onlineStatusService } from '$lib/services/onlineStatusService';
 
 export interface AuthState {
 	session: Session | null;
@@ -81,12 +82,13 @@ function createAuthStore() {
 						loading: false
 					});
 
-					// If we have a session, start activity tracking
+					// If we have a session, start activity tracking and online status tracking
 					if (finalSession) {
-						console.log('Initializing activity service for user:', finalSession.user.email);
+						console.log('Initializing services for user:', finalSession.user.email);
 						initializeActivityService();
+						onlineStatusService.startTracking(finalSession.user.id);
 					} else {
-						console.log('No session found, activity service not initialized');
+						console.log('No session found, services not initialized');
 					}
 				}).catch(error => {
 					console.error('Error getting initial session:', error);
@@ -112,23 +114,26 @@ function createAuthStore() {
 
 					// Handle sign out
 					if (event === 'SIGNED_OUT') {
-						console.log('User signed out, destroying activity service');
+						console.log('User signed out, destroying services');
 						activityService.destroy();
+						onlineStatusService.stopTracking();
 						await goto('/auth/login', { replaceState: true });
 					}
 					
-					// Handle sign in - start activity tracking only (no redirect)
-					if (event === 'SIGNED_IN') {
-						console.log('User signed in, initializing activity service');
+					// Handle sign in - start activity tracking and online status tracking (no redirect)
+					if (event === 'SIGNED_IN' && session) {
+						console.log('User signed in, initializing services');
 						initializeActivityService();
+						onlineStatusService.startTracking(session.user.id);
 						await invalidateAll();
 						// Login component handles redirect directly - no redirect here
 					}
 					
 					// Handle token refresh
-					if (event === 'TOKEN_REFRESHED') {
-						console.log('Token refreshed, reinitializing activity service');
+					if (event === 'TOKEN_REFRESHED' && session) {
+						console.log('Token refreshed, reinitializing services');
 						initializeActivityService();
+						onlineStatusService.startTracking(session.user.id);
 						await invalidateAll();
 					}
 				});
@@ -173,8 +178,9 @@ function createAuthStore() {
 					loading: false
 				});
 
-				// Stop activity tracking
+				// Stop activity tracking and online status tracking
 				activityService.destroy();
+				onlineStatusService.stopTracking();
 
 				// Redirect to login
 				await goto('/auth/login', { replaceState: true });
@@ -210,8 +216,9 @@ function createAuthStore() {
 					loading: false
 				});
 
-				// Stop activity tracking
+				// Stop activity tracking and online status tracking
 				activityService.destroy();
+				onlineStatusService.stopTracking();
 
 				// Redirect to homepage instead of login
 				await goto('/', { replaceState: true });
