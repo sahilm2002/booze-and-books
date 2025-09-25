@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { createEventDispatcher, onMount, afterUpdate } from 'svelte';
 	import { ChatService } from '$lib/services/chatService';
+	import { onlineStatusService, OnlineStatusService } from '$lib/services/onlineStatusService';
 	import type { ChatMessage, ChatMessageInput } from '$lib/types/notification';
 	import type { PublicProfile } from '$lib/types/profile';
 
@@ -8,6 +9,8 @@
 	export let conversationId: string;
 	export let otherUser: PublicProfile;
 	export let currentUserId: string;
+
+	let otherUserOnlineStatus: { is_online: boolean; last_seen_at: string | null; first_login_at: string | null } | null = null;
 
 	const dispatch = createEventDispatcher();
 
@@ -70,6 +73,19 @@
 		// Clear messages when modal is closed to ensure clean state
 		messages = [];
 		loading = false;
+		otherUserOnlineStatus = null;
+	}
+
+	// Fetch other user's online status when modal opens
+	$: if (isOpen && otherUser?.id) {
+		(async () => {
+			try {
+				const status = await onlineStatusService.getUserOnlineStatus(otherUser.id);
+				otherUserOnlineStatus = status;
+			} catch (error) {
+				console.error('Failed to fetch user online status:', error);
+			}
+		})();
 	}
 
 	// loadChatHistory no longer needed; reactive statement handles loading
@@ -232,11 +248,29 @@
 					{/if}
 					<div>
 						<h3>{otherUser.full_name || otherUser.username}</h3>
-						<p class="username">@{otherUser.username}</p>
+						<div class="user-status">
+							<p class="username">@{otherUser.username}</p>
+							{#if otherUserOnlineStatus}
+								<div class="online-status">
+									<span class="status-indicator {otherUserOnlineStatus.is_online ? 'online' : 'offline'}"></span>
+									<span class="status-text">
+										{OnlineStatusService.formatLastSeen(otherUserOnlineStatus.last_seen_at, otherUserOnlineStatus.is_online)}
+									</span>
+								</div>
+							{/if}
+						</div>
 					</div>
 				</div>
 				<button class="close-btn" on:click={closeModal}>×</button>
 			</div>
+
+			<!-- Offline notification -->
+			{#if otherUserOnlineStatus && !otherUserOnlineStatus.is_online}
+				<div class="offline-notification">
+					<span class="offline-icon">💤</span>
+					<span>{otherUser.username} is not available right now. They will see your message when they log in.</span>
+				</div>
+			{/if}
 
 			<!-- Messages -->
 			<div class="messages-container" bind:this={chatContainer}>
@@ -412,9 +446,42 @@
 		font-weight: 600;
 	}
 
+	.user-status {
+		display: flex;
+		flex-direction: column;
+		gap: 0.25rem;
+	}
+
 	.username {
 		margin: 0;
 		font-size: 0.875rem;
+		color: #6b7280;
+	}
+
+	.online-status {
+		display: flex;
+		align-items: center;
+		gap: 0.25rem;
+	}
+
+	.status-indicator {
+		width: 6px;
+		height: 6px;
+		border-radius: 50%;
+		display: inline-block;
+	}
+
+	.status-indicator.online {
+		background-color: #10b981;
+		box-shadow: 0 0 0 1px rgba(16, 185, 129, 0.2);
+	}
+
+	.status-indicator.offline {
+		background-color: #6b7280;
+	}
+
+	.status-text {
+		font-size: 0.75rem;
 		color: #6b7280;
 	}
 
@@ -429,6 +496,22 @@
 
 	.close-btn:hover {
 		color: #374151;
+	}
+
+	.offline-notification {
+		background: #fef3c7;
+		border: 1px solid #f59e0b;
+		color: #92400e;
+		padding: 0.75rem 1rem;
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+		font-size: 0.875rem;
+		border-bottom: 1px solid #e5e7eb;
+	}
+
+	.offline-icon {
+		font-size: 1rem;
 	}
 
 	.messages-container {
