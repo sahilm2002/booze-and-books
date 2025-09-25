@@ -1,5 +1,6 @@
 <script lang="ts">
-	import { createEventDispatcher, onMount, afterUpdate } from 'svelte';
+	import { createEventDispatcher, onMount, afterUpdate, onDestroy } from 'svelte';
+	import { goto } from '$app/navigation';
 	import { ChatService } from '$lib/services/chatService';
 	import { onlineStatusService, OnlineStatusService } from '$lib/services/onlineStatusService';
 	import type { ChatMessage, ChatMessageInput } from '$lib/types/notification';
@@ -22,6 +23,8 @@
 	let fileInput: HTMLInputElement;
 	let selectedFile: File | null = null;
 	let fileError: string = '';
+	let realtimeInterval: NodeJS.Timeout | null = null;
+	let statusInterval: NodeJS.Timeout | null = null;
 
 	// File validation constants
 	const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB in bytes
@@ -34,12 +37,64 @@
 		// Initial mount - reactive statement will handle loading
 	});
 
+	onDestroy(() => {
+		// Clean up intervals when component is destroyed
+		if (realtimeInterval) {
+			clearInterval(realtimeInterval);
+			realtimeInterval = null;
+		}
+		if (statusInterval) {
+			clearInterval(statusInterval);
+			statusInterval = null;
+		}
+	});
+
 	afterUpdate(() => {
 		// Scroll to bottom when new messages are added
 		if (chatContainer) {
 			chatContainer.scrollTop = chatContainer.scrollHeight;
 		}
 	});
+
+	// Function to navigate to user profile
+	async function goToProfile(username: string) {
+		closeModal();
+		await goto(`/app/profile/${username}`);
+	}
+
+	// Function to refresh messages for real-time updates
+	async function refreshMessages() {
+		if (!isOpen || !conversationId) return;
+		
+		try {
+			const updatedHistory = await ChatService.getChatHistory(conversationId);
+			const currentMessageCount = messages.length;
+			const newMessageCount = updatedHistory.length;
+			
+			// Only update if there are new messages
+			if (newMessageCount > currentMessageCount) {
+				messages = updatedHistory;
+				// Mark new messages as read
+				if (currentUserId && currentUserId.trim()) {
+					await ChatService.markMessagesAsRead(conversationId, currentUserId);
+				}
+			}
+		} catch (error) {
+			console.error('Failed to refresh messages:', error);
+		}
+	}
+
+	// Function to refresh online status
+	async function refreshOnlineStatus() {
+		if (!isOpen || !otherUser?.id) return;
+		
+		try {
+			const status = await onlineStatusService.getUserOnlineStatus(otherUser.id);
+			otherUserOnlineStatus = status;
+		} catch (error) {
+			console.error('Failed to refresh online status:', error);
+		}
+	}
 
 	// Reactive watcher: Load chat history when modal opens or conversation changes
 	$: if (isOpen && conversationId) {
@@ -86,6 +141,33 @@
 				console.error('Failed to fetch user online status:', error);
 			}
 		})();
+	}
+
+	// Start real-time polling when modal opens
+	$: if (isOpen && conversationId) {
+		// Clear any existing intervals
+		if (realtimeInterval) {
+			clearInterval(realtimeInterval);
+		}
+		if (statusInterval) {
+			clearInterval(statusInterval);
+		}
+		
+		// Start polling for new messages every 3 seconds
+		realtimeInterval = setInterval(refreshMessages, 3000);
+		
+		// Start polling for online status every 10 seconds
+		statusInterval = setInterval(refreshOnlineStatus, 10000);
+	} else if (!isOpen) {
+		// Stop polling when modal closes
+		if (realtimeInterval) {
+			clearInterval(realtimeInterval);
+			realtimeInterval = null;
+		}
+		if (statusInterval) {
+			clearInterval(statusInterval);
+			statusInterval = null;
+		}
 	}
 
 	// loadChatHistory no longer needed; reactive statement handles loading
@@ -238,7 +320,7 @@
 		<div class="modal-content" on:click|stopPropagation>
 			<!-- Header -->
 			<div class="modal-header">
-				<div class="user-info">
+				<div class="user-info clickable" on:click={() => goToProfile(otherUser.username)}>
 					{#if otherUser.avatar_url}
 						<img src={otherUser.avatar_url} alt={otherUser.username} class="avatar" />
 					{:else}
@@ -419,6 +501,17 @@
 		display: flex;
 		align-items: center;
 		gap: 0.75rem;
+	}
+
+	.user-info.clickable {
+		cursor: pointer;
+		border-radius: 8px;
+		padding: 0.25rem;
+		transition: background-color 0.2s;
+	}
+
+	.user-info.clickable:hover {
+		background-color: #f3f4f6;
 	}
 
 	.avatar {
