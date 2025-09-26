@@ -9,10 +9,13 @@ export class ChatService {
 		const { data, error } = await supabase
 			.from('notifications')
 			.insert({
+				user_id: input.recipient_id, // Only recipient gets notification
+				type: 'CHAT_MESSAGE',
 				message_type: MessageType.CHAT_MESSAGE,
 				sender_id: (await supabase.auth.getUser()).data.user?.id,
 				recipient_id: input.recipient_id,
-				title: 'Chat Message',
+				conversation_id: conversationId,
+				title: 'New Chat Message',
 				message: input.message,
 				attachment_url: input.attachment_url,
 				attachment_type: input.attachment_type,

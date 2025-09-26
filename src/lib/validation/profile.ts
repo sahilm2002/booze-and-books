@@ -56,7 +56,7 @@ export function validateProfileUpdate(data: unknown) {
 		};
 	} else {
 		const errors: Record<string, string> = {};
-		result.error.errors.forEach(error => {
+		result.error.issues.forEach((error: any) => {
 			const path = error.path.join('.');
 			errors[path] = error.message;
 		});
