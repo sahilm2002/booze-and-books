@@ -3,25 +3,35 @@ export interface PublicProfile {
 	username: string;
 	full_name?: string;
 	bio?: string;
-	location?: string;
 	avatar_url?: string;
 	created_at: string;
 	updated_at: string;
 	is_online?: boolean;
 	last_seen_at?: string;
 	first_login_at?: string;
+	city?: string;
+	state?: string;
+	zip_code?: string;
 }
 
 export interface PrivateProfile extends PublicProfile {
 	email?: string;
+	address_line1?: string;
+	address_line2?: string;
+	city?: string;
+	state?: string;
 }
 
 export interface ProfileUpdate {
 	username?: string;
 	full_name?: string;
 	bio?: string;
-	location?: string;
 	avatar_url?: string;
+	address_line1?: string;
+	address_line2?: string;
+	city?: string;
+	state?: string;
+	zip_code?: string;
 }
 
 export interface UserContactInfo {
@@ -29,7 +39,9 @@ export interface UserContactInfo {
 	full_name?: string;
 	email?: string;
 	bio?: string;
-	location?: string;
+	city?: string;
+	state?: string;
+	zip_code?: string;
 	avatar_url?: string;
 }
 
