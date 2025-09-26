@@ -1,17 +1,24 @@
 <script lang="ts">
 	import { page } from '$app/stores';
 	import { pendingSwapCounts } from '$lib/stores/swaps';
+	import { auth } from '$lib/stores/auth';
+	import { profile } from '$lib/stores/profile';
+	import { ProfileService } from '$lib/services/profileService';
+	import NotificationBell from '../notifications/NotificationBell.svelte';
+	
+	$: user = $auth.user;
+	$: avatarUrl = ProfileService.getAvatarUrl($profile?.avatar_url || null);
+	$: initials = ProfileService.generateInitials(
+		$profile?.full_name || null,
+		$profile?.username || null,
+		user?.email
+	);
 	
 	$: navItems = [
 		{
 			name: 'Dashboard',
 			href: '/app',
 			icon: 'home'
-		},
-		{
-			name: 'Profile',
-			href: '/app/profile',
-			icon: 'user'
 		},
 		{
 			name: 'My Books',

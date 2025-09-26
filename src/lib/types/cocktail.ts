@@ -54,7 +54,7 @@ export interface CocktailRefreshSession {
 export interface USStore {
 	id: string;
 	name: string;
-	chain: 'target' | 'walmart' | 'kroger' | 'bevmo' | 'total_wine' | 'safeway' | 'publix' | 'heb' | 'meijer' | 'costco' | 'sams_club' | 'whole_foods' | 'trader_joes' | 'cvs' | 'walgreens';
+	chain: 'target' | 'walmart' | 'kroger' | 'bevmo' | 'total_wine' | 'safeway' | 'publix' | 'heb' | 'meijer';
 	address: string;
 	city: string;
 	state: string; // US state abbreviation
@@ -195,9 +195,8 @@ export const US_STATES = [
 ];
 
 export const SUPPORTED_STORE_CHAINS = [
-	'target', 'walmart', 'kroger', 'bevmo', 'total_wine',
-	'safeway', 'publix', 'heb', 'meijer',
-	'costco', 'sams_club', 'whole_foods', 'trader_joes', 'cvs', 'walgreens'
+	'target', 'walmart', 'kroger', 'bevmo', 'total_wine', 
+	'safeway', 'publix', 'heb', 'meijer'
 ] as const;
 
 export type SupportedStoreChain = typeof SUPPORTED_STORE_CHAINS[number];
@@ -238,13 +237,7 @@ export function getStoreDisplayName(chain: string): string {
 		safeway: 'Safeway',
 		publix: 'Publix',
 		heb: 'H-E-B',
-		meijer: 'Meijer',
-		costco: 'Costco',
-		sams_club: "Sam's Club",
-		whole_foods: 'Whole Foods Market',
-		trader_joes: "Trader Joe's",
-		cvs: 'CVS Pharmacy',
-		walgreens: 'Walgreens'
+		meijer: 'Meijer'
 	};
 	return storeNames[chain] || chain;
 }
