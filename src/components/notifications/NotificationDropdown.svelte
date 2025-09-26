@@ -277,9 +277,9 @@
 	.dropdown-content {
 		position: absolute;
 		top: 60px;
-		right: 1rem;
+		right: 2rem;
 		width: 380px;
-		max-width: calc(100vw - 2rem);
+		max-width: calc(100vw - 4rem);
 		background: white;
 		border-radius: 12px;
 		box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
