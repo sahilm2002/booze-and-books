@@ -81,7 +81,9 @@ export interface SwapUserProfile {
 	username: string | null;
 	full_name: string | null;
 	avatar_url: string | null;
-	location: string | null;
+	city: string | null;
+	state: string | null;
+	zip_code: string | null;
 	email?: string | null; // Email from auth.users
 }
 
