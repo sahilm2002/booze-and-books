@@ -61,6 +61,12 @@ declare global {
 		}
 		// interface PageState {}
 		// interface Platform {}
+		interface PrivateEnv {
+			GOOGLE_PLACES_API_KEY: string;
+			GOOGLE_GEOCODING_API_KEY: string;
+		}
+		
+		interface PublicEnv {}
 	}
 }
 

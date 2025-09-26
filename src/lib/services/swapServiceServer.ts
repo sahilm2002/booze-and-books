@@ -188,7 +188,7 @@ export class SwapServiceServer {
 				.in('id', Array.from(bookIds)),
 			supabase
 				.from('profiles')
-				.select('id, username, full_name, avatar_url, location')
+				.select('id, username, full_name, avatar_url, city, state, zip_code')
 				.in('id', Array.from(userIds))
 		]);
 
@@ -228,7 +228,9 @@ export class SwapServiceServer {
 				full_name: null, 
 				avatar_url: null, 
 				email: null, 
-				location: null 
+				city: null,
+				state: null,
+				zip_code: null
 			};
 			const owner_profile = profilesMap.get(req.owner_id) || { 
 				id: req.owner_id,
@@ -236,7 +238,9 @@ export class SwapServiceServer {
 				full_name: null, 
 				avatar_url: null, 
 				email: null, 
-				location: null 
+				city: null,
+				state: null,
+				zip_code: null
 			};
 
 			return {
@@ -250,7 +254,9 @@ export class SwapServiceServer {
 					full_name: null, 
 					avatar_url: null, 
 					email: null, 
-					location: null 
+					city: null,
+					state: null,
+					zip_code: null
 				},
 				owner_profile: type === 'outgoing' ? owner_profile : { 
 					id: req.owner_id,
@@ -258,7 +264,9 @@ export class SwapServiceServer {
 					full_name: null, 
 					avatar_url: null, 
 					email: null, 
-					location: null 
+					city: null,
+					state: null,
+					zip_code: null
 				}
 			} as SwapRequestWithDetails;
 		});
@@ -397,12 +405,18 @@ export class SwapServiceServer {
 				requester_profile:profiles!swap_requests_requester_id_profiles_fkey (
 					username,
 					full_name,
-					avatar_url
+					avatar_url,
+					city,
+					state,
+					zip_code
 				),
 				owner_profile:profiles!swap_requests_owner_id_profiles_fkey (
 					username,
 					full_name,
-					avatar_url
+					avatar_url,
+					city,
+					state,
+					zip_code
 				)
 			`)
 			.eq('id', requestId)
@@ -634,12 +648,18 @@ export class SwapServiceServer {
 				requester_profile:profiles!swap_requests_requester_id_profiles_fkey (
 					username,
 					full_name,
-					avatar_url
+					avatar_url,
+					city,
+					state,
+					zip_code
 				),
 				owner_profile:profiles!swap_requests_owner_id_profiles_fkey (
 					username,
 					full_name,
-					avatar_url
+					avatar_url,
+					city,
+					state,
+					zip_code
 				)
 			`)
 			.eq('status', SwapStatus.COMPLETED)
