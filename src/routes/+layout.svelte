@@ -1,10 +1,12 @@
 <script lang="ts">
 	import { onMount, onDestroy } from 'svelte';
+	import { page } from '$app/stores';
 	import { auth } from '$lib/stores/auth';
 	import { profile, profileStore } from '$lib/stores/profile';
 	import { ProfileService } from '$lib/services/profileService';
 	import { realtimeService } from '$lib/services/realtimeService';
 	import NotificationBell from '../components/notifications/NotificationBell.svelte';
+	import DashboardNav from '../components/dashboard/DashboardNav.svelte';
 	import type { PageData } from './$types';
 	export let data: PageData;
 
@@ -36,7 +38,7 @@
 	} | null = null;
 
 	// Initialize realtime services when user is available
-	$: if (user?.id && !realtimeUnsubscribers) {
+	$: if (user && user.id && !realtimeUnsubscribers) {
 		realtimeService.initializeForUser(user.id).then((unsubscribers) => {
 			realtimeUnsubscribers = unsubscribers;
 		});
@@ -52,48 +54,37 @@
 	}
 
 	// SSR-safe user reference
-	$: user = data.session?.user ?? $auth.user;
+	$: user = data.user ?? $auth.user;
 	$: avatarUrl = ProfileService.getAvatarUrl($profile?.avatar_url || null);
 	$: initials = ProfileService.generateInitials(
 		$profile?.full_name || null,
 		$profile?.username || null,
 		user?.email
 	);
+	
+	// Check if we're on an /app route (which has its own layout with navigation)
+	$: isAppRoute = $page.url.pathname.startsWith('/app');
 </script>
 
 <div id="app">
-	<nav class="main-nav">
-		{#if user}
-			<div class="nav-user">
-				<a href="/app/profile" class="user-profile-link" title="Go to Profile">
-					<div class="user-profile">
-						<div class="user-avatar">
-							{#if avatarUrl}
-								<img src={avatarUrl} alt="Profile" class="avatar-img" />
-							{:else}
-								<div class="avatar-placeholder">{initials}</div>
-							{/if}
-						</div>
-						<div class="user-info">
-							<span class="user-name">
-								{$profile?.full_name || $profile?.username || user.email}
-							</span>
-							<span class="user-email">{user.email}</span>
-						</div>
-					</div>
+	{#if user && !isAppRoute}
+		<!-- Show DashboardNav for authenticated users only on non-app routes (like homepage) -->
+		<DashboardNav />
+	{:else if !user}
+		<!-- Show simple nav for non-authenticated users -->
+		<nav class="main-nav">
+			<div class="nav-brand">
+				<a href="/" class="brand-link">
+					📚 Booze & Books
 				</a>
-				<NotificationBell />
-				<form method="POST" action="/auth/logout" style="display: inline;">
-					<button type="submit" class="logout-btn">Sign Out</button>
-				</form>
 			</div>
-		{:else}
+			
 			<div class="nav-auth">
 				<a href="/auth/login" class="nav-link">Sign In</a>
 				<a href="/auth/signup" class="nav-link primary">Sign Up</a>
 			</div>
-		{/if}
-	</nav>
+		</nav>
+	{/if}
 	
 	<slot />
 	
@@ -117,8 +108,31 @@
 		border-bottom: 1px solid rgba(212, 175, 55, 0.2);
 		padding: 1rem 2rem;
 		display: flex;
-		justify-content: flex-end;
+		justify-content: space-between;
+		align-items: center;
 		box-shadow: 0 2px 8px rgba(139, 38, 53, 0.3);
+	}
+
+	.nav-brand {
+		flex-shrink: 0;
+	}
+
+	.brand-link {
+		color: #F5F5DC;
+		text-decoration: none;
+		font-size: 0.9rem;
+		font-weight: 700;
+		font-family: 'Georgia', serif;
+		transition: all 0.2s ease;
+		padding: 0.5rem;
+		border-radius: 8px;
+		text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.3);
+	}
+
+	.brand-link:hover {
+		color: #D4AF37;
+		background-color: rgba(255, 255, 255, 0.1);
+		transform: translateY(-1px);
 	}
 
 	.nav-user {
@@ -132,20 +146,16 @@
 		color: inherit;
 		border-radius: 8px;
 		transition: all 0.2s ease;
-		margin-right: 1rem;
 		cursor: pointer;
+		display: flex;
+		align-items: center;
+		gap: 0.75rem;
+		padding: 0.5rem;
 	}
 
 	.user-profile-link:hover {
 		background-color: rgba(255, 255, 255, 0.1);
 		transform: translateY(-1px);
-	}
-
-	.user-profile {
-		display: flex;
-		align-items: center;
-		gap: 0.75rem;
-		padding: 0.5rem;
 	}
 
 	.user-avatar {

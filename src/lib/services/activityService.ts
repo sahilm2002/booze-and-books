@@ -2,7 +2,7 @@ export class ActivityService {
 	private lastActivityTime: number = Date.now();
 	private inactivityTimer: NodeJS.Timeout | null = null;
 	private onInactivityCallback: (() => void) | null = null;
-	private readonly INACTIVITY_TIMEOUT = 60 * 60 * 1000; // 1 hour in milliseconds
+	private readonly INACTIVITY_TIMEOUT = 10 * 60 * 1000; // 10 minutes in milliseconds
 	private isInitialized = false;
 	
 	// Events that indicate user activity
@@ -21,14 +21,21 @@ export class ActivityService {
 	 * Initialize the activity service with an inactivity callback
 	 */
 	initialize(onInactivityCallback: () => void): void {
-		if (typeof window === 'undefined') return; // Skip on server
+		if (typeof window === 'undefined') {
+			console.log('ActivityService: Skipping initialization on server');
+			return; // Skip on server
+		}
 		
+		console.log('ActivityService: Initializing with 10-minute timeout');
 		this.onInactivityCallback = onInactivityCallback;
 		this.lastActivityTime = Date.now();
 		
 		if (!this.isInitialized) {
+			console.log('ActivityService: Adding activity listeners');
 			this.addActivityListeners();
 			this.isInitialized = true;
+		} else {
+			console.log('ActivityService: Already initialized, just resetting timer');
 		}
 		
 		this.resetInactivityTimer();
@@ -76,6 +83,7 @@ export class ActivityService {
 	 * Handle user activity events
 	 */
 	private handleActivity = (): void => {
+		console.log('ActivityService: User activity detected, resetting timer');
 		this.lastActivityTime = Date.now();
 		this.resetInactivityTimer();
 	};
@@ -85,6 +93,7 @@ export class ActivityService {
 	 */
 	private handleVisibilityChange = (): void => {
 		if (!document.hidden) {
+			console.log('ActivityService: Tab became visible, treating as activity');
 			// Tab became visible, treat as activity
 			this.handleActivity();
 		}
@@ -96,7 +105,9 @@ export class ActivityService {
 	private resetInactivityTimer(): void {
 		this.clearInactivityTimer();
 		
+		console.log('ActivityService: Setting 10-minute inactivity timer');
 		this.inactivityTimer = setTimeout(() => {
+			console.log('ActivityService: 10-minute timeout reached, triggering logout callback');
 			if (this.onInactivityCallback) {
 				this.onInactivityCallback();
 			}

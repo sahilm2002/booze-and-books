@@ -4,6 +4,7 @@ import { supabase } from '$lib/supabase';
 import { goto, invalidateAll } from '$app/navigation';
 import { browser } from '$app/environment';
 import { activityService } from '$lib/services/activityService';
+import { onlineStatusService } from '$lib/services/onlineStatusService';
 
 export interface AuthState {
 	session: Session | null;
@@ -24,7 +25,7 @@ function createAuthStore() {
 	const initializeActivityService = () => {
 		activityService.initialize(async () => {
 			console.log('Auto-logout triggered due to inactivity');
-			await auth.signOut();
+			await auth.signOutToHomepage();
 		});
 	};
 
@@ -81,9 +82,13 @@ function createAuthStore() {
 						loading: false
 					});
 
-					// If we have a session, start activity tracking
+					// If we have a session, start activity tracking and online status tracking
 					if (finalSession) {
+						console.log('Initializing services for user:', finalSession.user.email);
 						initializeActivityService();
+						onlineStatusService.startTracking(finalSession.user.id);
+					} else {
+						console.log('No session found, services not initialized');
 					}
 				}).catch(error => {
 					console.error('Error getting initial session:', error);
@@ -109,20 +114,26 @@ function createAuthStore() {
 
 					// Handle sign out
 					if (event === 'SIGNED_OUT') {
+						console.log('User signed out, destroying services');
 						activityService.destroy();
+						onlineStatusService.stopTracking();
 						await goto('/auth/login', { replaceState: true });
 					}
 					
-					// Handle sign in - start activity tracking only (no redirect)
-					if (event === 'SIGNED_IN') {
+					// Handle sign in - start activity tracking and online status tracking (no redirect)
+					if (event === 'SIGNED_IN' && session) {
+						console.log('User signed in, initializing services');
 						initializeActivityService();
+						onlineStatusService.startTracking(session.user.id);
 						await invalidateAll();
 						// Login component handles redirect directly - no redirect here
 					}
 					
 					// Handle token refresh
-					if (event === 'TOKEN_REFRESHED') {
+					if (event === 'TOKEN_REFRESHED' && session) {
+						console.log('Token refreshed, reinitializing services');
 						initializeActivityService();
+						onlineStatusService.startTracking(session.user.id);
 						await invalidateAll();
 					}
 				});
@@ -167,11 +178,50 @@ function createAuthStore() {
 					loading: false
 				});
 
-				// Stop activity tracking
+				// Stop activity tracking and online status tracking
 				activityService.destroy();
+				onlineStatusService.stopTracking();
 
 				// Redirect to login
 				await goto('/auth/login', { replaceState: true });
+
+				return { error: null };
+			} catch (error) {
+				console.error('Error signing out:', error);
+				update(state => ({ ...state, loading: false }));
+				return { error: error as Error };
+			}
+		},
+
+		/**
+		 * Sign out the current user and redirect to homepage - for auto-logout
+		 */
+		signOutToHomepage: async () => {
+			update(state => ({ ...state, loading: true }));
+			
+			try {
+				// Sign out from Supabase client-side
+				const { error } = await supabase.auth.signOut();
+
+				if (error) {
+					console.error('Error signing out:', error);
+					update(state => ({ ...state, loading: false }));
+					return { error };
+				}
+
+				// Clear auth state
+				set({
+					session: null,
+					user: null,
+					loading: false
+				});
+
+				// Stop activity tracking and online status tracking
+				activityService.destroy();
+				onlineStatusService.stopTracking();
+
+				// Redirect to homepage instead of login
+				await goto('/', { replaceState: true });
 
 				return { error: null };
 			} catch (error) {

@@ -9,6 +9,7 @@
 	import { SwapService } from '$lib/services/swapService';
 	import ConditionIndicator from './ConditionIndicator.svelte';
 	import SwapRequestDialog from '../swaps/SwapRequestDialog.svelte';
+	import CocktailGenerator from '../cocktails/CocktailGenerator.svelte';
 
 	export let book: Book | BookWithOwner;
 	export let showActions = true;
@@ -42,6 +43,7 @@
 	let isCreatingSwapRequest = false;
 	let existingSwapRequest: SwapRequestWithDetails | null = null;
 	let checkingExistingRequest = false;
+	let showCocktailGenerator = false;
 
 	// Check for existing swap request when user changes
 	$: if ($user?.id && enableSwapRequests && !isOwner) {
@@ -90,9 +92,28 @@
 		event.preventDefault();
 		
 		isToggling = true;
-		const newAvailability = !isAvailable;
 		
 		try {
+			// Check for any pending swap requests for this book (both incoming and outgoing)
+			if (!$user?.id) return;
+			const swapData = await SwapService.getSwapRequestsForUser($user.id);
+			const hasPendingRequests = [
+				...(swapData?.incoming || []),
+				...(swapData?.outgoing || [])
+			].some(req => 
+				req.book?.id === book.id && 
+				['PENDING', 'ACCEPTED'].includes(req.status)
+			);
+			
+			if (hasPendingRequests) {
+				dispatch('notification', {
+					type: 'error',
+					message: 'Cannot change availability while there are ongoing swap requests for this book.'
+				});
+				return;
+			}
+			
+			const newAvailability = !isAvailable;
 			const success = await bookStore.toggleAvailability(book.id, newAvailability);
 			if (success) {
 				// Update the local book object
@@ -100,6 +121,10 @@
 			}
 		} catch (error) {
 			console.error('Failed to toggle availability:', error);
+			dispatch('notification', {
+				type: 'error',
+				message: 'Failed to update availability. Please try again.'
+			});
 		} finally {
 			isToggling = false;
 		}
@@ -171,6 +196,16 @@
 
 	function handleSwapRequestClose() {
 		showSwapRequestDialog = false;
+	}
+
+	function handleCocktailGenerator() {
+		if ($user?.id) {
+			showCocktailGenerator = true;
+		}
+	}
+
+	function handleCocktailClose() {
+		showCocktailGenerator = false;
 	}
 
 	function getConditionBadgeClass(condition: string): string {
@@ -261,6 +296,15 @@
 		</div>
 	{/if}
 
+	<!-- Cocktail Ideas Button - Top Right -->
+	{#if $user?.id}
+		<div class="cocktail-button-container">
+			<button on:click={handleCocktailGenerator} class="btn-cocktail-top">
+				🍸 Cocktail Ideas
+			</button>
+		</div>
+	{/if}
+
 	<!-- Actions -->
 	{#if showActions}
 		<div class="actions-section">
@@ -301,6 +345,13 @@
 	on:close={handleSwapRequestClose}
 />
 
+<!-- Cocktail Generator Modal -->
+<CocktailGenerator 
+	{book}
+	bind:isOpen={showCocktailGenerator}
+	on:close={handleCocktailClose}
+/>
+
 
 <style>
 	.book-card {
@@ -311,6 +362,38 @@
 		padding: 1.5rem;
 		margin-bottom: 1rem;
 		transition: all 0.2s;
+		position: relative;
+	}
+
+	.cocktail-button-container {
+		position: absolute;
+		top: 1rem;
+		right: 1rem;
+		z-index: 10;
+	}
+
+	.btn-cocktail-top {
+		background: #fef5e7;
+		color: #d69e2e;
+		border: 1px solid #f6e05e;
+		padding: 0.4rem 0.8rem;
+		border-radius: 6px;
+		font-size: 0.8rem;
+		font-weight: 500;
+		cursor: pointer;
+		transition: all 0.2s;
+		display: flex;
+		align-items: center;
+		gap: 0.25rem;
+		box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+	}
+
+	.btn-cocktail-top:hover {
+		background: #ed8936;
+		color: white;
+		border-color: #ed8936;
+		transform: translateY(-1px);
+		box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
 	}
 
 	.book-card:hover {
@@ -604,6 +687,26 @@
 		color: white;
 	}
 
+	.btn-cocktail {
+		background: #fef5e7;
+		color: #d69e2e;
+		border: 1px solid #f6e05e;
+		padding: 0.5rem 1rem;
+		border-radius: 6px;
+		font-size: 0.85rem;
+		font-weight: 500;
+		cursor: pointer;
+		transition: all 0.2s;
+		display: flex;
+		align-items: center;
+		gap: 0.25rem;
+	}
+
+	.btn-cocktail:hover {
+		background: #ed8936;
+		color: white;
+		border-color: #ed8936;
+	}
 
 	.btn-spinner {
 		width: 16px;

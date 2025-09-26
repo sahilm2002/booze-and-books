@@ -11,7 +11,11 @@
 		username: '',
 		full_name: '',
 		bio: '',
-		location: ''
+		address_line1: '',
+		address_line2: '',
+		city: '',
+		state: '',
+		zip_code: ''
 	};
 
 	let saving = false;
@@ -69,7 +73,11 @@
 			username: $profile?.username || '',
 			full_name: $profile?.full_name || '',
 			bio: $profile?.bio || '',
-			location: $profile?.location || ''
+			address_line1: $profile?.address_line1 || '',
+			address_line2: $profile?.address_line2 || '',
+			city: $profile?.city || '',
+			state: $profile?.state || '',
+			zip_code: $profile?.zip_code || ''
 		};
 		
 		// Reset flags to allow reinitialization
@@ -92,7 +100,11 @@
 			username: $profile.username || '',
 			full_name: $profile.full_name || '',
 			bio: $profile.bio || '',
-			location: $profile.location || ''
+			address_line1: $profile.address_line1 || '',
+			address_line2: $profile.address_line2 || '',
+			city: $profile.city || '',
+			state: $profile.state || '',
+			zip_code: $profile.zip_code || ''
 		};
 		initialized = true;
 	}
@@ -167,18 +179,52 @@
 				</div>
 
 				<div class="form-group">
-					<label for="location" class="form-label">Address/Location</label>
+					<label for="city" class="form-label">City</label>
 					<input
 						type="text"
-						id="location"
-						bind:value={formData.location}
+						id="city"
+						bind:value={formData.city}
 						on:input={markDirty}
 						class="form-input"
-						placeholder="Enter your address or location"
+						placeholder="Enter your city"
 					/>
-					{#if errors.location}
-						<p class="form-error">{errors.location}</p>
+					{#if errors.city}
+						<p class="form-error">{errors.city}</p>
 					{/if}
+				</div>
+
+				<div class="form-group">
+					<label for="state" class="form-label">State</label>
+					<input
+						type="text"
+						id="state"
+						bind:value={formData.state}
+						on:input={markDirty}
+						class="form-input"
+						placeholder="e.g., CA, NY, TX"
+						maxlength="2"
+					/>
+					{#if errors.state}
+						<p class="form-error">{errors.state}</p>
+					{/if}
+					<p class="form-help">2-letter state abbreviation</p>
+				</div>
+
+				<div class="form-group">
+					<label for="zip_code" class="form-label">Zip Code *</label>
+					<input
+						type="text"
+						id="zip_code"
+						bind:value={formData.zip_code}
+						on:input={markDirty}
+						class="form-input"
+						placeholder="Enter your zip code (required for cocktail ordering)"
+						maxlength="10"
+					/>
+					{#if errors.zip_code}
+						<p class="form-error">{errors.zip_code}</p>
+					{/if}
+					<p class="form-help">Required for finding nearby stores for cocktail ingredients</p>
 				</div>
 			</div>
 

@@ -1,24 +1,36 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { notificationStore, unreadCount, notifications as notificationsStore } from '$lib/stores/notifications';
+	import { page } from '$app/stores';
 	import { goto } from '$app/navigation';
 	import { auth } from '$lib/stores/auth';
-	import type { Notification, NotificationType } from '$lib/types/notification';
+	import { supabase } from '$lib/supabase';
+	import { NotificationServiceServer } from '$lib/services/notificationServiceServer';
+	import NotificationDropdown from './NotificationDropdown.svelte';
+	import ChatModal from '../chat/ChatModal.svelte';
+	import type { Conversation } from '$lib/types/notification';
+	import type { PublicProfile } from '$lib/types/profile';
 
 	let isOpen = false;
 	let bellRef: HTMLButtonElement;
-	let currentPage = 0;
-	let loading = false;
-	const NOTIFICATIONS_PER_PAGE = 5;
+	let totalUnreadCount = 0;
+	let showChatModal = false;
+	let chatConversationId = '';
+	let chatOtherUser: PublicProfile | null = null;
+	let currentUserId = '';
 
-	// Load notifications when component mounts or when opening modal
+	// Get current user ID
+	$: if ($auth.user?.id) {
+		currentUserId = $auth.user.id;
+		loadUnreadCount();
+	}
+
 	onMount(() => {
-		loadNotifications();
+		loadUnreadCount();
 
 		function handleClickOutside(event: MouseEvent) {
 			if (isOpen && bellRef && !bellRef.contains(event.target as Node)) {
-				const modal = document.querySelector('.notification-modal');
-				if (modal && !modal.contains(event.target as Node)) {
+				const dropdown = document.querySelector('.dropdown-content');
+				if (dropdown && !dropdown.contains(event.target as Node)) {
 					isOpen = false;
 				}
 			}
@@ -38,140 +50,63 @@
 		};
 	});
 
-	async function loadNotifications() {
-		loading = true;
+	async function loadUnreadCount() {
+		if (!$auth.user?.id) return;
+		
 		try {
-			await notificationStore.loadNotifications(50); // Load more to enable pagination
+			totalUnreadCount = await NotificationServiceServer.getTotalUnreadCount(supabase, $auth.user.id);
 		} catch (error) {
-			console.error('Failed to load notifications:', error);
-		} finally {
-			loading = false;
+			console.error('Failed to load unread count:', error);
 		}
 	}
 
 	function toggleDropdown() {
 		isOpen = !isOpen;
-		if (isOpen) {
-			currentPage = 0; // Reset to first page when opening
-			loadNotifications();
-		}
 	}
 
-	async function markAllAsRead() {
-		await notificationStore.markAllAsRead();
-	}
-
-	async function handleNotificationClick(notification: Notification) {
-		// Check authentication first before any operations
-		if (!$auth.user) {
-			goto('/auth/login?redirectTo=/app/swaps');
-			return;
-		}
-
-		// Close modal immediately to avoid UI stalling
-		isOpen = false;
-
-		// Mark as read if not already (with error handling)
-		if (!notification.is_read) {
-			try {
-				await notificationStore.markAsRead(notification.id);
-			} catch (error) {
-				// Log error but don't prevent navigation
-				console.error('Failed to mark notification as read:', error);
+	function handleNotificationClick(event: CustomEvent) {
+		const { type, notification, conversation } = event.detail;
+		
+		isOpen = false; // Close dropdown
+		
+		if (type === 'chat') {
+			// Open chat modal
+			const conv = conversation as Conversation;
+			chatOtherUser = conv.other_participant;
+			chatConversationId = conv.id;
+			showChatModal = true;
+		} else if (type === 'notification') {
+			// Navigate based on notification type
+			switch (notification.type) {
+				case 'SWAP_REQUEST':
+					goto('/app/swaps?tab=incoming');
+					break;
+				case 'SWAP_ACCEPTED':
+				case 'SWAP_COUNTER_OFFER':
+				case 'SWAP_CANCELLED':
+				case 'SWAP_COMPLETED':
+					goto('/app/swaps?tab=outgoing');
+					break;
+				default:
+					goto('/app/swaps');
+					break;
 			}
 		}
-
-		// Navigate based on notification type (don't await navigation)
-		switch (notification.type) {
-			case 'SWAP_REQUEST':
-				goto('/app/swaps?tab=incoming');
-				break;
-			case 'SWAP_ACCEPTED':
-			case 'SWAP_COUNTER_OFFER':
-			case 'SWAP_CANCELLED':
-			case 'SWAP_COMPLETED':
-				goto('/app/swaps?tab=outgoing');
-				break;
-			default:
-				goto('/app/swaps');
-				break;
-		}
 	}
 
-	function getNotificationIcon(type: NotificationType): string {
-		switch (type) {
-			case 'SWAP_REQUEST':
-				return 'M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z';
-			case 'SWAP_ACCEPTED':
-				return 'M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z';
-			case 'SWAP_COUNTER_OFFER':
-				return 'M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4';
-			case 'SWAP_CANCELLED':
-				return 'M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z';
-			case 'SWAP_COMPLETED':
-				return 'M5 13l4 4L19 7';
-			default:
-				return 'M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9';
-		}
+	function handleAllMarkedAsRead() {
+		loadUnreadCount(); // Refresh count
 	}
 
-	function getNotificationColor(type: NotificationType): string {
-		switch (type) {
-			case 'SWAP_REQUEST':
-				return '#3B82F6';
-			case 'SWAP_ACCEPTED':
-				return '#10B981';
-			case 'SWAP_COUNTER_OFFER':
-				return '#F59E0B';
-			case 'SWAP_CANCELLED':
-				return '#EF4444';
-			case 'SWAP_COMPLETED':
-				return '#8B5CF6';
-			default:
-				return '#6B7280';
-		}
+	function handleCloseChat() {
+		showChatModal = false;
+		chatOtherUser = null;
+		chatConversationId = '';
 	}
 
-	function formatRelativeTime(dateString: string): string {
-		const date = new Date(dateString);
-		const now = new Date();
-		const diffInMinutes = Math.floor((now.getTime() - date.getTime()) / (1000 * 60));
-		
-		if (diffInMinutes < 1) return 'Just now';
-		if (diffInMinutes < 60) return `${diffInMinutes}m ago`;
-		
-		const diffInHours = Math.floor(diffInMinutes / 60);
-		if (diffInHours < 24) return `${diffInHours}h ago`;
-		
-		const diffInDays = Math.floor(diffInHours / 24);
-		if (diffInDays < 7) return `${diffInDays}d ago`;
-		
-		return new Intl.DateTimeFormat('en-US', {
-			month: 'short',
-			day: 'numeric'
-		}).format(date);
-	}
-
-	// Get paginated notifications
-	$: paginatedNotifications = $notificationsStore.slice(
-		currentPage * NOTIFICATIONS_PER_PAGE,
-		(currentPage + 1) * NOTIFICATIONS_PER_PAGE
-	);
-
-	$: totalPages = Math.ceil($notificationsStore.length / NOTIFICATIONS_PER_PAGE);
-	$: hasNextPage = currentPage < totalPages - 1;
-	$: hasPrevPage = currentPage > 0;
-
-	function nextPage() {
-		if (hasNextPage) {
-			currentPage++;
-		}
-	}
-
-	function prevPage() {
-		if (hasPrevPage) {
-			currentPage--;
-		}
+	function handleMessageSent() {
+		// Refresh unread count after sending message
+		loadUnreadCount();
 	}
 </script>
 
@@ -191,133 +126,36 @@
 		</svg>
 		
 		<!-- Notification badge -->
-		{#if $unreadCount > 0}
+		{#if totalUnreadCount > 0}
 			<span class="notification-badge">
-				{$unreadCount > 99 ? '99+' : $unreadCount}
+				{totalUnreadCount > 99 ? '99+' : totalUnreadCount}
 			</span>
 		{/if}
 	</button>
 
-	<!-- Modal -->
+	<!-- Dropdown -->
 	{#if isOpen}
-		<div class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="notifications-modal-title">
-			<div class="notification-modal">
-				<!-- Header -->
-				<div class="modal-header">
-					<h3 id="notifications-modal-title" class="modal-title">Notifications</h3>
-					<div class="header-actions">
-						{#if $unreadCount > 0}
-							<button
-								type="button"
-								class="mark-all-read-btn"
-								on:click={markAllAsRead}
-							>
-								Mark all read
-							</button>
-						{/if}
-						<button 
-							type="button" 
-							class="close-btn"
-							on:click={() => isOpen = false}
-							aria-label="Close notifications"
-						>
-							<svg class="close-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-							</svg>
-						</button>
-					</div>
-				</div>
-
-				<!-- Content -->
-				<div class="modal-content">
-					{#if loading}
-						<div class="loading-state">
-							<div class="loading-spinner"></div>
-							<p class="loading-text">Loading notifications...</p>
-						</div>
-					{:else if $notificationsStore.length === 0}
-						<div class="empty-state">
-							<div class="empty-icon">
-								<svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-									<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
-								</svg>
-							</div>
-							<h4 class="empty-title">No notifications yet</h4>
-							<p class="empty-subtitle">You'll see swap request updates here</p>
-						</div>
-					{:else}
-						<div class="notifications-list">
-							{#each paginatedNotifications as notification (notification.id)}
-								<button
-									type="button"
-									class="notification-item"
-									class:unread={!notification.is_read}
-									on:click={() => handleNotificationClick(notification)}
-								>
-									<div class="notification-content">
-										<!-- Icon -->
-										<div class="notification-icon" style="background-color: {getNotificationColor(notification.type)}20; color: {getNotificationColor(notification.type)}">
-											<svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-												<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="{getNotificationIcon(notification.type)}" />
-											</svg>
-										</div>
-
-										<!-- Details -->
-										<div class="notification-details">
-											<h4 class="notification-title">{notification.title}</h4>
-											<p class="notification-message">{notification.message}</p>
-											<p class="notification-time">{formatRelativeTime(notification.created_at)}</p>
-										</div>
-
-										<!-- Unread indicator -->
-										{#if !notification.is_read}
-											<div class="unread-indicator"></div>
-										{/if}
-									</div>
-								</button>
-							{/each}
-						</div>
-
-						<!-- Pagination -->
-						{#if totalPages > 1}
-							<div class="pagination">
-								<button
-									type="button"
-									class="pagination-btn"
-									class:disabled={!hasPrevPage}
-									on:click={prevPage}
-									disabled={!hasPrevPage}
-									aria-label="Previous page"
-								>
-									<svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-										<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
-									</svg>
-								</button>
-								
-								<span class="pagination-info">
-									{currentPage + 1} of {totalPages}
-								</span>
-								
-								<button
-									type="button"
-									class="pagination-btn"
-									class:disabled={!hasNextPage}
-									on:click={nextPage}
-									disabled={!hasNextPage}
-									aria-label="Next page"
-								>
-									<svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-										<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
-									</svg>
-								</button>
-							</div>
-						{/if}
-					{/if}
-				</div>
-			</div>
-		</div>
+		<NotificationDropdown
+			isOpen={true}
+			{supabase}
+			userId={currentUserId}
+			on:notificationClick={handleNotificationClick}
+			on:allMarkedAsRead={handleAllMarkedAsRead}
+		/>
 	{/if}
 </div>
+
+<!-- Chat Modal -->
+{#if showChatModal && chatOtherUser && chatConversationId}
+	<ChatModal
+		isOpen={showChatModal}
+		conversationId={chatConversationId}
+		otherUser={chatOtherUser}
+		{currentUserId}
+		on:close={handleCloseChat}
+		on:messageSent={handleMessageSent}
+	/>
+{/if}
 
 <style>
 	.notification-bell-container {
