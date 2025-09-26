@@ -55,10 +55,9 @@ if (typeof window === 'undefined') { // Only run on server
 
 // Cache key generators for consistent naming
 export const CacheKeys = {
-	// Bump key versions to invalidate any stale/synthetic results that may be cached
-	stores: (zipCode: string, radiusMiles: number) => `stores_v2_${zipCode}_${radiusMiles}`,
+	stores: (zipCode: string, radiusMiles: number) => `stores_${zipCode}_${radiusMiles}`,
 	geocode: (zipCode: string) => `geocode_${zipCode}`,
 	placeDetails: (placeId: string) => `place_${placeId}`,
 	nearbyStores: (lat: number, lng: number, radius: number, chain: string) => 
-		`nearby_v2_${lat.toFixed(4)}_${lng.toFixed(4)}_${radius}_${chain}`
+		`nearby_${lat.toFixed(4)}_${lng.toFixed(4)}_${radius}_${chain}`
 };
