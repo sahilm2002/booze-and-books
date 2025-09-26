@@ -20,9 +20,39 @@ export class ProfileServiceServer {
 	}
 
 	static async updateProfile(supabase: SupabaseClient, userId: string, updates: ProfileUpdate): Promise<PrivateProfile> {
+		// Only allow updating columns that actually exist in the profiles table
+		const whitelist = ['full_name', 'bio', 'city', 'state', 'zip_code', 'avatar_url'] as const;
+		const updateData: Record<string, unknown> = {};
+
+		for (const key of whitelist) {
+			const raw = (updates as any)[key];
+			if (raw !== undefined) {
+				if (typeof raw === 'string') {
+					const trimmed = raw.trim();
+					updateData[key] = trimmed === '' ? null : trimmed;
+				} else {
+					updateData[key] = raw;
+				}
+			}
+		}
+
+		// No valid fields to update - just return the current profile
+		if (Object.keys(updateData).length === 0) {
+			const { data: current, error: fetchError } = await supabase
+				.from('profiles')
+				.select('*')
+				.eq('id', userId)
+				.single();
+
+			if (fetchError) {
+				throw new Error(`Failed to fetch profile: ${fetchError.message}`);
+			}
+			return current as PrivateProfile;
+		}
+
 		const { data, error } = await supabase
 			.from('profiles')
-			.update(updates)
+			.update(updateData)
 			.eq('id', userId)
 			.select()
 			.single();
@@ -31,7 +61,7 @@ export class ProfileServiceServer {
 			throw new Error(`Failed to update profile: ${error.message}`);
 		}
 
-		return data;
+		return data as PrivateProfile;
 	}
 
 	static async createProfile(supabase: SupabaseClient, userId: string, initialData?: Partial<ProfileUpdate>): Promise<PrivateProfile> {
@@ -40,7 +70,9 @@ export class ProfileServiceServer {
 			username: initialData?.username || null,
 			full_name: initialData?.full_name || null,
 			bio: initialData?.bio || null,
-			location: initialData?.location || null,
+			city: initialData?.city || null,
+			state: initialData?.state || null,
+			zip_code: initialData?.zip_code || null,
 			avatar_url: initialData?.avatar_url || null
 		};
 
