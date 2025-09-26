@@ -404,10 +404,10 @@ export class SwapService {
 						id, title, authors, thumbnail_url, condition, owner_id, google_volume_id
 					),
 					requester_profile:profiles!swap_requests_requester_profile_fkey (
-						id, username, full_name, avatar_url, location, email
+						id, username, full_name, avatar_url, city, state, zip_code, email
 					),
 					owner_profile:profiles!swap_requests_owner_profile_fkey (
-						id, username, full_name, avatar_url, location, email
+						id, username, full_name, avatar_url, city, state, zip_code, email
 					)
 				`)
 				.eq('owner_id', userId)
@@ -432,10 +432,10 @@ export class SwapService {
 						id, title, authors, thumbnail_url, condition, owner_id, google_volume_id
 					),
 					requester_profile:profiles!swap_requests_requester_profile_fkey (
-						id, username, full_name, avatar_url, location, email
+						id, username, full_name, avatar_url, city, state, zip_code, email
 					),
 					owner_profile:profiles!swap_requests_owner_profile_fkey (
-						id, username, full_name, avatar_url, location, email
+						id, username, full_name, avatar_url, city, state, zip_code, email
 					)
 				`)
 				.eq('requester_id', userId)
@@ -474,10 +474,10 @@ export class SwapService {
 						id, title, authors, thumbnail_url, condition, owner_id
 					),
 					requester_profile:profiles!swap_requests_requester_profile_fkey (
-						id, username, full_name, avatar_url, location, email
+						id, username, full_name, avatar_url, city, state, zip_code, email
 					),
 					owner_profile:profiles!swap_requests_owner_profile_fkey (
-						id, username, full_name, avatar_url, location, email
+						id, username, full_name, avatar_url, city, state, zip_code, email
 					)
 				`)
 				.eq('id', requestId)
@@ -659,10 +659,10 @@ export class SwapService {
 						id, title, authors, thumbnail_url, condition, owner_id
 					),
 					requester_profile:profiles!swap_requests_requester_profile_fkey (
-						id, username, full_name, avatar_url, location, email
+						id, username, full_name, avatar_url, city, state, zip_code, email
 					),
 					owner_profile:profiles!swap_requests_owner_profile_fkey (
-						id, username, full_name, avatar_url, location, email
+						id, username, full_name, avatar_url, city, state, zip_code, email
 					)
 				`)
 				.eq('status', SwapStatus.ACCEPTED)
