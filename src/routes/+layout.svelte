@@ -54,7 +54,7 @@
 	}
 
 	// SSR-safe user reference
-	$: user = data.session?.user ?? $auth.user;
+	$: user = data.user ?? $auth.user;
 	$: avatarUrl = ProfileService.getAvatarUrl($profile?.avatar_url || null);
 	$: initials = ProfileService.generateInitials(
 		$profile?.full_name || null,
@@ -67,25 +67,15 @@
 </script>
 
 <div id="app">
-	<nav class="main-nav">
-		{#if user}
-			<div class="nav-user">
-				<a href="/app/profile" class="user-profile-link" title="Go to Profile">
-					<div class="user-profile">
-						<div class="user-avatar">
-							{#if avatarUrl}
-								<img src={avatarUrl} alt="Profile" class="avatar-img" />
-							{:else}
-								<div class="avatar-placeholder">{initials}</div>
-							{/if}
-						</div>
-						<div class="user-info">
-							<span class="user-name">
-								{$profile?.full_name || $profile?.username || user.email}
-							</span>
-							<span class="user-email">{user.email}</span>
-						</div>
-					</div>
+	{#if user && !isAppRoute}
+		<!-- Show DashboardNav for authenticated users only on non-app routes (like homepage) -->
+		<DashboardNav />
+	{:else if !user}
+		<!-- Show simple nav for non-authenticated users -->
+		<nav class="main-nav">
+			<div class="nav-brand">
+				<a href="/" class="brand-link">
+					📚 Booze & Books
 				</a>
 			</div>
 			
