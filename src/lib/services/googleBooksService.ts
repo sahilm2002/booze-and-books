@@ -73,6 +73,10 @@ export class GoogleBooksService {
 			};
 		} catch (error) {
 			console.error('Google Books API search error:', error);
+			// Preserve upstream error details when available
+			if (error instanceof Error) {
+				throw new Error(error.message);
+			}
 			throw new Error('Failed to search books. Please try again.');
 		}
 	}
