@@ -111,6 +111,23 @@ export class BookServiceServer {
 			throw new Error('You can only update your own books');
 		}
 
+		// If attempting to set the book to available, ensure there are no active swap requests involving this book
+		if (isAvailable === true) {
+			const { count, error: activeSwapError } = await supabase
+				.from('swap_requests')
+				.select('id', { count: 'exact', head: true })
+				.or(`book_id.eq.${bookId},offered_book_id.eq.${bookId},counter_offered_book_id.eq.${bookId}`)
+				.in('status', ['PENDING', 'COUNTER_OFFER', 'ACCEPTED']);
+
+			if (activeSwapError) {
+				throw new Error('Failed to validate swap status: ' + activeSwapError.message);
+			}
+
+			if ((count || 0) > 0) {
+				throw new Error('Cannot change availability while there are ongoing swap requests for this book.');
+			}
+		}
+
 		const { data, error } = await supabase
 			.from('books')
 			.update({ is_available: isAvailable })

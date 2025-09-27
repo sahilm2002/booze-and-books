@@ -183,15 +183,27 @@
 		}
 
 		try {
-			// Find nearby stores
-			const stores = await StoreLocatorService.findNearbyStores({
+			// Find nearby stores (service widens radius progressively; start at 10)
+			let stores = await StoreLocatorService.findNearbyStores({
 				zipCode: userPreferences!.zipCode!,
 				radiusMiles: 10,
 				includeAlcoholOnly: true
 			});
 
+			// Extra UI fallback: if still none, retry with broader radius and without alcohol-only filter
 			if (stores.length === 0) {
-				alert('No stores found within 10 miles of your location. Please try a different zip code.');
+				const wider = await StoreLocatorService.findNearbyStores({
+					zipCode: userPreferences!.zipCode!,
+					radiusMiles: 50,
+					includeAlcoholOnly: false
+				});
+				if (wider.length > 0) {
+					stores = wider;
+				}
+			}
+
+			if (stores.length === 0) {
+				alert('No stores found near your location. Try a different ZIP or increase the search radius.');
 				return;
 			}
 
@@ -200,30 +212,37 @@
 			state.showStoreSelector = true;
 		} catch (error) {
 			console.error('Failed to find stores:', error);
-			alert('Failed to find nearby stores. Please try again.');
+			const message = error instanceof Error ? error.message : 'Failed to find nearby stores. Please try again.';
+			if (message.toLowerCase().includes('invalid zip')) {
+				alert('We could not locate that zip code. Please check and try again.');
+			} else {
+				alert(message);
+			}
 		}
 	}
 
 	function handleStoreSelect(store: USStore, cocktail: Cocktail) {
-		// Build shopping cart items from cocktail ingredients
+		// Build shopping cart items from cocktail ingredients (not auto-adding, informational only)
 		const cartItems = cocktail.ingredients.map(ingredient => ({
 			ingredientName: ingredient.name,
 			quantity: 1,
 			estimatedPrice: 0
 		}));
 
-		// Build shopping cart URL
-		const cartUrl = StoreLocatorService.buildShoppingCartUrl(store, cartItems);
+		// Build store URL (no search terms); include ZIP context when supported
+		const cartUrl = StoreLocatorService.buildShoppingCartUrl(
+			store,
+			cartItems,
+			userPreferences?.zipCode
+		);
 
 		// Track selection for analytics
 		if (currentUser) {
 			StoreLocatorService.trackStoreSelection(currentUser.id, store.id, cocktail.id);
 		}
 
-		// Open store website in new tab
+		// Open store website in new tab; keep modal open per UX requirement
 		window.open(cartUrl, '_blank', 'noopener,noreferrer');
-
-		state.showStoreSelector = false;
 	}
 
 	function openCocktailModal(cocktail: Cocktail) {
