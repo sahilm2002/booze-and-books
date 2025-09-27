@@ -128,11 +128,9 @@ export class ChatService {
 		
 		if (conversationIds.length > 0) {
 			// Use a more efficient approach with SQL aggregation
-			const { data: unreadCounts } = await supabase
-				.rpc('get_unread_counts_by_conversation', {
-					conversation_ids: conversationIds,
-					user_id: userId
-				});
+			let unreadCounts: any[] | null = null;
+			// RPC disabled: use fallback aggregation to avoid 404s when the function is not deployed
+			// unreadCounts remains null to trigger the fallback code path below
 
 			// If RPC function doesn't exist, fall back to the current approach but optimized
 			if (!unreadCounts) {
@@ -144,8 +142,9 @@ export class ChatService {
 					.eq('is_read', false)
 					.eq('message_type', MessageType.CHAT_MESSAGE);
 
-				// Build a map of conversation_id -> count
-				unreadMessages?.forEach(row => {
+				// Build a map of conversation_id -> count (ensure array type)
+				const unreadRows: Array<{ conversation_id: string }> = Array.isArray(unreadMessages) ? (unreadMessages as Array<{ conversation_id: string }>) : [];
+				unreadRows.forEach((row) => {
 					const count = unreadCountMap.get(row.conversation_id) || 0;
 					unreadCountMap.set(row.conversation_id, count + 1);
 				});
@@ -530,8 +529,9 @@ export class ChatServiceServer {
 				.eq('is_read', false)
 				.eq('message_type', MessageType.CHAT_MESSAGE);
 
-			// Build a map of conversation_id -> count
-			unreadCounts?.forEach(row => {
+			// Build a map of conversation_id -> count (ensure array type)
+			const unreadRows: Array<{ conversation_id: string }> = Array.isArray(unreadCounts) ? (unreadCounts as Array<{ conversation_id: string }>) : [];
+			unreadRows.forEach((row) => {
 				const count = unreadCountMap.get(row.conversation_id) || 0;
 				unreadCountMap.set(row.conversation_id, count + 1);
 			});

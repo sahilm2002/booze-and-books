@@ -386,6 +386,12 @@
 								<div class="message-content">
 									{#if message.message}
 										<p>{message.message}</p>
+
+										{#if (message.data as any)?.auto_generated && (message.data as any)?.swap_request_id}
+											<p class="auto-link">
+												<a href={"/app/swaps#swap-" + (message.data as any).swap_request_id} class="swap-link">Book Swap Details</a>
+											</p>
+										{/if}
 									{/if}
 									{#if message.attachment_url}
 										<div class="attachment">
