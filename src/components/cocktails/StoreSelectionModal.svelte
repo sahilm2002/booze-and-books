@@ -13,6 +13,10 @@
 
 	const dispatch = createEventDispatcher();
 
+	// Show first 3 by default, allow user to reveal more
+	let visibleCount = 3;
+	$: visibleStores = stores.slice(0, visibleCount);
+
 	function handleStoreSelect(store: USStore) {
 		onStoreSelect(store, cocktail);
 		dispatch('storeSelected', { store, cocktail });
@@ -30,8 +34,8 @@
 	}
 
 	function formatDistance(distance: number | undefined): string {
-		if (!distance) return '';
-		return distance < 1 ? `${(distance * 5280).toFixed(0)} ft` : `${distance.toFixed(1)} mi`;
+		if (distance === undefined || distance === null) return '';
+		return `${distance.toFixed(1)} mi`;
 	}
 
 	function getStoreHours(store: USStore): string {
@@ -89,13 +93,14 @@
 					</div>
 				{:else}
 					<div class="stores-list">
-						{#each stores as store (store.id)}
+						{#each visibleStores as store (store.id)}
 							<div class="store-card" class:open={isStoreOpen(store)}>
 								<div class="store-header">
 									<div class="store-info">
 										<h3 class="store-name">{getStoreDisplayName(store.chain)}</h3>
 										<p class="store-address">{StoreLocatorService.formatStoreAddress(store)}</p>
 									</div>
+
 									<div class="store-meta">
 										{#if store.distance}
 											<div class="distance">
@@ -146,6 +151,17 @@
 						{/each}
 					</div>
 
+					{#if stores.length > visibleCount}
+						<div class="show-more">
+							<button
+								class="btn btn-secondary"
+								on:click={() => { visibleCount = Math.min(visibleCount + 3, stores.length); }}
+							>
+								Show more stores
+							</button>
+						</div>
+					{/if}
+
 					<div class="ingredients-preview">
 						<h4>🧾 Ingredients you'll need:</h4>
 						<div class="ingredients-list">
@@ -162,7 +178,7 @@
 
 					<div class="disclaimer">
 						<p class="disclaimer-text">
-							<strong>Note:</strong> We'll redirect you to the store's website with a search for these ingredients. 
+							<strong>Note:</strong> We'll take you to the selected store's site near your ZIP. Add items to your cart there.
 							Availability and prices may vary. You must be 21+ to purchase alcoholic beverages.
 						</p>
 					</div>
@@ -297,6 +313,12 @@
 		background: #f8f9fa;
 		color: #6b7280;
 		border: 1px solid #e2e8f0;
+	}
+
+	.show-more {
+		display: flex;
+		justify-content: center;
+		margin-bottom: 1.5rem;
 	}
 
 	.btn-secondary:hover {
