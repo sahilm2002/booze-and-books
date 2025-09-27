@@ -5,24 +5,22 @@ import { NotificationType } from '../types/notification.js';
 const NOTIFICATION_RETENTION_DAYS = 180;
 
 export class NotificationService {
-	// Get notifications for a user (last 180 days only)
-	static async getNotifications(userId: string, limit = 20, offset = 0): Promise<Notification[]> {
-		const retentionDate = new Date();
-		retentionDate.setDate(retentionDate.getDate() - NOTIFICATION_RETENTION_DAYS);
-
-		const { data, error } = await supabase
-			.from('notifications')
-			.select('*')
-			.eq('user_id', userId)
-			.gte('created_at', retentionDate.toISOString())
-			.order('created_at', { ascending: false })
-			.range(offset, offset + limit - 1);
-
-		if (error) {
-			throw new Error(`Failed to fetch notifications: ${error.message}`);
+	// Get notifications via server API to ensure consistent read-state and RLS handling
+	static async getNotifications(_userId: string, limit = 20, offset = 0): Promise<Notification[]> {
+		const params = new URLSearchParams({
+			limit: String(limit),
+			offset: String(offset)
+		});
+		const res = await fetch(`/api/notifications?${params.toString()}`, {
+			method: 'GET',
+			headers: { 'Accept': 'application/json' }
+		});
+		if (!res.ok) {
+			throw new Error('Failed to fetch notifications');
 		}
-
-		return data || [];
+		const json = await res.json();
+		// API returns { notifications, unreadCount, pagination }
+		return Array.isArray(json.notifications) ? json.notifications as Notification[] : [];
 	}
 
 	// Get unread notifications count (last 180 days only)
@@ -111,24 +109,21 @@ export class NotificationService {
 		return data;
 	}
 
-	// Get recent notifications (last 7 days)
-	static async getRecentNotifications(userId: string): Promise<Notification[]> {
-		const sevenDaysAgo = new Date();
-		sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-
-		const { data, error } = await supabase
-			.from('notifications')
-			.select('*')
-			.eq('user_id', userId)
-			.gte('created_at', sevenDaysAgo.toISOString())
-			.order('created_at', { ascending: false })
-			.limit(10);
-
-		if (error) {
-			throw new Error(`Failed to fetch recent notifications: ${error.message}`);
+	// Get recent notifications (unread only), via server API for consistent filtering
+	static async getRecentNotifications(_userId: string, limit = 50, offset = 0): Promise<Notification[]> {
+		const params = new URLSearchParams({
+			limit: String(limit),
+			offset: String(offset)
+		});
+		const res = await fetch(`/api/notifications?${params.toString()}`, {
+			method: 'GET',
+			headers: { 'Accept': 'application/json' }
+		});
+		if (!res.ok) {
+			throw new Error('Failed to fetch recent notifications');
 		}
-
-		return data || [];
+		const json = await res.json();
+		return Array.isArray(json.notifications) ? (json.notifications as Notification[]) : [];
 	}
 
 	// Get notification by ID
