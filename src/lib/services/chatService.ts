@@ -79,6 +79,40 @@ export class ChatService {
 			profileMap.set(profile.id, profile);
 		});
 
+		// Get unread counts for all conversations in a single query using SQL COUNT
+		const conversationIds = Array.from(conversationMap.keys());
+		const unreadCountMap = new Map<string, number>();
+		
+		if (conversationIds.length > 0) {
+			// Use a more efficient approach with SQL aggregation
+			let unreadCounts: any[] | null = null;
+			// RPC disabled: use fallback aggregation to avoid 404s when the function is not deployed
+			// unreadCounts remains null to trigger the fallback code path below
+
+			// If RPC function doesn't exist, fall back to the current approach but optimized
+			if (!unreadCounts) {
+				const { data: unreadMessages } = await supabase
+					.from('notifications')
+					.select('conversation_id')
+					.in('conversation_id', conversationIds)
+					.eq('recipient_id', userId)
+					.eq('is_read', false)
+					.eq('message_type', MessageType.CHAT_MESSAGE);
+
+				// Build a map of conversation_id -> count (ensure array type)
+				const unreadRows: Array<{ conversation_id: string }> = Array.isArray(unreadMessages) ? (unreadMessages as Array<{ conversation_id: string }>) : [];
+				unreadRows.forEach((row) => {
+					const count = unreadCountMap.get(row.conversation_id) || 0;
+					unreadCountMap.set(row.conversation_id, count + 1);
+				});
+			} else {
+				// Use the RPC results
+				unreadCounts.forEach((row: any) => {
+					unreadCountMap.set(row.conversation_id, row.unread_count);
+				});
+			}
+		}
+
 		// Convert to Conversation objects
 		const conversations: Conversation[] = [];
 		for (const [conversationId, lastMessage] of conversationMap) {
@@ -373,6 +407,17 @@ export class ChatServiceServer {
 				.eq('is_read', false)
 				.eq('message_type', MessageType.CHAT_MESSAGE);
 
+			// Build a map of conversation_id -> count (ensure array type)
+			const unreadRows: Array<{ conversation_id: string }> = Array.isArray(unreadCounts) ? (unreadCounts as Array<{ conversation_id: string }>) : [];
+			unreadRows.forEach((row) => {
+				const count = unreadCountMap.get(row.conversation_id) || 0;
+				unreadCountMap.set(row.conversation_id, count + 1);
+			});
+		}
+
+		// Convert to Conversation objects
+		const conversations: Conversation[] = [];
+		for (const [conversationId, lastMessage] of conversationMap) {
 			conversations.push({
 				id: conversationId,
 				participants: [lastMessage.sender_id, lastMessage.recipient_id],
