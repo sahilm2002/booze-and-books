@@ -10,18 +10,43 @@ export class NotificationServiceServer {
 		limit = 20, 
 		offset = 0
 	): Promise<Notification[]> {
-		const { data, error } = await supabase
-			.from('notifications')
-			.select('*')
-			.eq('user_id', userId)
-			.order('created_at', { ascending: false })
-			.range(offset, offset + limit - 1);
+		// Return only UNREAD items for this user:
+		// - System notifications (message_type=notification) by user_id
+		// - Chat messages (message_type=chat_message) by recipient_id
+		const [systemRes, chatRes] = await Promise.all([
+			supabase
+				.from('notifications')
+				.select('*')
+				.eq('user_id', userId)
+				.eq('is_read', false)
+				.eq('message_type', 'notification'),
+			supabase
+				.from('notifications')
+				.select('*')
+				.eq('recipient_id', userId)
+				.eq('is_read', false)
+				.eq('message_type', 'chat_message'),
+		]);
 
-		if (error) {
-			throw new Error(`Failed to fetch notifications: ${error.message}`);
+		if (systemRes.error) {
+			throw new Error(`Failed to fetch system notifications: ${systemRes.error.message}`);
+		}
+		if (chatRes.error) {
+			throw new Error(`Failed to fetch chat notifications: ${chatRes.error.message}`);
 		}
 
-		return data || [];
+		const combined = [
+			...(systemRes.data || []),
+			...(chatRes.data || [])
+		];
+
+		// Sort by created_at desc and paginate
+		combined.sort((a: any, b: any) => {
+			const at = new Date(a.created_at).getTime();
+			const bt = new Date(b.created_at).getTime();
+			return bt - at;
+		});
+		return combined.slice(offset, offset + limit);
 	}
 
 	// Get unread system notifications count (excluding chat messages)

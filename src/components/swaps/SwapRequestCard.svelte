@@ -219,7 +219,7 @@
 	}
 </script>
 
-<div class="swap-card">
+<div id={"swap-" + swapRequest.id} class="swap-card">
 	<div class="swap-header">
 		<div class="status-badge" style="background-color: {statusColor}">
 			{statusDisplay}
