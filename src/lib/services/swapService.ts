@@ -68,7 +68,7 @@ export class SwapService {
 				// Get both book titles for the message
 				const { data: requestedBookData } = await supabase
 					.from('books')
-					.select('title')
+					.select('title, authors')
 					.eq('id', input.book_id)
 					.single();
 
@@ -80,21 +80,28 @@ export class SwapService {
 					// Get the offered book title
 					const { data: offeredBookData } = await supabase
 						.from('books')
-						.select('title')
+						.select('title, authors')
 						.eq('id', input.offered_book_id)
 						.single();
 					
 					const offeredBookTitle = offeredBookData?.title || 'my book';
-					
-					// Create message with both book titles
-					chatMessage = input.message 
-						? `Hi! I'm interested in swapping your book, "${requestedBookTitle}", in return for my book "${offeredBookTitle}". ${input.message}`
-						: `Hi! I'm interested in swapping your book, "${requestedBookTitle}", in return for my book "${offeredBookTitle}".`;
+					const requestedAuthors = Array.isArray(requestedBookData?.authors)
+						? requestedBookData?.authors?.join(', ')
+						: (requestedBookData?.authors || '');
+					const offeredAuthors = Array.isArray(offeredBookData?.authors)
+						? offeredBookData?.authors?.join(', ')
+						: (offeredBookData?.authors || '');
+
+					// Create message with both book titles and authors (if available)
+					const baseMsg = `Hi! I'm interested in swapping your book, "${requestedBookTitle}"${requestedAuthors ? ` by ${requestedAuthors}` : ''}, in return for my book "${offeredBookTitle}"${offeredAuthors ? ` by ${offeredAuthors}` : ''}.`;
+					chatMessage = input.message ? `${baseMsg} ${input.message}` : baseMsg;
 				} else {
-					// Fallback for when no specific book is offered
-					chatMessage = input.message 
-						? `Hi! I'm interested in swapping for "${requestedBookTitle}". ${input.message}`
-						: `Hi! I'm interested in swapping for "${requestedBookTitle}".`;
+					// Fallback for when no specific book is offered (include authors if available)
+					const requestedAuthors = Array.isArray(requestedBookData?.authors)
+						? requestedBookData?.authors?.join(', ')
+						: (requestedBookData?.authors || '');
+					const baseMsg = `Hi! I'm interested in swapping for "${requestedBookTitle}"${requestedAuthors ? ` by ${requestedAuthors}` : ''}.`;
+					chatMessage = input.message ? `${baseMsg} ${input.message}` : baseMsg;
 				}
 
 				// Generate conversation ID
@@ -117,7 +124,8 @@ export class SwapService {
 						data: {
 							swap_request_id: data.id,
 							book_id: input.book_id,
-							book_title: requestedBookTitle
+							book_title: requestedBookTitle,
+							auto_generated: true
 						}
 					});
 			} catch (chatError) {
