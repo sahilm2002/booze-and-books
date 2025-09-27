@@ -35,6 +35,7 @@
 				.select('*')
 				.eq('user_id', userId)
 				.eq('message_type', 'notification')
+				.eq('is_read', false)
 				.order('created_at', { ascending: false })
 				.limit(10);
 

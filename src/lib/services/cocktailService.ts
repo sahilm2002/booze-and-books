@@ -298,7 +298,14 @@ export class CocktailService {
 		// Select different cocktails based on the random seed
 		const selectedTemplates = this.selectVariedCocktails(cocktailTemplates, randomSeed);
 		
-		return selectedTemplates;
+		// Enrich the generic template explanations with concrete, book- and ingredient-aware details
+		return selectedTemplates.map((tpl) => ({
+			...tpl,
+			themeExplanation: this.buildSpecificThemeExplanation(
+				tpl,
+				{ title, authors, description: description || '', themeAspect }
+			)
+		}));
 	}
 
 	private static getCocktailTemplatesByTheme(
@@ -310,7 +317,7 @@ export class CocktailService {
 		const templates = {
 			characters: [
 				{
-					name: `${firstWord} Character Martini`,
+					name: `${firstWord} Martini`,
 					type: 'alcoholic' as const,
 					description: `A sophisticated cocktail inspired by the complex characters in ${title}`,
 					themeExplanation: `This martini reflects the intricate personalities and relationships between characters in ${title}. Each ingredient represents a different character trait.`,
@@ -514,6 +521,176 @@ export class CocktailService {
 		const selectedNonAlcoholic = nonAlcoholicTemplates[0];
 		
 		return [...selectedAlcoholic, selectedNonAlcoholic];
+	}
+
+	// Build a specific, concrete "why this fits" explanation using actual ingredients and book context
+	private static buildSpecificThemeExplanation(
+		cocktail: {
+			name: string;
+			description?: string;
+			ingredients: CocktailIngredient[];
+			instructions: string;
+			difficulty: 'easy' | 'medium' | 'hard';
+			prepTimeMinutes: number;
+			type: 'alcoholic' | 'non_alcoholic';
+		},
+		meta: {
+			title: string;
+			authors: string[];
+			description: string;
+			themeAspect: string;
+		}
+	): string {
+		const { title, description, themeAspect } = meta;
+		const ingredients = cocktail.ingredients || [];
+
+		// Group ingredients by role
+		const primarySpirit = ingredients.find(i => i.category === 'spirit');
+		const liqueur = ingredients.find(i => i.category === 'liqueur');
+		const mixers = ingredients.filter(i => i.category === 'mixer');
+		const garnish = ingredients.find(i => i.category === 'garnish');
+
+		// Extract lightweight context from the book description
+		const ctx = this.extractContextFromDescription(description || '');
+
+		// Opening line tailored by theme aspect
+		const openers: Record<string, string> = {
+			characters: `Each element mirrors a facet of the characters in ${title}${ctx.mood ? `, whose ${ctx.mood} edges show through` : ''}.`,
+			plot: `Built to echo the plot mechanics of ${title}${ctx.mood ? `—${ctx.mood} and layered` : ''}, the flavors turn in stages like the story.`,
+			setting: `Anchored in the ${ctx.timePeriod || 'period'} atmosphere of ${ctx.setting || 'the book’s world'}, this recipe translates place into flavor.`,
+			mood: `The composition channels the ${ctx.mood || 'prevailing'} tone of ${title}, favoring mood-forward balance over sweetness.`,
+			title: `Named in spirit for ${title}, the build threads recognizable notes into a signature profile.`
+		};
+		const opener = openers[themeAspect] ?? openers.title;
+
+		// Ingredient symbolism sentences
+		const details: string[] = [];
+		if (primarySpirit) {
+			details.push(`${primarySpirit.name} provides ${this.ingredientSymbolism(primarySpirit.name)} as the base.`);
+		}
+		if (liqueur) {
+			details.push(`${liqueur.name} adds ${this.ingredientSymbolism(liqueur.name)}.`);
+		}
+		if (mixers.length > 0) {
+			const mixerNames = mixers.map(m => m.name).join(', ');
+			details.push(`${mixerNames} bring ${this.ingredientSymbolism(mixerNames)} to balance the profile.`);
+		}
+		if (garnish) {
+			details.push(`Finished with ${garnish.name} to ${this.ingredientSymbolism(garnish.name)}.`);
+		}
+
+		// Theme-specific tie-in
+		switch (themeAspect) {
+			case 'setting': {
+				const anchor = [primarySpirit?.name, liqueur?.name].filter(Boolean).join(' and ') || 'the ingredient choices';
+				const where = [ctx.timePeriod, ctx.setting].filter(Boolean).join(' ') || 'the setting';
+				details.push(`Together, ${anchor} nod to ${where}.`);
+				break;
+			}
+			case 'characters': {
+				const contrastLeft = primarySpirit?.name || 'the base';
+				const contrastRight = liqueur?.name || mixers[0]?.name || 'the accents';
+				details.push(`The tension between ${contrastLeft} and ${contrastRight} mirrors the push-and-pull between key figures.`);
+				break;
+			}
+			case 'plot': {
+				const reveal = liqueur?.name || mixers[0]?.name || garnish?.name || 'the finishing touch';
+				details.push(`A clear foundation with a late ${reveal} creates a reveal akin to the book’s turns.`);
+				break;
+			}
+			case 'mood': {
+				const mood = ctx.mood || 'a bittersweet steadiness';
+				details.push(`The overall profile skews toward ${mood}, aligning with the tone on the page.`);
+				break;
+			}
+			case 'title':
+			default: {
+				const tangible = garnish?.name || mixers[0]?.name || primarySpirit?.name || 'its components';
+				details.push(`The name gestures to ${title}, while ${tangible} makes that reference tangible in the glass.`);
+			}
+		}
+
+		return [opener, ...details].join(' ');
+	}
+
+	// Heuristic context extraction from a free-text book description
+	private static extractContextFromDescription(description: string): { setting?: string; timePeriod?: string; mood?: string } {
+		const text = (description || '').toLowerCase();
+
+		// Time period
+		let timePeriod: string | undefined;
+		if (/\b(18|19|20|21)(th|st|nd|rd)\b/.test(text)) timePeriod = (text.match(/\b(18|19|20|21)(th|st|nd|rd)\b/) || [])[0];
+		if (!timePeriod && /(1920s|1930s|1940s|1950s|1960s|1970s|1980s|1990s)/.test(text)) timePeriod = (text.match(/(19[2-9]0s)/) || [])[0];
+		if (!timePeriod && /(victorian|edwardian|mughal|colonial|postwar|contemporary|modern)/.test(text)) {
+			timePeriod = (text.match(/(victorian|edwardian|mughal|colonial|postwar|contemporary|modern)/) || [])[0];
+		}
+
+		// Setting
+		let setting: string | undefined;
+		const settingMatches = text.match(/\b(delhi|new\s?delhi|mumbai|bombay|kolkata|calcutta|london|new york|paris|tokyo|lahore|istanbul|rome|cairo|moscow|beijing|shanghai|seoul|tehran|karachi|palace|court|island|desert|jungle|village|harbor|harbour)\b/);
+		if (settingMatches) {
+			setting = settingMatches[0];
+		}
+
+		// Mood
+		let mood: string | undefined;
+		const moodMatches = text.match(/\b(dark|brooding|whimsical|satirical|romantic|melancholy|melancholic|tense|gritty|hopeful|bittersweet|elegant|opulent)\b/);
+		if (moodMatches) {
+			mood = moodMatches[0];
+		}
+
+		// Title-case some values for display
+		const titleCase = (s?: string) => s ? s.replace(/\b\w/g, c => c.toUpperCase()) : s;
+
+		return {
+			setting: titleCase(setting),
+			timePeriod: timePeriod ? timePeriod.toLowerCase() : undefined,
+			mood
+		};
+	}
+
+	// Map ingredient names to evocative, concrete sensory/meaning notes
+	private static ingredientSymbolism(name: string): string {
+		const n = name.toLowerCase();
+
+		// Spirits
+		if (n.includes('gin')) return 'crisp, botanical clarity';
+		if (n.includes('vodka')) return 'a clean, unadorned backbone';
+		if (n.includes('rye')) return 'spice and tension';
+		if (n.includes('bourbon')) return 'oak, vanilla warmth';
+		if (n.includes('whisky') || n.includes('whiskey')) return 'grain depth and resolve';
+		if (n.includes('scotch')) return 'smoke and austerity';
+		if (n.includes('rum')) return 'sunlit, tropical warmth';
+		if (n.includes('tequila')) return 'bright, herbal energy';
+		if (n.includes('mezcal')) return 'smoky, earthen intensity';
+		if (n.includes('brandy') || n.includes('cognac')) return 'old‑world richness and contemplative warmth';
+		if (n.includes('champagne') || n.includes('sparkling')) return 'celebratory sparkle';
+
+		// Liqueurs and bitters
+		if (n.includes('vermouth') && n.includes('dry')) return 'aromatic poise';
+		if (n.includes('vermouth') && n.includes('sweet')) return 'bittersweet depth';
+		if (n.includes('campari')) return 'bitter tension';
+		if (n.includes('amaretto')) return 'almond softness';
+		if (n.includes('elderflower')) return 'floral lift';
+		if (n.includes('bitters')) return 'structure and backbone';
+
+		// Mixers and sweeteners
+		if (n.includes('lemon') || n.includes('lime') || n.includes('citrus')) return 'cutting acidity and brightness';
+		if (n.includes('pineapple')) return 'lush tropical sweetness';
+		if (n.includes('coconut')) return 'creamy tropical body';
+		if (n.includes('ginger')) return 'ginger bite and lift';
+		if (n.includes('honey')) return 'rounded, pastoral sweetness';
+		if (n.includes('maple')) return 'wooded, amber sweetness';
+		if (n.includes('agave')) return 'earthy sweetness';
+
+		// Garnishes and herbs
+		if (n.includes('orange peel') || n.includes('orange')) return 'citrus oils that sharpen the finish';
+		if (n.includes('lemon twist') || n.includes('lemon')) return 'bright aromatics on the nose';
+		if (n.includes('thyme') || n.includes('rosemary') || n.includes('herb')) return 'an herbal thread that grounds the glass';
+		if (n.includes('cherry')) return 'a small note of nostalgic sweetness';
+
+		// Fallback
+		return 'balance and contrast';
 	}
 
 	private static async createRefreshSession(
