@@ -587,18 +587,29 @@ export class SwapServiceServer {
 			throw new Error('Only swap participants can mark a swap as completed');
 		}
 
-		// Determine if user is requester or owner and set appropriate rating
-		const updateData: any = {
-			status: SwapStatus.COMPLETED,
-			completion_date: new Date().toISOString()
-		};
+		// Determine if user is requester or owner and set appropriate timestamps and ratings
+		const now = new Date().toISOString();
+		const updateData: any = {};
 
 		if (request.requester_id === userId) {
+			updateData.requester_completed_at = now;
 			updateData.requester_rating = completion.rating;
 			updateData.requester_feedback = completion.feedback;
 		} else {
+			updateData.owner_completed_at = now;
 			updateData.owner_rating = completion.rating;
 			updateData.owner_feedback = completion.feedback;
+		}
+
+		// Check if both parties have now completed
+		const otherUserCompleted = request.requester_id === userId 
+			? request.owner_completed_at 
+			: request.requester_completed_at;
+
+		if (otherUserCompleted) {
+			// Both parties completed - mark overall completion
+			updateData.status = SwapStatus.COMPLETED;
+			updateData.completed_at = now;
 		}
 
 		const { data, error } = await supabase
@@ -664,7 +675,7 @@ export class SwapServiceServer {
 			`)
 			.eq('status', SwapStatus.COMPLETED)
 			.or(`requester_id.eq.${userId},owner_id.eq.${userId}`)
-			.order('completion_date', { ascending: false });
+			.order('completed_at', { ascending: false });
 
 		if (error) {
 			throw new Error(`Failed to fetch completed swaps: ${error.message}`);
