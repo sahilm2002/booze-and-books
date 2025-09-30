@@ -3,6 +3,8 @@ import { SwapServiceServer } from '$lib/services/swapServiceServer';
 import { validateSwapRequestInput } from '$lib/validation/swap';
 import type { RequestHandler } from './$types';
 
+import { EmailOrchestratorServer } from '$lib/services/emailOrchestratorServer';
+
 export const GET: RequestHandler = async ({ locals, url }) => {
 	if (!locals.session?.user) {
 		throw error(401, 'Unauthorized');
@@ -43,18 +45,24 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 	// Validate request data
 	const validation = validateSwapRequestInput(requestData);
 	if (!validation.success) {
-		throw error(400, {
-			message: 'Invalid request data',
-			errors: validation.errors
-		});
+		return json(
+			{
+				message: 'Invalid request data',
+				errors: validation.errors
+			},
+			{ status: 400 }
+		);
 	}
 
 	try {
+		const safeInput = { ...validation.data, message: validation.data.message ?? undefined };
 		const swapRequest = await SwapServiceServer.createSwapRequest(
 			locals.supabase,
-			validation.data,
+			safeInput,
 			userId
 		);
+
+		await EmailOrchestratorServer.onSwapCreated(locals.supabase, swapRequest.id, validation.data.message || null);
 
 		return json(swapRequest, { status: 201 });
 	} catch (err) {
