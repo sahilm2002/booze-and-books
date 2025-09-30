@@ -2,6 +2,7 @@ import { json } from '@sveltejs/kit';
 import type { RequestHandler } from '@sveltejs/kit';
 import { ChatServiceServer } from '$lib/services/chatService';
 import type { ChatMessageInput } from '$lib/types/notification';
+import { ChatEmailDigestServer } from '$lib/services/chatEmailDigestServer';
 
 export const GET: RequestHandler = async ({ url, locals }) => {
 	const { supabase, session } = locals;
@@ -68,6 +69,14 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 				};
 
 				const sentMessage = await ChatServiceServer.sendMessage(supabase, session.user.id, messageInput);
+
+				// After sending, trigger offline chat digest (max 1/day, excludes auto_generated)
+				try {
+					await ChatEmailDigestServer.maybeSendDigest(supabase, recipient_id);
+				} catch (e) {
+					console.error('Failed to trigger chat email digest:', e);
+				}
+
 				return json({ message: sentMessage });
 
 			case 'markAsRead':
