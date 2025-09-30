@@ -143,30 +143,28 @@
 		})();
 	}
 
-	// Start real-time polling when modal opens
-	$: if (isOpen && conversationId) {
-		// Clear any existing intervals
-		if (realtimeInterval) {
-			clearInterval(realtimeInterval);
-		}
-		if (statusInterval) {
-			clearInterval(statusInterval);
-		}
-		
-		// Start polling for new messages every 3 seconds
-		realtimeInterval = setInterval(refreshMessages, 3000);
-		
-		// Start polling for online status every 10 seconds
-		statusInterval = setInterval(refreshOnlineStatus, 10000);
-	} else if (!isOpen) {
-		// Stop polling when modal closes
-		if (realtimeInterval) {
-			clearInterval(realtimeInterval);
-			realtimeInterval = null;
-		}
-		if (statusInterval) {
-			clearInterval(statusInterval);
-			statusInterval = null;
+	// Start/stop polling intervals atomically based on modal state
+	$: {
+		const shouldPoll = isOpen && !!conversationId;
+
+		if (shouldPoll) {
+			// Create intervals only if they don't already exist (prevents duplicates on rapid toggles)
+			if (!realtimeInterval) {
+				realtimeInterval = setInterval(refreshMessages, 3000);
+			}
+			if (!statusInterval) {
+				statusInterval = setInterval(refreshOnlineStatus, 10000);
+			}
+		} else {
+			// Clear and nullify intervals when modal is closed or conversationId missing
+			if (realtimeInterval) {
+				clearInterval(realtimeInterval);
+				realtimeInterval = null;
+			}
+			if (statusInterval) {
+				clearInterval(statusInterval);
+				statusInterval = null;
+			}
 		}
 	}
 

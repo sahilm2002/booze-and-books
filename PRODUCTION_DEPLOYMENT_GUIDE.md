@@ -22,6 +22,10 @@ PUBLIC_SUPABASE_URL=https://your-project.supabase.co
 PUBLIC_SUPABASE_ANON_KEY=sb_publishable_your-key-here
 SUPABASE_SERVICE_ROLE_KEY=sb_secret_your-key-here
 
+# Google Maps/Places API Keys (Required; app fails fast on startup if missing)
+GOOGLE_PLACES_API_KEY=your-google-places-api-key
+GOOGLE_GEOCODING_API_KEY=your-google-geocoding-api-key
+
 # Optional: Daily Reminder System
 DAILY_REMINDER_TOKEN=your-secret-token-here
 ```
@@ -72,6 +76,12 @@ vercel env add PUBLIC_SUPABASE_ANON_KEY
 
 vercel env add SUPABASE_SERVICE_ROLE_KEY
 # Enter your secret key
+
+vercel env add GOOGLE_PLACES_API_KEY
+# Enter your Google Places API key
+
+vercel env add GOOGLE_GEOCODING_API_KEY
+# Enter your Google Geocoding API key
 
 vercel env add DAILY_REMINDER_TOKEN
 # Enter your daily reminder token
@@ -150,6 +160,8 @@ railway variables set JWT_ISSUER=booze-and-books-app
 railway variables set PUBLIC_SUPABASE_URL=your-supabase-url
 railway variables set PUBLIC_SUPABASE_ANON_KEY=your-publishable-key
 railway variables set SUPABASE_SERVICE_ROLE_KEY=your-secret-key
+railway variables set GOOGLE_PLACES_API_KEY=your-google-places-api-key
+railway variables set GOOGLE_GEOCODING_API_KEY=your-google-geocoding-api-key
 railway variables set DAILY_REMINDER_TOKEN=your-daily-reminder-token
 
 # Deploy
@@ -216,6 +228,7 @@ export default {
 1. **Environment Variables Loaded**
    - Check your hosting platform's logs
    - Ensure no "JWT_SECRET environment variable is required" errors
+- Ensure no "Missing required environment variable GOOGLE_PLACES_API_KEY" or "Missing required environment variable GOOGLE_GEOCODING_API_KEY" errors
 
 2. **HTTPS Enabled**
    - Your site should use HTTPS (required for secure cookies)

@@ -1,6 +1,20 @@
 import { createServerClient } from '@supabase/ssr';
 import { type Handle, redirect } from '@sveltejs/kit';
 import { PUBLIC_SUPABASE_URL, PUBLIC_SUPABASE_ANON_KEY } from '$env/static/public';
+import { env } from '$env/dynamic/private';
+
+const requiredEnvVars = ['GOOGLE_PLACES_API_KEY', 'GOOGLE_GEOCODING_API_KEY'] as const;
+
+for (const key of requiredEnvVars) {
+  const value = env[key];
+  if (!value || value.trim() === '') {
+    const message =
+      `Missing required environment variable ${key}. Configure GOOGLE_PLACES_API_KEY and GOOGLE_GEOCODING_API_KEY for Google APIs. ` +
+      'Set them in your environment (.env for dev, CI/CD secrets for deploy). See PRODUCTION_DEPLOYMENT_GUIDE.md and DEPLOYMENT_CHECKLIST.md.';
+    console.error(message);
+    throw new Error(message);
+  }
+}
 
 export const handle: Handle = async ({ event, resolve }) => {
 	// Create Supabase client

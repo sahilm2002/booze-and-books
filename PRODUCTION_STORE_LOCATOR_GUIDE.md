@@ -513,3 +513,10 @@ npm run build
 ```
 
 This implementation will give you a production-ready store locator that finds real stores within any radius of any US location!
+
+## Fail-fast startup validation
+
+A runtime check in `src/hooks.server.ts` validates that `GOOGLE_PLACES_API_KEY` and `GOOGLE_GEOCODING_API_KEY` are set and non-empty. The application throws an explicit error on startup when these are missing, ensuring misconfigured deployments fail fast. Set these variables in all environments:
+- Local development: `.env`
+- CI/CD: pipeline or project secrets
+- Production: hosting provider environment variables
