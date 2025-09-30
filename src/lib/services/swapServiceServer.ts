@@ -188,7 +188,7 @@ export class SwapServiceServer {
 				.in('id', Array.from(bookIds)),
 			supabase
 				.from('profiles')
-				.select('id, username, full_name, avatar_url, email, location')
+				.select('id, username, full_name, avatar_url, city, state, zip_code')
 				.in('id', Array.from(userIds))
 		]);
 
@@ -228,7 +228,9 @@ export class SwapServiceServer {
 				full_name: null, 
 				avatar_url: null, 
 				email: null, 
-				location: null 
+				city: null,
+				state: null,
+				zip_code: null
 			};
 			const owner_profile = profilesMap.get(req.owner_id) || { 
 				id: req.owner_id,
@@ -236,7 +238,9 @@ export class SwapServiceServer {
 				full_name: null, 
 				avatar_url: null, 
 				email: null, 
-				location: null 
+				city: null,
+				state: null,
+				zip_code: null
 			};
 
 			return {
@@ -250,7 +254,9 @@ export class SwapServiceServer {
 					full_name: null, 
 					avatar_url: null, 
 					email: null, 
-					location: null 
+					city: null,
+					state: null,
+					zip_code: null
 				},
 				owner_profile: type === 'outgoing' ? owner_profile : { 
 					id: req.owner_id,
@@ -258,7 +264,9 @@ export class SwapServiceServer {
 					full_name: null, 
 					avatar_url: null, 
 					email: null, 
-					location: null 
+					city: null,
+					state: null,
+					zip_code: null
 				}
 			} as SwapRequestWithDetails;
 		});
@@ -398,13 +406,17 @@ export class SwapServiceServer {
 					username,
 					full_name,
 					avatar_url,
-					email
+					city,
+					state,
+					zip_code
 				),
 				owner_profile:profiles!swap_requests_owner_id_profiles_fkey (
 					username,
 					full_name,
 					avatar_url,
-					email
+					city,
+					state,
+					zip_code
 				)
 			`)
 			.eq('id', requestId)
@@ -575,18 +587,29 @@ export class SwapServiceServer {
 			throw new Error('Only swap participants can mark a swap as completed');
 		}
 
-		// Determine if user is requester or owner and set appropriate rating
-		const updateData: any = {
-			status: SwapStatus.COMPLETED,
-			completion_date: new Date().toISOString()
-		};
+		// Determine if user is requester or owner and set appropriate timestamps and ratings
+		const now = new Date().toISOString();
+		const updateData: any = {};
 
 		if (request.requester_id === userId) {
+			updateData.requester_completed_at = now;
 			updateData.requester_rating = completion.rating;
 			updateData.requester_feedback = completion.feedback;
 		} else {
+			updateData.owner_completed_at = now;
 			updateData.owner_rating = completion.rating;
 			updateData.owner_feedback = completion.feedback;
+		}
+
+		// Check if both parties have now completed
+		const otherUserCompleted = request.requester_id === userId 
+			? request.owner_completed_at 
+			: request.requester_completed_at;
+
+		if (otherUserCompleted) {
+			// Both parties completed - mark overall completion
+			updateData.status = SwapStatus.COMPLETED;
+			updateData.completed_at = now;
 		}
 
 		const { data, error } = await supabase
@@ -637,18 +660,22 @@ export class SwapServiceServer {
 					username,
 					full_name,
 					avatar_url,
-					email
+					city,
+					state,
+					zip_code
 				),
 				owner_profile:profiles!swap_requests_owner_id_profiles_fkey (
 					username,
 					full_name,
 					avatar_url,
-					email
+					city,
+					state,
+					zip_code
 				)
 			`)
 			.eq('status', SwapStatus.COMPLETED)
 			.or(`requester_id.eq.${userId},owner_id.eq.${userId}`)
-			.order('completion_date', { ascending: false });
+			.order('completed_at', { ascending: false });
 
 		if (error) {
 			throw new Error(`Failed to fetch completed swaps: ${error.message}`);

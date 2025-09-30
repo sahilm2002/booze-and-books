@@ -32,11 +32,10 @@ function createAuthStore() {
 		subscribe,
 		
 		/**
-		 * Check if user is authenticated - simplified for client-side only
+		 * Check if session is valid and refresh if needed
 		 */
 		ensureValidSession: async (): Promise<boolean> => {
 			try {
-				// Get session from client-side only (no server calls)
 				const { data: { session }, error } = await supabase.auth.getSession();
 				
 				if (error) {
@@ -44,19 +43,29 @@ function createAuthStore() {
 					return false;
 				}
 				
-				if (!session || !session.user) {
-					console.log('No authenticated session found');
+				if (!session) {
+					console.log('No active session found');
 					await auth.signOut();
 					return false;
 				}
 				
-				// Update store with current session
-				update(state => ({
-					...state,
-					session,
-					user: session.user,
-					loading: false
-				}));
+				// Check if token is expired or will expire soon (within 5 minutes)
+				const now = Math.floor(Date.now() / 1000);
+				const expiresAt = session.expires_at || 0;
+				
+				if (expiresAt <= now + 300) { // 5 minutes buffer
+					console.log('Token expired or expiring soon, attempting refresh');
+					const { data: { session: refreshedSession }, error: refreshError } = await supabase.auth.refreshSession();
+					
+					if (refreshError || !refreshedSession) {
+						console.error('Failed to refresh session:', refreshError);
+						await auth.signOut();
+						return false;
+					}
+					
+					console.log('Session refreshed successfully');
+					return true;
+				}
 				
 				return true;
 			} catch (error) {
@@ -67,39 +76,22 @@ function createAuthStore() {
 		},
 
 		/**
-		 * Initialize the auth store - client-side only
+		 * Initialize the auth store with session data from the server
 		 */
-		initialize: (session: Session | null = null) => {
-			// Start with provided session or try to get current session
+		initialize: (session: Session | null) => {
+			set({
+				session,
+				user: session?.user ?? null,
+				loading: false
+			});
+
+			// Set up auth state change listener only in browser
 			if (browser) {
-				// Get current session on initialization
-				supabase.auth.getSession().then(({ data: { session: currentSession } }) => {
-					const finalSession = session || currentSession;
-					set({
-						session: finalSession,
-						user: finalSession?.user ?? null,
-						loading: false
-					});
-
-					// If we have a session, start activity tracking
-					if (finalSession) {
-						initializeActivityService();
-					}
-				}).catch(error => {
-					console.error('Error getting initial session:', error);
-					set({
-						session: null,
-						user: null,
-						loading: false
-					});
-				});
-
-				// Set up auth state change listener
+				// remove prior listener if any
 				unsubscribe?.();
 				const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
 					console.log('Auth state changed:', event, session?.user?.email);
 					
-					// Update store with new session
 					update(state => ({
 						...state,
 						session,
@@ -109,31 +101,24 @@ function createAuthStore() {
 
 					// Handle sign out
 					if (event === 'SIGNED_OUT') {
+						// Stop activity tracking when user signs out
 						activityService.destroy();
 						await goto('/auth/login', { replaceState: true });
 					}
 					
-					// Handle sign in - start activity tracking only (no redirect)
-					if (event === 'SIGNED_IN') {
-						initializeActivityService();
-						await invalidateAll();
-						// Login component handles redirect directly - no redirect here
-					}
-					
-					// Handle token refresh
-					if (event === 'TOKEN_REFRESHED') {
+					// Handle sign in - start activity tracking
+					if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+						// Initialize activity tracking for auto-logout
 						initializeActivityService();
 						await invalidateAll();
 					}
 				});
 				unsubscribe = () => subscription.unsubscribe();
-			} else {
-				// Server-side: just set the provided session
-				set({
-					session,
-					user: session?.user ?? null,
-					loading: false
-				});
+				
+				// If we already have a session, start activity tracking
+				if (session) {
+					initializeActivityService();
+				}
 			}
 		},
 
@@ -145,40 +130,21 @@ function createAuthStore() {
 		},
 
 		/**
-		 * Sign out the current user - client-side only
+		 * Sign out the current user
 		 */
 		signOut: async () => {
 			update(state => ({ ...state, loading: true }));
 			
-			try {
-				// Sign out from Supabase client-side
-				const { error } = await supabase.auth.signOut();
-
-				if (error) {
-					console.error('Error signing out:', error);
-					update(state => ({ ...state, loading: false }));
-					return { error };
-				}
-
-				// Clear auth state
-				set({
-					session: null,
-					user: null,
-					loading: false
-				});
-
-				// Stop activity tracking
-				activityService.destroy();
-
-				// Redirect to login
-				await goto('/auth/login', { replaceState: true });
-
-				return { error: null };
-			} catch (error) {
+			const { error } = await supabase.auth.signOut();
+			
+			if (error) {
 				console.error('Error signing out:', error);
 				update(state => ({ ...state, loading: false }));
-				return { error: error as Error };
+				return { error };
 			}
+
+			// The onAuthStateChange listener will handle the redirect
+			return { error: null };
 		},
 
 		/**

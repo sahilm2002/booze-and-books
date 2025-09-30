@@ -174,7 +174,7 @@
 		<div class="sidebar">
 			<div class="profile-section">
 				<div class="profile-card-wrapper card">
-					<ProfileCard />
+					<ProfileCard showEditButton={false} />
 				</div>
 			</div>
 		</div>

@@ -30,7 +30,7 @@ export const GET: RequestHandler = async ({ locals, url }) => {
 			offset
 		);
 
-		const unreadCount = await NotificationServiceServer.getUnreadCount(
+  const unreadCount = await NotificationServiceServer.getUnreadChatCount(
 			locals.supabase,
 			userId
 		);
