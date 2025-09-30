@@ -9,8 +9,20 @@ export const POST: RequestHandler = async ({ request }) => {
 	try {
 		const { zipCode, radiusMiles = 10 } = await request.json();
 
-		if (!zipCode) {
-			return json({ error: 'Zip code is required' }, { status: 400 });
+		if (!zipCode || typeof zipCode !== 'string' || zipCode.trim() === '') {
+			return json({ 
+				error: 'Please set your zip code in your profile settings to find nearby stores.',
+				errorType: 'MISSING_ZIP_CODE'
+			}, { status: 400 });
+		}
+
+		// Validate zip code format
+		const cleanZip = zipCode.trim();
+		if (!/^\d{5}(-\d{4})?$/.test(cleanZip)) {
+			return json({ 
+				error: 'Please enter a valid US zip code (e.g., 90210 or 90210-1234).',
+				errorType: 'INVALID_ZIP_CODE'
+			}, { status: 400 });
 		}
 
 		// Check cache first

@@ -51,8 +51,12 @@ export const GET: RequestHandler = async ({ url }) => {
 			return json({ error: 'Query parameter is required' }, { status: 400 });
 		}
 
-		// Prefer a dedicated GOOGLE_BOOKS_API_KEY if set; otherwise reuse Places key if available
-		const API_KEY = env.GOOGLE_BOOKS_API_KEY || GOOGLE_PLACES_API_KEY || undefined;
+		// Use ONLY a dedicated GOOGLE_BOOKS_API_KEY if explicitly set and non-empty.
+		// Do NOT fall back to Places key, since it often has HTTP referrer restrictions not valid for server-side calls.
+		const API_KEY =
+			env.GOOGLE_BOOKS_API_KEY && env.GOOGLE_BOOKS_API_KEY.trim()
+				? env.GOOGLE_BOOKS_API_KEY
+				: undefined;
 
 		let response;
 		try {
