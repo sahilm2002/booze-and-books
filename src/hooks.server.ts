@@ -3,14 +3,7 @@ import { type Handle, redirect } from '@sveltejs/kit';
 import { PUBLIC_SUPABASE_URL, PUBLIC_SUPABASE_ANON_KEY } from '$env/static/public';
 
 export const handle: Handle = async ({ event, resolve }) => {
-	/**
-	 * Creates a Supabase client specific to this server request.
-	 * 
-	 * The Supabase client is configured to:
-	 * - Use cookies for session management
-	 * - Allow session refreshing
-	 * - Handle authentication state server-side
-	 */
+	// Create Supabase client
 	event.locals.supabase = createServerClient(PUBLIC_SUPABASE_URL, PUBLIC_SUPABASE_ANON_KEY, {
 		cookies: {
 			get: (key) => event.cookies.get(key),
@@ -27,12 +20,28 @@ export const handle: Handle = async ({ event, resolve }) => {
 	 * A convenience helper so we can just call await getSession() instead const { data: { session } } = await supabase.auth.getSession()
 	 */
 	event.locals.safeGetSession = async () => {
-		const {
-			data: { session },
-			error,
-		} = await event.locals.supabase.auth.getSession();
-		if (error) {
-			console.error('Error getting session:', error);
+		try {
+			// Try to get session with a more aggressive timeout and better error handling
+			const controller = new AbortController();
+			const timeoutId = setTimeout(() => controller.abort(), 3000); // 3 second timeout
+			
+			try {
+				const { data: { session }, error } = await event.locals.supabase.auth.getSession();
+				clearTimeout(timeoutId);
+				
+				if (error) {
+					console.error('Session error:', error);
+					return { session: null, user: null };
+				}
+				
+				return { session, user: session?.user || null };
+			} catch (authError) {
+				clearTimeout(timeoutId);
+				console.error('Auth call failed:', authError);
+				return { session: null, user: null };
+			}
+		} catch (error) {
+			console.error('Error in safeGetSession:', error);
 			return { session: null, user: null };
 		}
 
@@ -59,15 +68,16 @@ export const handle: Handle = async ({ event, resolve }) => {
 	const authRoutes = ['/auth/login', '/auth/signup'];
 	const isAuthRoute = authRoutes.includes(pathname);
 
-	// Redirect unauthenticated users away from protected routes
-	if (isProtectedRoute && !session) {
-		const returnTo = encodeURIComponent(url.pathname + url.search);
-		throw redirect(303, `/auth/login?redirectTo=${returnTo}`);
-	}
+		// Redirect unauthenticated users away from protected routes
+		if (isProtectedRoute && !session) {
+			const returnTo = encodeURIComponent(url.pathname + url.search);
+			throw redirect(303, `/auth/login?redirectTo=${returnTo}`);
+		}
 
-	// Redirect authenticated users away from auth pages to dashboard
-	if (isAuthRoute && session) {
-		throw redirect(303, '/app');
+		// Redirect authenticated users away from auth pages to dashboard
+		if (isAuthRoute && session) {
+			throw redirect(303, '/app');
+		}
 	}
 
 	return resolve(event, {
