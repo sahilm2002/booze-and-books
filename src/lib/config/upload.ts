@@ -15,6 +15,33 @@ export const ALLOWED_AVATAR_MIME_TYPES = [
 ];
 
 /**
+ * Chat attachment allowlists (shared by client and server)
+ */
+export const ALLOWED_ATTACHMENT_MIME_TYPES = [
+	'image/jpeg',
+	'image/png',
+	'image/gif',
+	'application/pdf'
+];
+
+export const ALLOWED_ATTACHMENT_EXTENSIONS = [
+	'.jpg',
+	'.jpeg',
+	'.png',
+	'.gif',
+	'.pdf'
+];
+
+// Convenience: same extensions without dot for server-side checks
+export const ALLOWED_ATTACHMENT_EXTENSIONS_NO_DOT = [
+	'jpg',
+	'jpeg',
+	'png',
+	'gif',
+	'pdf'
+];
+
+/**
  * Converts bytes to MB for display purposes
  * @param bytes - Size in bytes
  * @returns Size in MB as a string with 1 decimal place

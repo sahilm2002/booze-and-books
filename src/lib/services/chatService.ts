@@ -2,6 +2,7 @@ import { supabase } from '$lib/supabase';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { ChatMessage, ChatMessageInput, Conversation, ChatAttachment } from '../types/notification.js';
 import { MessageType } from '../types/notification.js';
+import { ALLOWED_ATTACHMENT_MIME_TYPES, ALLOWED_ATTACHMENT_EXTENSIONS_NO_DOT } from '$lib/config/upload';
 
 export class ChatService {
 	// Send a chat message
@@ -118,7 +119,7 @@ export class ChatService {
 		}
 
 		const profileMap = new Map();
-		profiles.forEach(profile => {
+		(Array.isArray(profiles) ? profiles : []).forEach((profile: any) => {
 			profileMap.set(profile.id, profile);
 		});
 
@@ -127,33 +128,21 @@ export class ChatService {
 		const unreadCountMap = new Map<string, number>();
 		
 		if (conversationIds.length > 0) {
-			// Use a more efficient approach with SQL aggregation
-			let unreadCounts: any[] | null = null;
-			// RPC disabled: use fallback aggregation to avoid 404s when the function is not deployed
-			// unreadCounts remains null to trigger the fallback code path below
+			// Placeholder for potential RPC optimization; using fallback aggregation path
+			const { data: unreadMessages } = await supabase
+				.from('notifications')
+				.select('conversation_id')
+				.in('conversation_id', conversationIds)
+				.eq('recipient_id', userId)
+				.eq('is_read', false)
+				.eq('message_type', MessageType.CHAT_MESSAGE);
 
-			// If RPC function doesn't exist, fall back to the current approach but optimized
-			if (!unreadCounts) {
-				const { data: unreadMessages } = await supabase
-					.from('notifications')
-					.select('conversation_id')
-					.in('conversation_id', conversationIds)
-					.eq('recipient_id', userId)
-					.eq('is_read', false)
-					.eq('message_type', MessageType.CHAT_MESSAGE);
-
-				// Build a map of conversation_id -> count (ensure array type)
-				const unreadRows: Array<{ conversation_id: string }> = Array.isArray(unreadMessages) ? (unreadMessages as Array<{ conversation_id: string }>) : [];
-				unreadRows.forEach((row) => {
-					const count = unreadCountMap.get(row.conversation_id) || 0;
-					unreadCountMap.set(row.conversation_id, count + 1);
-				});
-			} else {
-				// Use the RPC results
-				unreadCounts.forEach((row: any) => {
-					unreadCountMap.set(row.conversation_id, row.unread_count);
-				});
-			}
+			// Build a map of conversation_id -> count (ensure array type)
+			const unreadRows: Array<{ conversation_id: string }> = Array.isArray(unreadMessages) ? (unreadMessages as Array<{ conversation_id: string }>) : [];
+			unreadRows.forEach((row) => {
+				const count = unreadCountMap.get(row.conversation_id) || 0;
+				unreadCountMap.set(row.conversation_id, count + 1);
+			});
 		}
 
 		// Convert to Conversation objects
@@ -222,7 +211,7 @@ export class ChatService {
 		}
 
 		const profileMap = new Map();
-		profiles.forEach(profile => {
+		(Array.isArray(profiles) ? profiles : []).forEach((profile: any) => {
 			profileMap.set(profile.id, profile);
 		});
 
@@ -307,22 +296,16 @@ export class ChatService {
 			throw new Error('File size exceeds 10MB limit');
 		}
 
-		// Validate file type (customize as needed)
-		const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'application/pdf'];
-		if (!ALLOWED_TYPES.includes(file.type)) {
+		// Validate file type and extension against shared allowlists (both must be valid)
+		const extFromName = (file.name.split('.').pop() || '').toLowerCase();
+		const isAllowedExt = ALLOWED_ATTACHMENT_EXTENSIONS_NO_DOT.includes(extFromName);
+		const isAllowedMime = ALLOWED_ATTACHMENT_MIME_TYPES.includes(file.type);
+		if (!isAllowedMime || !isAllowedExt) {
 			throw new Error('File type not allowed. Allowed: JPEG, PNG, GIF, PDF.');
 		}
 
-		// Derive safe extension; fall back to MIME
-		const mimeToExt: Record<string, string> = {
-			'image/jpeg': 'jpg',
-			'image/png': 'png',
-			'image/gif': 'gif',
-			'application/pdf': 'pdf'
-		};
-		const parts = file.name.split('.');
-		const extFromName = parts.length > 1 ? parts.pop()!.toLowerCase() : null;
-		const fileExt = extFromName && extFromName.length <= 10 ? extFromName : (mimeToExt[file.type] ?? 'bin');
+		// Use validated extension for storage path
+		const fileExt = extFromName;
 		const fileName = `${(globalThis.crypto?.randomUUID?.() ?? Date.now())}.${fileExt}`;
 		const filePath = `conversations/${conversationId}/${fileName}`;
 

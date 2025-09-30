@@ -3,6 +3,7 @@
 	import { goto } from '$app/navigation';
 	import { ChatService } from '$lib/services/chatService';
 	import { onlineStatusService, OnlineStatusService } from '$lib/services/onlineStatusService';
+	import { ALLOWED_ATTACHMENT_MIME_TYPES, ALLOWED_ATTACHMENT_EXTENSIONS } from '$lib/config/upload';
 	import type { ChatMessage, ChatMessageInput } from '$lib/types/notification';
 	import type { PublicProfile } from '$lib/types/profile';
 
@@ -28,8 +29,6 @@
 
 	// File validation constants
 	const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB in bytes
-	const ALLOWED_MIME_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'application/pdf'];
-	const ALLOWED_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.gif', '.pdf'];
 
 	// Tracking via conversationId guard; no reactive token needed
 
@@ -241,20 +240,12 @@
 		const fileName = file.name.toLowerCase();
 		const fileExtension = fileName.includes('.') ? '.' + fileName.split('.').pop() : '';
 		
-		// Validate file type using MIME type and extension
-		const isValidMimeType = ALLOWED_MIME_TYPES.includes(file.type);
-		const isValidExtension = fileExtension && ALLOWED_EXTENSIONS.includes(fileExtension);
+		// Validate file type using MIME type and extension (both must be valid)
+		const isValidMimeType = ALLOWED_ATTACHMENT_MIME_TYPES.includes(file.type);
+		const isValidExtension = fileExtension && ALLOWED_ATTACHMENT_EXTENSIONS.includes(fileExtension);
 		
-		// Reject immediately if MIME type is present and explicitly not allowed
-		if (file.type && !isValidMimeType) {
-			fileError = 'Unsupported file type. Please select an image (JPEG, PNG, GIF) or PDF file.';
-			selectedFile = null;
-			target.value = '';
-			return;
-		}
-		
-		// Accept if either MIME type OR extension is valid
-		if (!isValidMimeType && !isValidExtension) {
+		// Require BOTH valid: fail if MIME OR extension is invalid
+		if (!isValidMimeType || !isValidExtension) {
 			fileError = 'Unsupported file type. Please select an image (JPEG, PNG, GIF) or PDF file.';
 			selectedFile = null;
 			target.value = '';
