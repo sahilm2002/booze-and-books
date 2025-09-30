@@ -34,9 +34,14 @@
 		selectedBookId = userBooks[0].id;
 	}
 
-	// Google Books image URL utility function
-	const GOOGLE_BOOKS_IMAGE_URL = (volumeId: string) => 
-		`https://books.google.com/books/content?id=${volumeId}&printsec=frontcover&img=1&zoom=1&source=gbs_api`;
+	// Use the exact same logic as BookCard - only show image if google_volume_id exists
+	function hasBookImage(book: Book): boolean {
+		return !!book.google_volume_id;
+	}
+
+	function getBookImageUrl(book: Book): string {
+		return `https://books.google.com/books/content?id=${book.google_volume_id}&printsec=frontcover&img=1&zoom=1&source=gbs_api`;
+	}
 
 	async function loadUserBooks() {
 		if (!currentUser) return;
@@ -109,7 +114,7 @@
 						<div class="book-image">
 							{#if targetBook.google_volume_id}
 								<img 
-									src={GOOGLE_BOOKS_IMAGE_URL(targetBook.google_volume_id)} 
+									src="https://books.google.com/books/content?id={targetBook.google_volume_id}&printsec=frontcover&img=1&zoom=1&source=gbs_api" 
 									alt="{targetBook.title} cover"
 									class="book-cover"
 									loading="lazy"
@@ -192,7 +197,7 @@
 										<div class="book-image">
 											{#if book.google_volume_id}
 												<img 
-													src={GOOGLE_BOOKS_IMAGE_URL(book.google_volume_id)} 
+													src="https://books.google.com/books/content?id={book.google_volume_id}&printsec=frontcover&img=1&zoom=1&source=gbs_api" 
 													alt="{book.title} cover"
 													class="book-cover"
 													loading="lazy"

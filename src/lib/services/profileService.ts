@@ -1,8 +1,8 @@
 import { supabase } from '$lib/supabase';
-import type { Profile, ProfileUpdate } from '$lib/types/profile';
+import type { PrivateProfile, ProfileUpdate } from '$lib/types/profile';
 
 export class ProfileService {
-	static async getProfile(userId: string): Promise<Profile | null> {
+	static async getProfile(userId: string): Promise<PrivateProfile | null> {
 		const { data, error } = await supabase
 			.from('profiles')
 			.select('*')
@@ -19,19 +19,22 @@ export class ProfileService {
 		return data;
 	}
 
-	static async updateProfile(userId: string, updates: ProfileUpdate): Promise<Profile> {
-		const { data, error } = await supabase
-			.from('profiles')
-			.update(updates)
-			.eq('id', userId)
-			.select()
-			.single();
+	static async updateProfile(userId: string, updates: ProfileUpdate): Promise<PrivateProfile> {
+		const response = await fetch('/api/profile', {
+			method: 'PUT',
+			headers: {
+				'Content-Type': 'application/json'
+			},
+			body: JSON.stringify(updates)
+		});
 
-		if (error) {
-			throw new Error(`Failed to update profile: ${error.message}`);
+		if (!response.ok) {
+			const errorData = await response.json();
+			throw new Error(errorData.error || 'Failed to update profile');
 		}
 
-		return data;
+		const { profile } = await response.json();
+		return profile;
 	}
 
 	static async uploadAvatar(userId: string, file: File): Promise<string> {
@@ -85,13 +88,15 @@ export class ProfileService {
 		}
 	}
 
-	static async createProfile(userId: string, initialData?: Partial<ProfileUpdate>): Promise<Profile> {
+	static async createProfile(userId: string, initialData?: Partial<ProfileUpdate>): Promise<PrivateProfile> {
 		const profileData = {
 			id: userId,
 			username: initialData?.username || null,
 			full_name: initialData?.full_name || null,
 			bio: initialData?.bio || null,
-			location: initialData?.location || null,
+			city: initialData?.city || null,
+			state: initialData?.state || null,
+			zip_code: initialData?.zip_code || null,
 			avatar_url: initialData?.avatar_url || null
 		};
 

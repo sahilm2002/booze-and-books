@@ -6,6 +6,8 @@ export interface GoogleBooksSearchOptions {
 	maxResults?: number;
 	startIndex?: number;
 	langRestrict?: string;
+	// Server-side only: pass API key from the API route to avoid bundling private env on client
+	apiKey?: string;
 }
 
 export class GoogleBooksService {
@@ -34,7 +36,7 @@ export class GoogleBooksService {
 			return { items: [], totalItems: 0 };
 		}
 
-		const { maxResults = 10, startIndex = 0, langRestrict } = options;
+		const { maxResults = 10, startIndex = 0, langRestrict, apiKey } = options;
 		
 		const searchParams = new URLSearchParams({
 			q: query.trim(),
@@ -47,12 +49,20 @@ export class GoogleBooksService {
 		if (langRestrict) {
 			searchParams.append('langRestrict', langRestrict);
 		}
+		if (apiKey) {
+			searchParams.append('key', apiKey);
+		}
 
 		try {
 			const response = await fetch(`${GOOGLE_BOOKS_API_BASE}?${searchParams}`);
 			
 			if (!response.ok) {
-				throw new Error(`Google Books API error: ${response.status} ${response.statusText}`);
+				// Try to surface upstream error body for easier debugging
+				let body = '';
+				try {
+					body = await response.text();
+				} catch {}
+				throw new Error(`Google Books API error: ${response.status} ${response.statusText}${body ? ` - ${body}` : ''}`);
 			}
 
 			const data = await response.json();
@@ -63,6 +73,10 @@ export class GoogleBooksService {
 			};
 		} catch (error) {
 			console.error('Google Books API search error:', error);
+			// Preserve upstream error details when available
+			if (error instanceof Error) {
+				throw new Error(error.message);
+			}
 			throw new Error('Failed to search books. Please try again.');
 		}
 	}

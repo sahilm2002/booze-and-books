@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Notification, NotificationInput } from '../types/notification.js';
+import { MessageType } from '../types/notification.js';
 
 export class NotificationServiceServer {
 	// Get notifications for a user
@@ -9,27 +10,53 @@ export class NotificationServiceServer {
 		limit = 20, 
 		offset = 0
 	): Promise<Notification[]> {
-		const { data, error } = await supabase
-			.from('notifications')
-			.select('*')
-			.eq('user_id', userId)
-			.order('created_at', { ascending: false })
-			.range(offset, offset + limit - 1);
+		// Return only UNREAD items for this user:
+		// - System notifications (message_type=notification) by user_id
+		// - Chat messages (message_type=chat_message) by recipient_id
+		const [systemRes, chatRes] = await Promise.all([
+			supabase
+				.from('notifications')
+				.select('*')
+				.eq('user_id', userId)
+				.eq('is_read', false)
+				.eq('message_type', 'notification'),
+			supabase
+				.from('notifications')
+				.select('*')
+				.eq('recipient_id', userId)
+				.eq('is_read', false)
+				.eq('message_type', 'chat_message'),
+		]);
 
-		if (error) {
-			throw new Error(`Failed to fetch notifications: ${error.message}`);
+		if (systemRes.error) {
+			throw new Error(`Failed to fetch system notifications: ${systemRes.error.message}`);
+		}
+		if (chatRes.error) {
+			throw new Error(`Failed to fetch chat notifications: ${chatRes.error.message}`);
 		}
 
-		return data || [];
+		const combined = [
+			...(systemRes.data || []),
+			...(chatRes.data || [])
+		];
+
+		// Sort by created_at desc and paginate
+		combined.sort((a: any, b: any) => {
+			const at = new Date(a.created_at).getTime();
+			const bt = new Date(b.created_at).getTime();
+			return bt - at;
+		});
+		return combined.slice(offset, offset + limit);
 	}
 
-	// Get unread notifications count
-	static async getUnreadCount(supabase: SupabaseClient, userId: string): Promise<number> {
+	// Get unread system notifications count (excluding chat messages)
+	static async getUnreadNotificationsCount(supabase: SupabaseClient, userId: string): Promise<number> {
 		const { count, error } = await supabase
 			.from('notifications')
 			.select('id', { count: 'exact', head: true })
 			.eq('user_id', userId)
-			.eq('is_read', false);
+			.eq('is_read', false)
+			.eq('message_type', 'notification');
 
 		if (error) {
 			throw new Error(`Failed to count unread notifications: ${error.message}`);
@@ -38,7 +65,33 @@ export class NotificationServiceServer {
 		return count || 0;
 	}
 
-	// Mark a notification as read
+	// Get unread chat messages count
+	static async getUnreadChatCount(supabase: SupabaseClient, userId: string): Promise<number> {
+		const { count, error } = await supabase
+			.from('notifications')
+			.select('id', { count: 'exact', head: true })
+			.eq('recipient_id', userId)
+			.eq('is_read', false)
+			.eq('message_type', 'chat_message');
+
+		if (error) {
+			throw new Error(`Failed to count unread chat messages: ${error.message}`);
+		}
+
+		return count || 0;
+	}
+
+	// Get combined unread count for notification bell
+	static async getTotalUnreadCount(supabase: SupabaseClient, userId: string): Promise<number> {
+		const [notificationCount, chatCount] = await Promise.all([
+			this.getUnreadNotificationsCount(supabase, userId),
+			this.getUnreadChatCount(supabase, userId)
+		]);
+
+		return notificationCount + chatCount;
+	}
+
+	// Mark a notification or chat message as read
 	static async markAsRead(
 		supabase: SupabaseClient,
 		notificationId: string
@@ -57,16 +110,30 @@ export class NotificationServiceServer {
 		return data;
 	}
 
-	// Mark all notifications as read for a user
+	// Mark all notifications and chat messages as read for a user
 	static async markAllAsRead(supabase: SupabaseClient, userId: string): Promise<void> {
-		const { error } = await supabase
+		// Mark traditional notifications as read
+		const { error: notificationError } = await supabase
 			.from('notifications')
 			.update({ is_read: true })
 			.eq('user_id', userId)
-			.eq('is_read', false);
+			.eq('is_read', false)
+			.eq('message_type', MessageType.NOTIFICATION);
 
-		if (error) {
-			throw new Error(`Failed to mark all notifications as read: ${error.message}`);
+		if (notificationError) {
+			throw new Error(`Failed to mark notifications as read: ${notificationError.message}`);
+		}
+
+		// Mark chat messages as read (only where user is the recipient)
+		const { error: chatError } = await supabase
+			.from('notifications')
+			.update({ is_read: true })
+			.eq('recipient_id', userId)
+			.eq('is_read', false)
+			.eq('message_type', MessageType.CHAT_MESSAGE);
+
+		if (chatError) {
+			throw new Error(`Failed to mark chat messages as read: ${chatError.message}`);
 		}
 	}
 

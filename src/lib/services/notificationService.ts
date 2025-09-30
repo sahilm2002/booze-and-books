@@ -2,40 +2,32 @@ import { supabase } from '$lib/supabase';
 import type { Notification, NotificationInput } from '../types/notification.js';
 import { NotificationType } from '../types/notification.js';
 
-const NOTIFICATION_RETENTION_DAYS = 180;
-
 export class NotificationService {
-	// Get notifications for a user (last 180 days only)
-	static async getNotifications(userId: string, limit = 20, offset = 0): Promise<Notification[]> {
-		const retentionDate = new Date();
-		retentionDate.setDate(retentionDate.getDate() - NOTIFICATION_RETENTION_DAYS);
-
-		const { data, error } = await supabase
-			.from('notifications')
-			.select('*')
-			.eq('user_id', userId)
-			.gte('created_at', retentionDate.toISOString())
-			.order('created_at', { ascending: false })
-			.range(offset, offset + limit - 1);
-
-		if (error) {
-			throw new Error(`Failed to fetch notifications: ${error.message}`);
+	// Get notifications via server API to ensure consistent read-state and RLS handling
+	static async getNotifications(_userId: string, limit = 20, offset = 0): Promise<Notification[]> {
+		const params = new URLSearchParams({
+			limit: String(limit),
+			offset: String(offset)
+		});
+		const res = await fetch(`/api/notifications?${params.toString()}`, {
+			method: 'GET',
+			headers: { 'Accept': 'application/json' }
+		});
+		if (!res.ok) {
+			throw new Error('Failed to fetch notifications');
 		}
-
-		return data || [];
+		const json = await res.json();
+		// API returns { notifications, unreadCount, pagination }
+		return Array.isArray(json.notifications) ? json.notifications as Notification[] : [];
 	}
 
-	// Get unread notifications count (last 180 days only)
+	// Get unread notifications count
 	static async getUnreadCount(userId: string): Promise<number> {
-		const retentionDate = new Date();
-		retentionDate.setDate(retentionDate.getDate() - NOTIFICATION_RETENTION_DAYS);
-
 		const { count, error } = await supabase
 			.from('notifications')
 			.select('id', { count: 'exact', head: true })
 			.eq('user_id', userId)
-			.eq('is_read', false)
-			.gte('created_at', retentionDate.toISOString());
+			.eq('is_read', false);
 
 		if (error) {
 			throw new Error(`Failed to count unread notifications: ${error.message}`);
@@ -46,35 +38,30 @@ export class NotificationService {
 
 	// Mark a notification as read
 	static async markAsRead(notificationId: string): Promise<Notification> {
-		const response = await fetch('/api/notifications/mark-read', {
-			method: 'POST',
-			headers: {
-				'Content-Type': 'application/json',
-			},
-			body: JSON.stringify({ notificationId }),
-		});
+		const { data, error } = await supabase
+			.from('notifications')
+			.update({ is_read: true })
+			.eq('id', notificationId)
+			.select()
+			.single();
 
-		if (!response.ok) {
-			const error = await response.json();
-			throw new Error(error.error || 'Failed to mark notification as read');
+		if (error) {
+			throw new Error(`Failed to mark notification as read: ${error.message}`);
 		}
 
-		const result = await response.json();
-		return result.notification;
+		return data;
 	}
 
-	// Mark all notifications as read for a user (last 180 days only)
+	// Mark all notifications as read for a user
 	static async markAllAsRead(userId: string): Promise<void> {
-		const response = await fetch('/api/notifications/mark-all-read', {
-			method: 'POST',
-			headers: {
-				'Content-Type': 'application/json',
-			},
-		});
+		const { error } = await supabase
+			.from('notifications')
+			.update({ is_read: true })
+			.eq('user_id', userId)
+			.eq('is_read', false);
 
-		if (!response.ok) {
-			const error = await response.json();
-			throw new Error(error.error || 'Failed to mark all notifications as read');
+		if (error) {
+			throw new Error(`Failed to mark all notifications as read: ${error.message}`);
 		}
 	}
 
@@ -111,24 +98,21 @@ export class NotificationService {
 		return data;
 	}
 
-	// Get recent notifications (last 7 days)
-	static async getRecentNotifications(userId: string): Promise<Notification[]> {
-		const sevenDaysAgo = new Date();
-		sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-
-		const { data, error } = await supabase
-			.from('notifications')
-			.select('*')
-			.eq('user_id', userId)
-			.gte('created_at', sevenDaysAgo.toISOString())
-			.order('created_at', { ascending: false })
-			.limit(10);
-
-		if (error) {
-			throw new Error(`Failed to fetch recent notifications: ${error.message}`);
+	// Get recent notifications (unread only), via server API for consistent filtering
+	static async getRecentNotifications(_userId: string, limit = 50, offset = 0): Promise<Notification[]> {
+		const params = new URLSearchParams({
+			limit: String(limit),
+			offset: String(offset)
+		});
+		const res = await fetch(`/api/notifications?${params.toString()}`, {
+			method: 'GET',
+			headers: { 'Accept': 'application/json' }
+		});
+		if (!res.ok) {
+			throw new Error('Failed to fetch recent notifications');
 		}
-
-		return data || [];
+		const json = await res.json();
+		return Array.isArray(json.notifications) ? (json.notifications as Notification[]) : [];
 	}
 
 	// Get notification by ID
@@ -268,10 +252,9 @@ export class NotificationService {
 
 	static async sendUserDailyReminder(userId: string): Promise<void> {
 		try {
-			// Check if user already received a reminder today
-			const today = new Date();
-			today.setHours(0, 0, 0, 0);
-			
+			// Check if user already received a reminder in the last 4 days
+			const fourDaysAgo = new Date(Date.now() - 4 * 24 * 60 * 60 * 1000);
+
 			const { data: existingReminder } = await supabase
 				.from('notifications')
 				.select('id')
@@ -281,11 +264,11 @@ export class NotificationService {
 					NotificationType.DAILY_REMINDER_COUNTER_OFFERS,
 					NotificationType.DAILY_REMINDER_ACCEPTED_SWAPS
 				])
-				.gte('created_at', today.toISOString())
+				.gte('created_at', fourDaysAgo.toISOString())
 				.limit(1);
 
 			if (existingReminder && existingReminder.length > 0) {
-				console.log(`User ${userId} already received daily reminder today`);
+				console.log(`User ${userId} already received reminder within the last 4 days`);
 				return;
 			}
 

@@ -45,22 +45,94 @@ export class SwapService {
 			}
 
 
-			// Create the swap request - database trigger will handle marking books as unavailable
-			const { data, error } = await supabase
-				.from('swap_requests')
-				.insert({
+			// Create the swap request via API so server can orchestrate emails (onSwapCreated)
+			const resp = await fetch('/api/swaps', {
+				method: 'POST',
+				headers: {
+					'Content-Type': 'application/json'
+				},
+				body: JSON.stringify({
 					book_id: input.book_id,
 					offered_book_id: input.offered_book_id || null,
-					requester_id: requesterId,
-					owner_id: requestedBook.owner_id,
-					message: input.message || null,
-					status: SwapStatus.PENDING
+					message: input.message || null
 				})
-				.select()
-				.single();
+			});
 
-			if (error) {
-				throw new Error(`Failed to create swap request: ${error.message}`);
+			if (!resp.ok) {
+				const errorData = await resp.json().catch(() => ({}));
+				throw new Error(errorData.message || `Failed to create swap request: HTTP ${resp.status}`);
+			}
+
+			const data = await resp.json();
+
+			// Create a chat message for the swap request using the proper chat service
+			try {
+				// Get both book titles for the message
+				const { data: requestedBookData } = await supabase
+					.from('books')
+					.select('title, authors')
+					.eq('id', input.book_id)
+					.single();
+
+				const requestedBookTitle = requestedBookData?.title || 'a book';
+				
+				let chatMessage = '';
+				
+				if (input.offered_book_id) {
+					// Get the offered book title
+					const { data: offeredBookData } = await supabase
+						.from('books')
+						.select('title, authors')
+						.eq('id', input.offered_book_id)
+						.single();
+					
+					const offeredBookTitle = offeredBookData?.title || 'my book';
+					const requestedAuthors = Array.isArray(requestedBookData?.authors)
+						? requestedBookData?.authors?.join(', ')
+						: (requestedBookData?.authors || '');
+					const offeredAuthors = Array.isArray(offeredBookData?.authors)
+						? offeredBookData?.authors?.join(', ')
+						: (offeredBookData?.authors || '');
+
+					// Create message with both book titles and authors (if available)
+					const baseMsg = `Hi! I'm interested in swapping your book, "${requestedBookTitle}"${requestedAuthors ? ` by ${requestedAuthors}` : ''}, in return for my book "${offeredBookTitle}"${offeredAuthors ? ` by ${offeredAuthors}` : ''}.`;
+					chatMessage = input.message ? `${baseMsg} ${input.message}` : baseMsg;
+				} else {
+					// Fallback for when no specific book is offered (include authors if available)
+					const requestedAuthors = Array.isArray(requestedBookData?.authors)
+						? requestedBookData?.authors?.join(', ')
+						: (requestedBookData?.authors || '');
+					const baseMsg = `Hi! I'm interested in swapping for "${requestedBookTitle}"${requestedAuthors ? ` by ${requestedAuthors}` : ''}.`;
+					chatMessage = input.message ? `${baseMsg} ${input.message}` : baseMsg;
+				}
+
+				// Generate conversation ID
+				const conversationId = requesterId < requestedBook.owner_id 
+					? `${requesterId}_${requestedBook.owner_id}` 
+					: `${requestedBook.owner_id}_${requesterId}`;
+
+				// Create chat message using proper structure
+				await supabase
+					.from('notifications')
+					.insert({
+						user_id: requestedBook.owner_id, // Required field for notifications table
+						type: 'CHAT_MESSAGE',
+						message_type: 'chat_message',
+						sender_id: requesterId,
+						recipient_id: requestedBook.owner_id,
+						conversation_id: conversationId,
+						title: 'Chat Message',
+						message: chatMessage,
+						data: {
+							swap_request_id: data.id,
+							book_id: input.book_id,
+							book_title: requestedBookTitle,
+							auto_generated: true
+						}
+					});
+			} catch (chatError) {
+				console.error('Failed to create chat message for swap request:', chatError);
+				// Don't fail the entire swap request if chat message creation fails
 			}
 
 			return data;
@@ -152,41 +224,19 @@ export class SwapService {
 	 */
 	static async acceptSwapRequest(requestId: string, userId: string): Promise<SwapRequest> {
 		try {
-			// Get the current request
-			const { data: request, error: fetchError } = await supabase
-				.from('swap_requests')
-				.select('*')
-				.eq('id', requestId)
-				.single();
+			// Call the API endpoint so the server can orchestrate emails (onSwapApproved)
+			const response = await fetch(`/api/swaps/${requestId}`, {
+				method: 'PUT',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ status: 'ACCEPTED' })
+			});
 
-			if (fetchError) {
-				throw new Error(`Swap request not found: ${fetchError.message}`);
+			if (!response.ok) {
+				const errorData = await response.json().catch(() => ({}));
+				throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
 			}
 
-			// Check permissions based on current status
-			let canAccept = false;
-			if (request.status === SwapStatus.PENDING) {
-				canAccept = canUserAcceptSwap(request, userId);
-			} else if (request.status === SwapStatus.COUNTER_OFFER) {
-				canAccept = canUserAcceptCounterOffer(request, userId);
-			}
-
-			if (!canAccept) {
-				throw new Error('You cannot accept this swap request');
-			}
-
-			// Update the status to accepted
-			const { data, error } = await supabase
-				.from('swap_requests')
-				.update({ status: SwapStatus.ACCEPTED })
-				.eq('id', requestId)
-				.select()
-				.single();
-
-			if (error) {
-				throw new Error(`Failed to accept swap request: ${error.message}`);
-			}
-
+			const data = await response.json();
 			return data;
 		} catch (error) {
 			console.error('Error accepting swap request:', error);
@@ -199,58 +249,17 @@ export class SwapService {
 	 */
 	static async cancelSwapRequest(requestId: string, userId: string): Promise<SwapRequest> {
 		try {
-			// Get the current request
-			const { data: request, error: fetchError } = await supabase
-				.from('swap_requests')
-				.select('*')
-				.eq('id', requestId)
-				.single();
+			// Call the API endpoint so the server can orchestrate emails (onSwapCancelled)
+			const response = await fetch(`/api/swaps/${requestId}`, {
+				method: 'DELETE'
+			});
 
-			if (fetchError) {
-				throw new Error(`Swap request not found: ${fetchError.message}`);
+			if (!response.ok) {
+				const errorData = await response.json().catch(() => ({}));
+				throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
 			}
 
-			if (!canUserCancelSwap(request, userId)) {
-				throw new Error('You cannot cancel this swap request');
-			}
-
-			// Update the status to cancelled
-			const { data, error } = await supabase
-				.from('swap_requests')
-				.update({ 
-					status: SwapStatus.CANCELLED,
-					cancelled_by: userId
-				})
-				.eq('id', requestId)
-				.select()
-				.single();
-
-			if (error) {
-				throw new Error(`Failed to cancel swap request: ${error.message}`);
-			}
-
-			// Restore availability of all books involved in the swap
-			const bookIds = [request.book_id]; // Always restore the requested book
-			
-			// Add offered book if it exists
-			if (request.offered_book_id) {
-				bookIds.push(request.offered_book_id);
-			}
-			
-			// Add counter-offered book if it exists
-			if (request.counter_offered_book_id) {
-				bookIds.push(request.counter_offered_book_id);
-			}
-			
-			// Filter out any null values and restore availability
-			const validBookIds = bookIds.filter(id => id !== null);
-			if (validBookIds.length > 0) {
-				await supabase
-					.from('books')
-					.update({ is_available: true })
-					.in('id', validBookIds);
-			}
-
+			const data = await response.json();
 			return data;
 		} catch (error) {
 			console.error('Error cancelling swap request:', error);
@@ -272,46 +281,22 @@ export class SwapService {
 				throw new Error('Rating must be between 1 and 5');
 			}
 
-			// Get the current request
-			const { data: request, error: fetchError } = await supabase
-				.from('swap_requests')
-				.select('*')
-				.eq('id', requestId)
-				.single();
+			// Call the API endpoint instead of Supabase directly
+			// This ensures EmailOrchestratorServer.onSwapCompleted gets triggered
+			const response = await fetch(`/api/swaps/${requestId}`, {
+				method: 'PATCH',
+				headers: {
+					'Content-Type': 'application/json',
+				},
+				body: JSON.stringify(completion)
+			});
 
-			if (fetchError) {
-				throw new Error(`Swap request not found: ${fetchError.message}`);
+			if (!response.ok) {
+				const errorData = await response.json().catch(() => ({}));
+				throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
 			}
 
-			if (!canUserCompleteSwap(request, userId)) {
-				throw new Error('You cannot complete this swap request');
-			}
-
-			// Determine which completion fields to update
-			const updateData: any = {};
-
-			if (request.requester_id === userId) {
-				updateData.requester_completed_at = new Date().toISOString();
-				updateData.requester_rating = completion.rating || null;
-				updateData.requester_feedback = completion.feedback || null;
-			} else {
-				updateData.owner_completed_at = new Date().toISOString();
-				updateData.owner_rating = completion.rating || null;
-				updateData.owner_feedback = completion.feedback || null;
-			}
-
-			// Update the request (trigger will handle full completion logic)
-			const { data, error } = await supabase
-				.from('swap_requests')
-				.update(updateData)
-				.eq('id', requestId)
-				.select()
-				.single();
-
-			if (error) {
-				throw new Error(`Failed to complete swap request: ${error.message}`);
-			}
-
+			const data = await response.json();
 			return data;
 		} catch (error) {
 			console.error('Error completing swap request:', error);
@@ -342,10 +327,10 @@ export class SwapService {
 						id, title, authors, thumbnail_url, condition, owner_id, google_volume_id
 					),
 					requester_profile:profiles!swap_requests_requester_profile_fkey (
-						id, username, full_name, avatar_url, location, email
+						id, username, full_name, avatar_url, city, state, zip_code, email
 					),
 					owner_profile:profiles!swap_requests_owner_profile_fkey (
-						id, username, full_name, avatar_url, location, email
+						id, username, full_name, avatar_url, city, state, zip_code, email
 					)
 				`)
 				.eq('owner_id', userId)
@@ -370,10 +355,10 @@ export class SwapService {
 						id, title, authors, thumbnail_url, condition, owner_id, google_volume_id
 					),
 					requester_profile:profiles!swap_requests_requester_profile_fkey (
-						id, username, full_name, avatar_url, location, email
+						id, username, full_name, avatar_url, city, state, zip_code, email
 					),
 					owner_profile:profiles!swap_requests_owner_profile_fkey (
-						id, username, full_name, avatar_url, location, email
+						id, username, full_name, avatar_url, city, state, zip_code, email
 					)
 				`)
 				.eq('requester_id', userId)
@@ -412,10 +397,10 @@ export class SwapService {
 						id, title, authors, thumbnail_url, condition, owner_id
 					),
 					requester_profile:profiles!swap_requests_requester_profile_fkey (
-						id, username, full_name, avatar_url, location, email
+						id, username, full_name, avatar_url, city, state, zip_code, email
 					),
 					owner_profile:profiles!swap_requests_owner_profile_fkey (
-						id, username, full_name, avatar_url, location, email
+						id, username, full_name, avatar_url, city, state, zip_code, email
 					)
 				`)
 				.eq('id', requestId)
@@ -597,10 +582,10 @@ export class SwapService {
 						id, title, authors, thumbnail_url, condition, owner_id
 					),
 					requester_profile:profiles!swap_requests_requester_profile_fkey (
-						id, username, full_name, avatar_url, location, email
+						id, username, full_name, avatar_url, city, state, zip_code, email
 					),
 					owner_profile:profiles!swap_requests_owner_profile_fkey (
-						id, username, full_name, avatar_url, location, email
+						id, username, full_name, avatar_url, city, state, zip_code, email
 					)
 				`)
 				.eq('status', SwapStatus.ACCEPTED)

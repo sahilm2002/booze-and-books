@@ -2,6 +2,7 @@ import { json, error } from '@sveltejs/kit';
 import { SwapServiceServer } from '$lib/services/swapServiceServer';
 import { z } from 'zod';
 import type { RequestHandler } from './$types';
+import { EmailOrchestratorServer } from '$lib/services/emailOrchestratorServer';
 
 // Validation schema for counter-offer
 const counterOfferSchema = z.object({
@@ -34,15 +35,18 @@ export const POST: RequestHandler = async ({ params, request, locals }) => {
 	const validation = counterOfferSchema.safeParse(requestData);
 	if (!validation.success) {
 		const errors: Record<string, string> = {};
-		validation.error.errors.forEach(error => {
-			const path = error.path.join('.');
-			errors[path] = error.message;
+		validation.error.issues.forEach((issue) => {
+			const path = issue.path.join('.');
+			errors[path] = issue.message;
 		});
 		
-		throw error(400, {
-			message: 'Invalid request data',
-			errors
-		});
+		return json(
+			{
+				message: 'Invalid request data',
+				errors
+			},
+			{ status: 400 }
+		);
 	}
 
 	try {
@@ -52,6 +56,9 @@ export const POST: RequestHandler = async ({ params, request, locals }) => {
 			userId,
 			validation.data.counter_offered_book_id
 		);
+
+		// Notify original requester about counter-offer (with dedupe and prefs)
+		await EmailOrchestratorServer.onCounterOffer(locals.supabase, id);
 
 		return json(updatedRequest);
 	} catch (err) {
