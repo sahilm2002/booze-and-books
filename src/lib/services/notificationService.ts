@@ -252,10 +252,9 @@ export class NotificationService {
 
 	static async sendUserDailyReminder(userId: string): Promise<void> {
 		try {
-			// Check if user already received a reminder today
-			const today = new Date();
-			today.setHours(0, 0, 0, 0);
-			
+			// Check if user already received a reminder in the last 4 days
+			const fourDaysAgo = new Date(Date.now() - 4 * 24 * 60 * 60 * 1000);
+
 			const { data: existingReminder } = await supabase
 				.from('notifications')
 				.select('id')
@@ -265,11 +264,11 @@ export class NotificationService {
 					NotificationType.DAILY_REMINDER_COUNTER_OFFERS,
 					NotificationType.DAILY_REMINDER_ACCEPTED_SWAPS
 				])
-				.gte('created_at', today.toISOString())
+				.gte('created_at', fourDaysAgo.toISOString())
 				.limit(1);
 
 			if (existingReminder && existingReminder.length > 0) {
-				console.log(`User ${userId} already received daily reminder today`);
+				console.log(`User ${userId} already received reminder within the last 4 days`);
 				return;
 			}
 
