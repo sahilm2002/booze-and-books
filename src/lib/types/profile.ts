@@ -12,6 +12,13 @@ export interface PublicProfile {
 	city?: string;
 	state?: string;
 	zip_code?: string;
+	// Email notification preferences (jsonb in DB). Defaults to all true if undefined.
+	email_notifications?: {
+		chat_messages?: boolean;
+		swap_requests?: boolean;
+		swap_updates?: boolean;
+		completion_reminders?: boolean;
+	};
 }
 
 export interface PrivateProfile extends PublicProfile {
@@ -27,11 +34,19 @@ export interface ProfileUpdate {
 	full_name?: string;
 	bio?: string;
 	avatar_url?: string;
+	email?: string;
 	address_line1?: string;
 	address_line2?: string;
 	city?: string;
 	state?: string;
 	zip_code?: string;
+	// Email notification preferences
+	email_notifications?: {
+		chat_messages?: boolean;
+		swap_requests?: boolean;
+		swap_updates?: boolean;
+		completion_reminders?: boolean;
+	};
 }
 
 export interface UserContactInfo {

@@ -38,7 +38,21 @@ export const profileUpdateSchema = z.object({
 		.max(2, 'State must be 2 characters (e.g., CA, NY)')
 		.optional(),
 	
-	avatar_url: z.string().url().optional()
+	avatar_url: z.string().url().optional(),
+	
+	// Optional email (used to backfill profiles.email for notifications)
+	email: z.string().email('Please enter a valid email address').optional(),
+
+	// Email notification preferences (optional json object)
+	email_notifications: z
+		.object({
+			chat_messages: z.boolean().optional(),
+			swap_requests: z.boolean().optional(),
+			swap_updates: z.boolean().optional(),
+			completion_reminders: z.boolean().optional()
+		})
+		.partial()
+		.optional()
 });
 
 // Type derived from schema

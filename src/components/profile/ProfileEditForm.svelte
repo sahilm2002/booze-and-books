@@ -15,7 +15,13 @@
 		address_line2: '',
 		city: '',
 		state: '',
-		zip_code: ''
+		zip_code: '',
+		email_notifications: {
+			chat_messages: true,
+			swap_requests: true,
+			swap_updates: true,
+			completion_reminders: true
+		}
 	};
 
 	let saving = false;
@@ -23,6 +29,25 @@
 	let errors: Record<string, string> = {};
 	let initialized = false;
 	let dirty = false;
+
+	// Ensure email_notifications object always exists for two-way bindings
+	let prefs = formData.email_notifications ?? {
+		chat_messages: true,
+		swap_requests: true,
+		swap_updates: true,
+		completion_reminders: true
+	};
+	formData.email_notifications = prefs;
+
+	$: if (!formData.email_notifications) {
+		formData.email_notifications = {
+			chat_messages: true,
+			swap_requests: true,
+			swap_updates: true,
+			completion_reminders: true
+		};
+		prefs = formData.email_notifications;
+	}
 
 	function validateForm(): boolean {
 		const validation = validateProfileUpdate(formData);
@@ -77,7 +102,13 @@
 			address_line2: $profile?.address_line2 || '',
 			city: $profile?.city || '',
 			state: $profile?.state || '',
-			zip_code: $profile?.zip_code || ''
+			zip_code: $profile?.zip_code || '',
+			email_notifications: {
+				chat_messages: $profile?.email_notifications?.chat_messages ?? true,
+				swap_requests: $profile?.email_notifications?.swap_requests ?? true,
+				swap_updates: $profile?.email_notifications?.swap_updates ?? true,
+				completion_reminders: $profile?.email_notifications?.completion_reminders ?? true
+			}
 		};
 		
 		// Reset flags to allow reinitialization
@@ -104,7 +135,13 @@
 			address_line2: $profile.address_line2 || '',
 			city: $profile.city || '',
 			state: $profile.state || '',
-			zip_code: $profile.zip_code || ''
+			zip_code: $profile.zip_code || '',
+			email_notifications: {
+				chat_messages: $profile.email_notifications?.chat_messages ?? true,
+				swap_requests: $profile.email_notifications?.swap_requests ?? true,
+				swap_updates: $profile.email_notifications?.swap_updates ?? true,
+				completion_reminders: $profile.email_notifications?.completion_reminders ?? true
+			}
 		};
 		initialized = true;
 	}
@@ -246,6 +283,65 @@
 						{formData.bio?.length || 0}/500 characters
 					</p>
 				</div>
+			</div>
+		</div>
+
+		<!-- Email Notification Preferences -->
+		<div class="form-section" id="email-preferences">
+			<h3 class="section-title">Email Notifications</h3>
+			<p class="form-help">Choose which emails you want to receive. Changes take effect immediately.</p>
+			<div class="prefs-grid">
+				<label class="pref-item">
+					<input
+						type="checkbox"
+						bind:checked={prefs.chat_messages}
+						on:change={markDirty}
+					/>
+					<span>
+						<strong>Chat messages</strong>
+						<br />
+						<span class="pref-desc">Occasional digest if you have unread messages while offline</span>
+					</span>
+				</label>
+
+				<label class="pref-item">
+					<input
+						type="checkbox"
+						bind:checked={prefs.swap_requests}
+						on:change={markDirty}
+					/>
+					<span>
+						<strong>Swap requests</strong>
+						<br />
+						<span class="pref-desc">When someone requests one of your books</span>
+					</span>
+				</label>
+
+				<label class="pref-item">
+					<input
+						type="checkbox"
+						bind:checked={prefs.swap_updates}
+						on:change={markDirty}
+					/>
+					<span>
+						<strong>Swap updates</strong>
+						<br />
+						<span class="pref-desc">Counter-offers, approvals, cancellations, and completions</span>
+					</span>
+				</label>
+
+				<label class="pref-item">
+					<input
+						type="checkbox"
+						bind:checked={prefs.completion_reminders}
+						on:change={markDirty}
+					/>
+					<span>
+						<strong>Completion reminders</strong>
+						<br />
+						<span class="pref-desc">Occasional reminders (every 4 days) to complete accepted swaps</span>
+					</span>
+				</label>
 			</div>
 		</div>
 
@@ -550,4 +646,36 @@
 			font-size: 1rem;
 		}
 	}
+	.prefs-grid {
+		display: grid;
+		grid-template-columns: 1fr;
+		gap: 1rem;
+	}
+
+	@media (min-width: 640px) {
+		.prefs-grid {
+			grid-template-columns: 1fr 1fr;
+		}
+	}
+
+	.pref-item {
+		display: grid;
+		grid-template-columns: 20px 1fr;
+		gap: 0.75rem;
+		align-items: start;
+		padding: 0.75rem 1rem;
+		border: 1px solid #e5e7eb;
+		border-radius: 8px;
+		background: #fafafa;
+	}
+
+	.pref-item input[type='checkbox'] {
+		margin-top: 4px;
+	}
+
+	.pref-desc {
+		color: #6b7280;
+		font-size: 0.85rem;
+	}
+
 </style>
