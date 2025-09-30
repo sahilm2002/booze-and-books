@@ -25,16 +25,9 @@ CREATE POLICY "Users can insert notifications"
 ON notifications FOR INSERT 
 WITH CHECK (true); -- Allow system to insert notifications
 
--- 3. Grant proper permissions for notifications (least-privilege)
--- Only authenticated users can read their own notifications
-GRANT SELECT, UPDATE ON notifications TO authenticated;
-
--- Only system/service functions need INSERT permission
--- Remove anon grants entirely - anonymous users should not access notifications
--- If anonymous read access is needed, create a controlled read-only view instead
-
--- Revoke any existing problematic permissions for anon role
-REVOKE ALL ON notifications FROM anon;
+-- 3. Grant proper permissions for notifications
+GRANT SELECT, INSERT, UPDATE ON notifications TO authenticated;
+GRANT SELECT, INSERT, UPDATE ON notifications TO anon;
 
 -- 4. Test notification system by creating a test notification
 DO $$

@@ -1,8 +1,18 @@
 import type { Session, User, SupabaseClient } from '@supabase/supabase-js';
-import type { Profile } from '$lib/types/profile';
+import type { PrivateProfile } from '$lib/types/profile';
 import type { Book, BookWithOwner } from '$lib/types/book';
 import type { SwapRequestWithBook } from '$lib/types/swap';
 import type { Notification } from '$lib/types/notification';
+
+// Sanitized user type that excludes sensitive tokens and metadata
+export interface SafeUser {
+	id: string;
+	email?: string;
+	user_metadata?: {
+		full_name?: string;
+		avatar_url?: string;
+	};
+}
 
 // See https://svelte.dev/docs/kit/types#app.d.ts
 // for information about these interfaces
@@ -17,8 +27,8 @@ declare global {
 		}
 		interface PageData {
 			session: Session | null;
-			profile: Profile | null;
-			user: User | null;
+			profile: PrivateProfile | null;
+			user: SafeUser | null;
 			bookCount?: number;
 			recentBooks?: Book[];
 			books?: Book[];
@@ -51,6 +61,12 @@ declare global {
 		}
 		// interface PageState {}
 		// interface Platform {}
+		interface PrivateEnv {
+			GOOGLE_PLACES_API_KEY: string;
+			GOOGLE_GEOCODING_API_KEY: string;
+		}
+		
+		interface PublicEnv {}
 	}
 }
 

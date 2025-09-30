@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { createEventDispatcher } from 'svelte';
+	import { goto } from '$app/navigation';
 	import { auth } from '$lib/stores/auth';
 	import { profile } from '$lib/stores/profile';
 	import { swapStore } from '$lib/stores/swaps';
@@ -35,7 +36,9 @@
 	let counterOfferMessage = '';
 	let userBooks: any[] = [];
 	let loadingUserBooks = false;
+	let completionRating = 5;
 	let completionFeedback = '';
+	let completionRating = 5; // Default to 5 stars
 
 	$: currentUser = $auth.user;
 	$: canAccept = currentUser && canUserAcceptSwap(swapRequest, currentUser.id);
@@ -109,10 +112,13 @@
 		loading = true;
 		try {
 			await swapStore.completeSwapRequest(swapRequest.id, {
+				rating: completionRating,
 				feedback: completionFeedback || undefined
 			});
 			showCompletionDialog = false;
+			completionRating = 5;
 			completionFeedback = '';
+			completionRating = 5; // Reset to default
 			dispatch('updated', swapRequest);
 		} catch (error) {
 			dispatch('error', error instanceof Error ? error.message : 'Failed to complete swap');
@@ -158,67 +164,24 @@
 		counterOfferBookId = userBooks[0].id;
 	}
 
-	let swapServiceError = false;
-	let swapServiceErrorMessage = '';
-
 	async function loadUserBooks() {
 		if (!currentUser) return;
 		
 		loadingUserBooks = true;
-		swapServiceError = false;
-		swapServiceErrorMessage = '';
-		
 		try {
 			// Import SwapService for this specific method since it's not in the store
-			// Wrap the dynamic import in a timeout to prevent infinite loading
-			const importPromise = import('$lib/services/swapService');
-			const timeoutPromise = new Promise((_, reject) => 
-				setTimeout(() => reject(new Error('Import timeout - SwapService took too long to load')), 5000)
-			);
-			
-			const { SwapService } = await Promise.race([importPromise, timeoutPromise]) as { SwapService: any };
-			
-			// Also add timeout to the service call itself
-			const booksPromise = SwapService.getUserAvailableBooksForOffering(currentUser.id);
-			const serviceTimeoutPromise = new Promise((_, reject) => 
-				setTimeout(() => reject(new Error('Service timeout - getUserAvailableBooksForOffering took too long')), 5000)
-			);
-			
-			userBooks = await Promise.race([booksPromise, serviceTimeoutPromise]);
+			const { SwapService } = await import('$lib/services/swapService');
+			userBooks = await SwapService.getUserAvailableBooksForOffering(currentUser.id);
 		} catch (error) {
-			// Log the full error for debugging
-			console.error('Error loading SwapService or user books:', error);
-			
-			// Set local error state for UI feedback
-			swapServiceError = true;
-			
-			// Determine user-friendly error message based on error type
-			if (error instanceof Error) {
-				if (error.message.includes('Import timeout') || error.message.includes('Service timeout')) {
-					swapServiceErrorMessage = 'Loading is taking longer than expected. Please try again or refresh the page.';
-				} else if (error.message.includes('Failed to resolve module') || 
-					error.message.includes('import') || 
-					error.message.includes('module')) {
-					swapServiceErrorMessage = 'Unable to load swap functionality. Please refresh the page and try again.';
-				} else {
-					swapServiceErrorMessage = `Failed to load your available books: ${error.message}`;
-				}
-			} else {
-				swapServiceErrorMessage = 'An unexpected error occurred while loading your books. Please try again.';
-			}
-			
-			// Also dispatch error for parent component handling
-			dispatch('error', swapServiceErrorMessage);
-			
-			// Prevent further execution that depends on SwapService
-			return;
+			console.error('Error loading user books:', error);
+			dispatch('error', 'Failed to load your available books');
 		} finally {
 			loadingUserBooks = false;
 		}
 	}
 </script>
 
-<div class="swap-card">
+<div id={"swap-" + swapRequest.id} class="swap-card">
 	<div class="swap-header">
 		<div class="status-badge" style="background-color: {statusColor}">
 			{statusDisplay}
@@ -244,7 +207,15 @@
 				</div>
 			{/if}
 			<div class="user-details">
-				<h4>{otherUser.username || 'Unknown User'}</h4>
+				<h4>
+					<button 
+						class="username-link"
+						on:click={() => goto(`/app/profile/${otherUser.username}`)}
+						disabled={!otherUser.username}
+					>
+						{otherUser.username || 'Unknown User'}
+					</button>
+				</h4>
 				<div class="user-role">
 					{isIncoming ? 'Requesting your book' : 'Book owner'}
 				</div>
@@ -406,41 +377,33 @@
 				<h5>Contact Information</h5>
 				<div class="contact-details">
 					<div class="contact-user">
-						<h6>{isIncoming ? 'Requester' : 'Book Owner'}: {otherUser.username}</h6>
-						{#if otherUser.full_name && otherUser.full_name !== otherUser.username}
-							<p><strong>Name:</strong> {otherUser.full_name}</p>
-						{/if}
-						{#if otherUser.location}
-							<p><strong>Location:</strong> {otherUser.location}</p>
-						{/if}
-						{#if otherUser.email}
-							<p><strong>Email:</strong> {otherUser.email}</p>
-						{:else}
-							<p class="contact-note-small">
-								<strong>Email:</strong> Contact {otherUser.username} directly to exchange email addresses
-							</p>
+						<h6>{isIncoming ? 'Requester' : 'Book Owner'}</h6>
+						<p><strong>Name:</strong> {otherUser.full_name || otherUser.username}</p>
+						<p><strong>Email:</strong> 
+							<button 
+								class="contact-chat-link"
+								on:click={() => window.open(`/app/profile/${otherUser.username}?openChat=1`, '_blank')}
+							>
+								Contact {otherUser.username}
+							</button>
+						</p>
+						{#if otherUser.city && otherUser.state}
+							<p><strong>Location:</strong> {otherUser.city}, {otherUser.state}</p>
 						{/if}
 					</div>
 					
 					<div class="contact-user">
 						<h6>Your Information</h6>
-						{#if $profile?.email || $auth.user?.email}
-							<p><strong>Email:</strong> {$profile?.email || $auth.user?.email}</p>
-						{/if}
-						{#if $profile?.full_name}
-							<p><strong>Name:</strong> {$profile.full_name}</p>
-						{:else if $auth.user?.user_metadata?.full_name}
-							<p><strong>Name:</strong> {$auth.user.user_metadata.full_name}</p>
-						{/if}
-						{#if $profile?.location}
-							<p><strong>Location:</strong> {$profile.location}</p>
+						<p><strong>Name:</strong> {$profile?.full_name || $profile?.username || $auth.user?.email}</p>
+						<p><strong>Email:</strong> {$profile?.email || $auth.user?.email}</p>
+						{#if $profile?.city && $profile?.state}
+							<p><strong>Location:</strong> {$profile.city}, {$profile.state}</p>
 						{/if}
 					</div>
 				</div>
 				<div class="contact-instructions">
 					<p class="contact-note">
-						<strong>Next Steps:</strong> Contact {otherUser.username} via email to coordinate the physical book exchange. 
-						Exchange phone numbers or arrange a meetup location and time.
+						<strong>Next Steps:</strong> Use the chat link above to coordinate logistics, exchange contact details, and arrange the physical book exchange.
 					</p>
 					<p class="safety-note">
 						<strong>Safety Tip:</strong> Meet in a public place for the book exchange.
@@ -449,15 +412,31 @@
 			</div>
 		{/if}
 
-		<!-- Feedback (for completed swaps) -->
-		{#if swapRequest.status === SwapStatus.COMPLETED && (swapRequest.requester_feedback || swapRequest.owner_feedback)}
-			<div class="feedback-section">
-				<h5>Swap Feedback</h5>
-				{#if swapRequest.requester_feedback}
-					<p><strong>Requester:</strong> {swapRequest.requester_feedback}</p>
-				{/if}
-				{#if swapRequest.owner_feedback}
-					<p><strong>Owner:</strong> {swapRequest.owner_feedback}</p>
+		<!-- Ratings (for completed swaps) -->
+		{#if swapRequest.status === SwapStatus.COMPLETED}
+			<div class="ratings-section">
+				<h5>Swap Ratings</h5>
+				<div class="ratings-grid">
+					{#if swapRequest.requester_rating}
+						<div class="rating-item">
+							<span>Requester Rating: {swapRequest.requester_rating}/5</span>
+						</div>
+					{/if}
+					{#if swapRequest.owner_rating}
+						<div class="rating-item">
+							<span>Owner Rating: {swapRequest.owner_rating}/5</span>
+						</div>
+					{/if}
+				</div>
+				{#if swapRequest.requester_feedback || swapRequest.owner_feedback}
+					<div class="feedback-section">
+						{#if swapRequest.requester_feedback}
+							<p><strong>Requester:</strong> {swapRequest.requester_feedback}</p>
+						{/if}
+						{#if swapRequest.owner_feedback}
+							<p><strong>Owner:</strong> {swapRequest.owner_feedback}</p>
+						{/if}
+					</div>
 				{/if}
 			</div>
 		{/if}
@@ -573,26 +552,6 @@
 								</svg>
 							</div>
 							<p>Loading your available books...</p>
-						</div>
-					{:else if swapServiceError}
-						<div class="error-state">
-							<div class="error-icon">
-								<svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-									<circle cx="12" cy="12" r="10"/>
-									<line x1="15" y1="9" x2="9" y2="15"/>
-									<line x1="9" y1="9" x2="15" y2="15"/>
-								</svg>
-							</div>
-							<h4>Unable to Load Books</h4>
-							<p class="error-message">{swapServiceErrorMessage}</p>
-							<button 
-								type="button" 
-								class="btn btn-secondary retry-btn" 
-								on:click={loadUserBooks}
-								disabled={loadingUserBooks}
-							>
-								{loadingUserBooks ? 'Retrying...' : 'Try Again'}
-							</button>
 						</div>
 					{:else if userBooks.length === 0}
 						<div class="empty-state">
@@ -723,6 +682,17 @@
 			
 			<form on:submit|preventDefault={handleComplete}>
 				<div class="form-group">
+					<label for="rating">Rate your experience (1-5 stars):</label>
+					<select bind:value={completionRating} required>
+						<option value={5}>⭐⭐⭐⭐⭐ Excellent (5 stars)</option>
+						<option value={4}>⭐⭐⭐⭐ Good (4 stars)</option>
+						<option value={3}>⭐⭐⭐ Average (3 stars)</option>
+						<option value={2}>⭐⭐ Poor (2 stars)</option>
+						<option value={1}>⭐ Terrible (1 star)</option>
+					</select>
+				</div>
+
+				<div class="form-group">
 					<label for="feedback">Message for {otherUser.username} (optional):</label>
 					<textarea 
 						bind:value={completionFeedback}
@@ -811,6 +781,28 @@
 		margin: 0 0 0.25rem 0;
 		font-size: 1.125rem;
 		font-weight: 600;
+	}
+
+	.username-link {
+		background: none;
+		border: none;
+		color: #3b82f6;
+		font-size: inherit;
+		font-weight: inherit;
+		cursor: pointer;
+		padding: 0;
+		text-decoration: none;
+		transition: color 0.2s ease;
+	}
+
+	.username-link:hover:not(:disabled) {
+		color: #2563eb;
+		text-decoration: underline;
+	}
+
+	.username-link:disabled {
+		color: inherit;
+		cursor: default;
 	}
 
 	.user-role {
@@ -947,6 +939,21 @@
 		margin: 0.25rem 0;
 		font-size: 0.75rem;
 		color: #6b7280;
+	}
+
+	.contact-chat-link {
+		background: none;
+		border: none;
+		color: #3b82f6;
+		text-decoration: underline;
+		cursor: pointer;
+		font-size: inherit;
+		padding: 0;
+		transition: color 0.2s ease;
+	}
+
+	.contact-chat-link:hover {
+		color: #2563eb;
 	}
 
 	.contact-instructions {
@@ -1424,8 +1431,7 @@
 	}
 
 	.loading-state,
-	.empty-state,
-	.error-state {
+	.empty-state {
 		text-align: center;
 		padding: 3rem 2rem;
 		color: #6b7280;
@@ -1449,35 +1455,6 @@
 		to {
 			transform: rotate(360deg);
 		}
-	}
-
-	.error-state {
-		background: #fef2f2;
-		border: 2px dashed #fca5a5;
-		border-radius: 12px;
-	}
-
-	.error-state h4 {
-		margin: 0 0 0.5rem 0;
-		font-size: 1.125rem;
-		font-weight: 600;
-		color: #dc2626;
-	}
-
-	.error-message {
-		margin: 0.5rem 0 1.5rem 0;
-		font-size: 0.95rem;
-		line-height: 1.5;
-		color: #991b1b;
-	}
-
-	.error-icon {
-		margin: 0 auto 1rem;
-		color: #dc2626;
-	}
-
-	.retry-btn {
-		margin-top: 1rem;
 	}
 
 	.empty-state {

@@ -2,6 +2,8 @@ import { json, error } from '@sveltejs/kit';
 import { SwapServiceServer } from '$lib/services/swapServiceServer';
 import { validateSwapRequestUpdate, validateSwapCompletion } from '$lib/validation/swap';
 import type { RequestHandler } from './$types';
+import { EmailOrchestratorServer } from '$lib/services/emailOrchestratorServer';
+import { SwapStatus } from '$lib/types/swap';
 
 export const GET: RequestHandler = async ({ params, locals }) => {
 	if (!locals.session?.user) {
@@ -60,19 +62,40 @@ export const PUT: RequestHandler = async ({ params, request, locals }) => {
 	// Validate request data
 	const validation = validateSwapRequestUpdate(requestData);
 	if (!validation.success) {
-		throw error(400, {
-			message: 'Invalid request data',
-			errors: validation.errors
-		});
+		return json(
+			{
+				message: 'Invalid request data',
+				errors: validation.errors
+			},
+			{ status: 400 }
+		);
 	}
 
 	try {
+		const statusMap: Record<string, SwapStatus> = {
+			PENDING: SwapStatus.PENDING,
+			COUNTER_OFFER: SwapStatus.COUNTER_OFFER,
+			ACCEPTED: SwapStatus.ACCEPTED,
+			COMPLETED: SwapStatus.COMPLETED,
+			CANCELLED: SwapStatus.CANCELLED
+		};
+		const newStatus = statusMap[validation.data.status as keyof typeof statusMap];
+
 		const updatedRequest = await SwapServiceServer.updateSwapRequestStatus(
 			locals.supabase,
 			id,
-			validation.data.status,
+			newStatus,
 			userId
 		);
+
+		// Fire email notifications based on resulting status
+		if (updatedRequest.status === 'ACCEPTED') {
+			// trigger email notifications for approval
+			await EmailOrchestratorServer.onSwapApproved(locals.supabase, id);
+		} else if (updatedRequest.status === 'CANCELLED') {
+			// trigger email notifications for cancellation
+			await EmailOrchestratorServer.onSwapCancelled(locals.supabase, id);
+		}
 
 		return json(updatedRequest);
 	} catch (err) {
@@ -116,19 +139,30 @@ export const PATCH: RequestHandler = async ({ params, request, locals }) => {
 	// Validate completion data
 	const validation = validateSwapCompletion(requestData);
 	if (!validation.success) {
-		throw error(400, {
-			message: 'Invalid completion data',
-			errors: validation.errors
-		});
+		return json(
+			{
+				message: 'Invalid completion data',
+				errors: validation.errors
+			},
+			{ status: 400 }
+		);
 	}
 
 	try {
+		const safeCompletion = {
+			rating: validation.data.rating,
+			feedback: validation.data.feedback ?? undefined
+		};
+
 		const completedRequest = await SwapServiceServer.markSwapAsCompleted(
 			locals.supabase,
 			id,
 			userId,
-			validation.data
+			safeCompletion
 		);
+
+		// Swap marked as completed - notify both users
+		await EmailOrchestratorServer.onSwapCompleted(locals.supabase, id);
 
 		return json(completedRequest);
 	} catch (err) {
@@ -166,9 +200,12 @@ export const DELETE: RequestHandler = async ({ params, locals }) => {
 		await SwapServiceServer.updateSwapRequestStatus(
 			locals.supabase,
 			id,
-			'CANCELLED',
+			SwapStatus.CANCELLED,
 			userId
 		);
+
+		// Notify requester about cancellation
+		await EmailOrchestratorServer.onSwapCancelled(locals.supabase, id);
 
 		return json({ success: true });
 	} catch (err) {

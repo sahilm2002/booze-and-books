@@ -1,22 +1,9 @@
-import { createClient } from '@supabase/supabase-js';
-import fs from 'fs';
-import path from 'path';
-import dotenv from 'dotenv';
+const { createClient } = require('@supabase/supabase-js');
+const fs = require('fs');
+const path = require('path');
 
-// Load environment variables
-dotenv.config();
-
-// Validate required environment variables
-const supabaseUrl = process.env.SUPABASE_URL;
-const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-if (!supabaseUrl) {
-  throw new Error('SUPABASE_URL environment variable is required but not set');
-}
-
-if (!supabaseKey) {
-  throw new Error('SUPABASE_SERVICE_ROLE_KEY environment variable is required but not set');
-}
+const supabaseUrl = 'https://pzmrvovqxbmobunludna.supabase.co';
+const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InB6bXJ2b3ZxeGJtb2J1bmx1ZG5hIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc1NjkxOTU2NSwiZXhwIjoyMDcyNDk1NTY1fQ.3o9ptCH3gFnyykTte7RUpsAG-etQRJJ0iPn5DnfQ2_M';
 
 const supabase = createClient(supabaseUrl, supabaseKey);
 
@@ -88,9 +75,15 @@ async function applyMigration(migrationFile) {
 }
 
 async function main() {
-  // List of migrations that need to be applied (the ones we modified)
+  // List of migrations that need to be applied (the new chat migrations)
   const migrationsToApply = [
-    '036_rebuild_swap_system.sql'
+    '051_extend_notifications_for_chat.sql',
+    '052_remove_duplicate_notifications.sql',
+    '053_fix_chat_message_rls_policy.sql',
+    '054_fix_message_type_column.sql',
+    '055_force_schema_refresh.sql',
+    '056_fix_foreign_keys_and_schema.sql',
+    '057_add_conversation_id_column.sql'
   ];
 
   console.log('Starting migration application...');

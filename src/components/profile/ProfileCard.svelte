@@ -45,8 +45,16 @@
         <p class="bio">{$profileWithUser.bio}</p>
       {/if}
 
-      {#if $profileWithUser.location}
-        <p class="location">📍 {$profileWithUser.location}</p>
+      {#if $profileWithUser.city || $profileWithUser.state}
+        <p class="location">📍 
+          {#if $profileWithUser.city && $profileWithUser.state}
+            {$profileWithUser.city}, {$profileWithUser.state}
+          {:else if $profileWithUser.city}
+            {$profileWithUser.city}
+          {:else if $profileWithUser.state}
+            {$profileWithUser.state}
+          {/if}
+        </p>
       {/if}
     </div>
 
