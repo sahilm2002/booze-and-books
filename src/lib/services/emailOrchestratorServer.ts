@@ -23,8 +23,6 @@ async function sendOnceAndLog(
     send: () => Promise<void>;
   }
 ): Promise<void> {
-  console.log(`[sendOnceAndLog] Checking for duplicate: user=${opts.userId}, type=${opts.emailType}, ref=${opts.referenceId}`);
-  
   const { data: already } = await supabase
     .from('email_log')
     .select('id')
@@ -34,22 +32,17 @@ async function sendOnceAndLog(
     .limit(1);
 
   if (already && already.length > 0) {
-    console.log(`[sendOnceAndLog] Email already sent, skipping: user=${opts.userId}, type=${opts.emailType}, ref=${opts.referenceId}`);
     return;
   }
 
-  console.log(`[sendOnceAndLog] No duplicate found, attempting to send email: user=${opts.userId}, type=${opts.emailType}, ref=${opts.referenceId}`);
-  
   try {
     await opts.send();
-    console.log(`[sendOnceAndLog] Email sent successfully: user=${opts.userId}, type=${opts.emailType}, ref=${opts.referenceId}`);
   } catch (err) {
     console.error(`[sendOnceAndLog] Email send failed [type=${opts.emailType}, ref=${opts.referenceId}, user=${opts.userId}]`, err);
     throw err; // Re-throw to see the error in the calling code
   }
 
   // Log regardless of downstream opens/clicks
-  console.log(`[sendOnceAndLog] Logging email send: user=${opts.userId}, type=${opts.emailType}, ref=${opts.referenceId}`);
   await supabase.from('email_log').insert({
     user_id: opts.userId,
     email_type: opts.emailType,
@@ -155,21 +148,15 @@ function buildPayload(
 export class EmailOrchestratorServer {
   // Swap created (notify owner)
   static async onSwapCreated(supabase: SupabaseClient, swapId: string, initialMessage?: string | null): Promise<void> {
-    console.log(`[EmailOrchestrator] onSwapCreated triggered for swap ${swapId}`);
     const res = await fetchSwapAndProfiles(supabase, swapId);
     if (!res) {
-      console.log(`[EmailOrchestrator] Failed to fetch swap/profiles for swap ${swapId}`);
       return;
     }
     const { requester, owner, requested_book, offered_book, counter_offered_book } = res;
 
-    console.log(`[EmailOrchestrator] Swap created: requester=${requester.username} (${requester.email}), owner=${owner.username} (${owner.email})`);
-
     // Respect preferences: owner must allow swap_requests
     const ownerPrefs = isPrefEnabled((owner as any).email_notifications, 'swap_requests');
-    console.log(`[EmailOrchestrator] Owner ${owner.username} swap_requests pref: ${ownerPrefs}`);
     if (!ownerPrefs) {
-      console.log(`[EmailOrchestrator] Owner has disabled swap_requests emails, skipping`);
       return;
     }
 
@@ -185,10 +172,8 @@ export class EmailOrchestratorServer {
       initialMessage
     );
 
-    console.log(`[EmailOrchestrator] Sending swap created email to ${owner.email} (no duplicate check)`);
     try {
       await EmailService.sendSwapCreatedEmail(payload, 'owner');
-      console.log(`[EmailOrchestrator] Swap created email sent successfully to ${owner.email}`);
     } catch (err) {
       console.error(`[EmailOrchestrator] Failed to send swap created email to ${owner.email}:`, err);
     }
@@ -248,15 +233,11 @@ export class EmailOrchestratorServer {
 
   // Swap approved (notify both, next steps)
   static async onSwapApproved(supabase: SupabaseClient, swapId: string): Promise<void> {
-    console.log(`[EmailOrchestrator] onSwapApproved triggered for swap ${swapId}`);
     const res = await fetchSwapAndProfiles(supabase, swapId);
     if (!res) {
-      console.log(`[EmailOrchestrator] Failed to fetch swap/profiles for swap ${swapId}`);
       return;
     }
     const { requester, owner, requested_book, offered_book, counter_offered_book } = res;
-
-    console.log(`[EmailOrchestrator] Swap approved: requester=${requester.username} (${requester.email}), owner=${owner.username} (${owner.email})`);
 
     const payload = buildPayload({
       swapId,
@@ -269,24 +250,18 @@ export class EmailOrchestratorServer {
 
     // Respect preferences individually
     const requesterPrefs = isPrefEnabled((requester as any).email_notifications, 'swap_updates');
-    console.log(`[EmailOrchestrator] Requester ${requester.username} swap_updates pref: ${requesterPrefs}`);
     if (requesterPrefs) {
-      console.log(`[EmailOrchestrator] Sending swap approved email to requester ${requester.email} (no duplicate check)`);
       try {
         await EmailService.sendSwapApprovedEmail(payload);
-        console.log(`[EmailOrchestrator] Swap approved email sent successfully to requester ${requester.email}`);
       } catch (err) {
         console.error(`[EmailOrchestrator] Failed to send swap approved email to requester ${requester.email}:`, err);
       }
     }
 
     const ownerPrefs = isPrefEnabled((owner as any).email_notifications, 'swap_updates');
-    console.log(`[EmailOrchestrator] Owner ${owner.username} swap_updates pref: ${ownerPrefs}`);
     if (ownerPrefs) {
-      console.log(`[EmailOrchestrator] Sending swap approved email to owner ${owner.email} (no duplicate check)`);
       try {
         await EmailService.sendSwapApprovedEmail(payload);
-        console.log(`[EmailOrchestrator] Swap approved email sent successfully to owner ${owner.email}`);
       } catch (err) {
         console.error(`[EmailOrchestrator] Failed to send swap approved email to owner ${owner.email}:`, err);
       }
@@ -295,15 +270,11 @@ export class EmailOrchestratorServer {
 
   // Swap completed (notify both - celebratory)
   static async onSwapCompleted(supabase: SupabaseClient, swapId: string): Promise<void> {
-    console.log(`[EmailOrchestrator] onSwapCompleted triggered for swap ${swapId}`);
     const res = await fetchSwapAndProfiles(supabase, swapId);
     if (!res) {
-      console.log(`[EmailOrchestrator] Failed to fetch swap/profiles for swap ${swapId}`);
       return;
     }
     const { requester, owner, requested_book, offered_book, counter_offered_book } = res;
-
-    console.log(`[EmailOrchestrator] Swap completed: requester=${requester.username} (${requester.email}), owner=${owner.username} (${owner.email})`);
 
     const payload = buildPayload({
       swapId,
@@ -315,24 +286,18 @@ export class EmailOrchestratorServer {
     });
 
     const requesterPrefs = isPrefEnabled((requester as any).email_notifications, 'swap_updates');
-    console.log(`[EmailOrchestrator] Requester ${requester.username} swap_updates pref: ${requesterPrefs}`);
     if (requesterPrefs) {
-      console.log(`[EmailOrchestrator] Sending swap completed email to requester ${requester.email} (no duplicate check)`);
       try {
         await EmailService.sendFullCompletionEmail(payload);
-        console.log(`[EmailOrchestrator] Swap completed email sent successfully to requester ${requester.email}`);
       } catch (err) {
         console.error(`[EmailOrchestrator] Failed to send swap completed email to requester ${requester.email}:`, err);
       }
     }
 
     const ownerPrefs = isPrefEnabled((owner as any).email_notifications, 'swap_updates');
-    console.log(`[EmailOrchestrator] Owner ${owner.username} swap_updates pref: ${ownerPrefs}`);
     if (ownerPrefs) {
-      console.log(`[EmailOrchestrator] Sending swap completed email to owner ${owner.email} (no duplicate check)`);
       try {
         await EmailService.sendFullCompletionEmail(payload);
-        console.log(`[EmailOrchestrator] Swap completed email sent successfully to owner ${owner.email}`);
       } catch (err) {
         console.error(`[EmailOrchestrator] Failed to send swap completed email to owner ${owner.email}:`, err);
       }
