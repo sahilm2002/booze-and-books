@@ -37,6 +37,7 @@
 	let userBooks: any[] = [];
 	let loadingUserBooks = false;
 	let completionFeedback = '';
+	let completionRating = 5; // Default to 5 stars
 
 	$: currentUser = $auth.user;
 	$: canAccept = currentUser && canUserAcceptSwap(swapRequest, currentUser.id);
@@ -110,10 +111,12 @@
 		loading = true;
 		try {
 			await swapStore.completeSwapRequest(swapRequest.id, {
+				rating: completionRating,
 				feedback: completionFeedback || undefined
 			});
 			showCompletionDialog = false;
 			completionFeedback = '';
+			completionRating = 5; // Reset to default
 			dispatch('updated', swapRequest);
 		} catch (error) {
 			dispatch('error', error instanceof Error ? error.message : 'Failed to complete swap');
@@ -723,6 +726,17 @@
 			<p>Confirm that you've received your book from {otherUser.username} and rate your experience.</p>
 			
 			<form on:submit|preventDefault={handleComplete}>
+				<div class="form-group">
+					<label for="rating">Rate your experience (1-5 stars):</label>
+					<select bind:value={completionRating} required>
+						<option value={5}>⭐⭐⭐⭐⭐ Excellent (5 stars)</option>
+						<option value={4}>⭐⭐⭐⭐ Good (4 stars)</option>
+						<option value={3}>⭐⭐⭐ Average (3 stars)</option>
+						<option value={2}>⭐⭐ Poor (2 stars)</option>
+						<option value={1}>⭐ Terrible (1 star)</option>
+					</select>
+				</div>
+
 				<div class="form-group">
 					<label for="feedback">Message for {otherUser.username} (optional):</label>
 					<textarea 
