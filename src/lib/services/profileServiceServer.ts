@@ -21,7 +21,7 @@ export class ProfileServiceServer {
 
 	static async updateProfile(supabase: SupabaseClient, userId: string, updates: ProfileUpdate): Promise<PrivateProfile> {
 		// Only allow updating columns that actually exist in the profiles table
-		const whitelist = ['full_name', 'bio', 'city', 'state', 'zip_code', 'avatar_url'] as const;
+		const whitelist = ['full_name', 'bio', 'city', 'state', 'zip_code', 'avatar_url', 'email_notifications', 'email'] as const;
 		const updateData: Record<string, unknown> = {};
 
 		for (const key of whitelist) {
@@ -73,7 +73,8 @@ export class ProfileServiceServer {
 			city: initialData?.city || null,
 			state: initialData?.state || null,
 			zip_code: initialData?.zip_code || null,
-			avatar_url: initialData?.avatar_url || null
+			avatar_url: initialData?.avatar_url || null,
+			email: initialData?.email || null
 		};
 
 		const { data, error } = await supabase
