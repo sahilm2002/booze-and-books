@@ -254,7 +254,8 @@ ${this.buildFooter(to)}`;
 
   // 3) Swap cancelled (notify requester only)
   static async sendSwapCancelledEmail(payload: SwapEmailPayload, cancelledBy: 'owner' | 'requester'): Promise<void> {
-    const target = payload.requester; // requester gets the email when the owner cancels
+    // Notify the non-cancelling party
+    const target = cancelledBy === 'requester' ? payload.owner : payload.requester;
     const name = target.full_name || target.username || 'there';
     const requestedAuthors = toAuthorString(payload.requested_book.authors);
     const link = loginRedirectUrl(`/app/swaps#swap-${payload.swap_id}`);
