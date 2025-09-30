@@ -90,8 +90,10 @@ export const PUT: RequestHandler = async ({ params, request, locals }) => {
 
 		// Fire email notifications based on resulting status
 		if (updatedRequest.status === 'ACCEPTED') {
+			// trigger email notifications for approval
 			await EmailOrchestratorServer.onSwapApproved(locals.supabase, id);
 		} else if (updatedRequest.status === 'CANCELLED') {
+			// trigger email notifications for cancellation
 			await EmailOrchestratorServer.onSwapCancelled(locals.supabase, id);
 		}
 

@@ -1,9 +1,11 @@
 # Cline Rules for Booze and Books Project
 
 ## Development Server
-- **Port**: 5173 (NOT 3000)
+- **Port**: **ALWAYS USE 5173** (NEVER use 3000, 4173, 5174, or other ports)
 - **URL**: http://localhost:5173
 - **Command**: `npm run dev`
+- **Rule**: When restarting dev server, always use port 5173 - this is the established port for this project
+- **Kill Command**: `pkill -f "vite|dev|5173"` (target specific port to avoid conflicts)
 
 ## Database Configuration
 - **Supabase URL**: https://pzmrvovqxbmobunludna.supabase.co

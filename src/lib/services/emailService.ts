@@ -28,6 +28,14 @@ function getEnv(name: string, fallback?: string): string {
   return val;
 }
 
+function getEnvSafe(name: string, fallback?: string): string | null {
+  const val = process.env[name];
+  if (!val || !val.trim()) {
+    return fallback || null;
+  }
+  return val;
+}
+
 function toAuthorString(authors?: string[] | string | null): string {
   if (!authors) return '';
   if (Array.isArray(authors)) return authors.join(', ');
@@ -49,10 +57,61 @@ function loginRedirectUrl(path: string): string {
 }
 
 export class EmailService {
-  private static resend = new Resend(getEnv('RESEND_API_KEY', ''));
+	private static _resend: Resend | null = null;
+	private static lastRequestTime = 0;
+	private static readonly MIN_REQUEST_INTERVAL = 1000; // 1 second between requests (Resend allows 2/sec)
+
+	// Reset the cached Resend instance (useful after environment changes)
+	static resetCache(): void {
+		console.log('[EmailService] Resetting cached Resend instance');
+		this._resend = null;
+	}
+
+	// Rate limiting helper to prevent 429 errors from Resend
+	private static async enforceRateLimit(): Promise<void> {
+		const now = Date.now();
+		const timeSinceLastRequest = now - this.lastRequestTime;
+		
+		if (timeSinceLastRequest < this.MIN_REQUEST_INTERVAL) {
+			const waitTime = this.MIN_REQUEST_INTERVAL - timeSinceLastRequest;
+			console.log(`[EmailService] Rate limiting: waiting ${waitTime}ms before next request`);
+			await new Promise(resolve => setTimeout(resolve, waitTime));
+		}
+		
+		this.lastRequestTime = Date.now();
+	}
+
+  private static getResend(): Resend | null {
+    if (!this._resend) {
+      // Bypass getEnvSafe function due to scoping issue - use direct access
+      const apiKey = process.env.RESEND_API_KEY;
+
+      console.log(`[EmailService] Direct process.env.RESEND_API_KEY: ${apiKey ? `***${apiKey.slice(-4)}` : 'null'}`);
+
+      if (!apiKey || !apiKey.trim()) {
+        console.warn('[EmailService] RESEND_API_KEY not configured - emails will be skipped');
+        return null;
+      }
+      console.log(`[EmailService] Loading Resend with API key: ***${apiKey.slice(-4)}`);
+      this._resend = new Resend(apiKey);
+    }
+    return this._resend;
+  }
 
   private static from(): string {
-    return getEnv('EMAIL_FROM', 'Booze & Books <no-reply@localhost>');
+    const configuredRaw = getEnvSafe('EMAIL_FROM') || null;
+    const configured = configuredRaw ? configuredRaw.trim() : null;
+
+    // Default to verified domain if not configured
+    let chosen = configured || 'Booze & Books <notifications@boozeandbooks.me>';
+
+    // If configured but not on verified domain, force override to avoid Resend 403
+    if (!/boozeandbooks\.me/i.test(chosen)) {
+      console.warn(`[EmailService] EMAIL_FROM not on verified domain, overriding. Was: "${chosen}"`);
+      chosen = 'Booze & Books <notifications@boozeandbooks.me>';
+    }
+
+    return chosen;
   }
 
   // Footer appended to all outgoing emails with a link to manage preferences
@@ -72,24 +131,45 @@ export class EmailService {
 
   static async send(to: string, subject: string, html: string, text?: string): Promise<void> {
     console.log(`[EmailService] Attempting to send email to: ${to}, subject: ${subject}`);
-    
+
     if (!to || !to.includes('@')) {
       console.warn('EmailService.send skipped: invalid recipient', to);
       return;
     }
+
+    const resend = this.getResend();
+    if (!resend) {
+      console.warn(`[EmailService] Email to ${to} skipped: RESEND_API_KEY not configured`);
+      return;
+    }
+
     try {
+      // Apply rate limiting before making the API call
+      await this.enforceRateLimit();
+
       const finalHtml = `${html}
 ${this.buildFooter(to)}`;
 
+      const from = this.from();
+      console.log(`[EmailService] Using From: ${from}`);
       console.log(`[EmailService] Calling Resend API for email to: ${to}`);
-      const result = await this.resend.emails.send({
-        from: this.from(),
+
+      const result = await resend.emails.send({
+        from,
         to,
         subject,
         html: finalHtml,
         text
       });
-      console.log(`[EmailService] Email sent successfully to ${to}, Resend result:`, result);
+
+      // Treat Resend validation errors as failures
+      if (result && (result as any).error) {
+        const errObj: any = (result as any).error;
+        console.error(`[EmailService] Resend returned error for ${to}:`, errObj);
+        throw new Error(`Resend error (${errObj.statusCode || 'unknown'}): ${errObj.message || 'unknown error'}`);
+      }
+
+      console.log(`[EmailService] Email accepted by Resend for ${to}. Result:`, result);
     } catch (err) {
       console.error(`[EmailService] Failed to send email to ${to}:`, err);
       throw err; // Re-throw so calling code knows it failed
