@@ -30,24 +30,23 @@
 	let initialized = false;
 	let dirty = false;
 
-	// Ensure email_notifications object always exists for two-way bindings
-	let prefs = formData.email_notifications ?? {
+	// Single source of truth for default email notification preferences
+	type EmailPrefs = {
+		chat_messages: boolean;
+		swap_requests: boolean;
+		swap_updates: boolean;
+		completion_reminders: boolean;
+	};
+	const defaultPrefs: EmailPrefs = {
 		chat_messages: true,
 		swap_requests: true,
 		swap_updates: true,
 		completion_reminders: true
 	};
-	formData.email_notifications = prefs;
+	let prefs: EmailPrefs = formData.email_notifications
+		? { ...defaultPrefs, ...formData.email_notifications }
+		: defaultPrefs;
 
-	$: if (!formData.email_notifications) {
-		formData.email_notifications = {
-			chat_messages: true,
-			swap_requests: true,
-			swap_updates: true,
-			completion_reminders: true
-		};
-		prefs = formData.email_notifications;
-	}
 
 	function validateForm(): boolean {
 		const validation = validateProfileUpdate(formData);
@@ -110,6 +109,7 @@
 				completion_reminders: $profile?.email_notifications?.completion_reminders ?? true
 			}
 		};
+		prefs = { ...defaultPrefs, ...formData.email_notifications };
 		
 		// Reset flags to allow reinitialization
 		initialized = false;
@@ -143,6 +143,7 @@
 				completion_reminders: $profile.email_notifications?.completion_reminders ?? true
 			}
 		};
+		prefs = { ...defaultPrefs, ...formData.email_notifications };
 		initialized = true;
 	}
 </script>

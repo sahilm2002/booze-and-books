@@ -8,7 +8,9 @@ import jwt from 'jsonwebtoken';
 // Environment variables - these will be loaded from process.env in server context
 const JWT_SECRET = process.env.JWT_SECRET ?? null;
 const JWT_ALGORITHM = (process.env.JWT_ALGORITHM || 'HS256') as jwt.Algorithm;
-const JWT_EXPIRES_IN = (process.env.JWT_EXPIRES_IN || '24h') as string | number;
+const RAW_JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN ?? '24h';
+const JWT_EXPIRES_IN: string | number =
+  /^\d+$/.test(RAW_JWT_EXPIRES_IN) ? parseInt(RAW_JWT_EXPIRES_IN, 10) : RAW_JWT_EXPIRES_IN;
 const JWT_ISSUER = process.env.JWT_ISSUER || 'booze-and-books-app';
 const CUSTOM_JWT_ENABLED = !!JWT_SECRET;
 
@@ -35,7 +37,7 @@ export function generateCustomToken(payload: Omit<CustomJWTPayload, 'iat' | 'exp
 
   const options: jwt.SignOptions = {
     algorithm: JWT_ALGORITHM,
-    expiresIn: JWT_EXPIRES_IN as any,
+    expiresIn: JWT_EXPIRES_IN as unknown as jwt.SignOptions['expiresIn'],
   };
 
   return jwt.sign(tokenPayload, JWT_SECRET, options);
