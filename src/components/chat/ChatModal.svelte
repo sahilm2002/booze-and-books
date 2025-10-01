@@ -293,6 +293,33 @@
 		return type.startsWith('image/');
 	}
 
+	// Safe typing and validation for message.data to avoid XSS
+	type MessageData = {
+		swap_request_id?: string;
+		auto_generated?: boolean;
+	};
+
+	const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+	function isMessageData(x: unknown): x is MessageData {
+		if (!x || typeof x !== 'object') return false;
+		const md = x as Record<string, unknown>;
+		const ag = md['auto_generated'];
+		const id = md['swap_request_id'];
+		const agOk = ag === undefined || typeof ag === 'boolean';
+		const idOk = id === undefined || typeof id === 'string';
+		return agOk && idOk;
+	}
+
+	function getValidatedSwapHref(msg: ChatMessage): string | null {
+		const d: unknown = msg.data as unknown;
+		if (!isMessageData(d)) return null;
+		if (!d.auto_generated) return null;
+		const id = d.swap_request_id;
+		if (!id || typeof id !== 'string' || !UUID_RE.test(id)) return null;
+		return `/app/swaps#swap-${encodeURIComponent(id)}`;
+	}
+
 	// Group messages by date
 	$: groupedMessages = messages.reduce((groups, message) => {
 		const date = formatDate(message.created_at);
@@ -376,9 +403,9 @@
 									{#if message.message}
 										<p>{message.message}</p>
 
-										{#if (message.data as any)?.auto_generated && (message.data as any)?.swap_request_id}
+										{#if getValidatedSwapHref(message)}
 											<p class="auto-link">
-												<a href={"/app/swaps#swap-" + (message.data as any).swap_request_id} class="swap-link">Book Swap Details</a>
+												<a href={getValidatedSwapHref(message)} class="swap-link">Book Swap Details</a>
 											</p>
 										{/if}
 									{/if}
