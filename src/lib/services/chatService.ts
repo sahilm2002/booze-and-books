@@ -603,4 +603,20 @@ export class ChatServiceServer {
 			throw new Error(`Failed to mark messages as read: ${error.message}`);
 		}
 	}
+
+	static async markAllMessagesAsRead(
+		supabase: SupabaseClient,
+		userId: string
+	): Promise<void> {
+		const { error } = await supabase
+			.from('notifications')
+			.update({ is_read: true })
+			.eq('recipient_id', userId)
+			.eq('is_read', false)
+			.eq('message_type', MessageType.CHAT_MESSAGE);
+
+		if (error) {
+			throw new Error(`Failed to mark all chat messages as read: ${error.message}`);
+		}
+	}
 }

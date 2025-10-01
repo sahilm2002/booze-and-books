@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { createEventDispatcher, onMount } from 'svelte';
 	import { NotificationServiceServer } from '$lib/services/notificationServiceServer';
-	import { ChatService } from '$lib/services/chatService';
+	import { ChatService, ChatServiceServer } from '$lib/services/chatService';
 	import { NotificationType } from '$lib/types/notification';
 	import type { Notification, Conversation } from '$lib/types/notification';
 	import type { SupabaseClient } from '@supabase/supabase-js';
@@ -15,15 +15,18 @@
 	let notifications: Notification[] = [];
 	let conversations: Conversation[] = [];
 	let loading = false;
+	let loadingNotifications = false;
 
-	$: if (isOpen) {
+	$: if (isOpen && !loadingNotifications) {
 		loadNotificationsAndChats();
 	}
 
 	async function loadNotificationsAndChats() {
+		// Prevent overlapping loads
+		if (loadingNotifications) return;
+		loadingNotifications = true;
+		loading = true;
 		try {
-			loading = true;
-			
 			// Load system notifications (excluding chat messages)
 			const { data: notificationData, error: notificationError } = await supabase
 				.from('notifications')
@@ -43,12 +46,12 @@
 			// Load recent conversations with unread messages
 			conversations = await ChatService.getConversations(userId);
 			// Only show conversations with unread messages in the dropdown
-			conversations = conversations.filter(conv => conv.unread_count > 0);
-
+			conversations = conversations.filter((conv) => conv.unread_count > 0);
 		} catch (error) {
 			console.error('Failed to load notifications and chats:', error);
 		} finally {
 			loading = false;
+			loadingNotifications = false;
 		}
 	}
 
@@ -83,12 +86,21 @@
 
 	async function markAllAsRead() {
 		try {
-			await NotificationServiceServer.markAllAsRead(supabase, userId);
+			loading = true;
+			// Mark both system notifications and chat messages as read on the server
+			await Promise.all([
+				NotificationServiceServer.markAllAsRead(supabase, userId),
+				ChatServiceServer.markAllMessagesAsRead(supabase, userId)
+			]);
+			// Only clear UI after both succeed
 			notifications = [];
 			conversations = [];
 			dispatch('allMarkedAsRead');
 		} catch (error) {
-			console.error('Failed to mark all as read:', error);
+			console.error('Failed to mark all as read (notifications + chats):', error);
+			// do not clear UI so user does not lose unread items on failure
+		} finally {
+			loading = false;
 		}
 	}
 
