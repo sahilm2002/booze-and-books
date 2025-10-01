@@ -1,5 +1,5 @@
 import { Client, PlacesNearbyRanking } from '@googlemaps/google-maps-services-js';
-import { GOOGLE_PLACES_API_KEY, GOOGLE_GEOCODING_API_KEY } from '$env/static/private';
+import { env } from '$env/dynamic/private';
 
 const client = new Client({});
 
@@ -33,13 +33,13 @@ export class GooglePlacesService {
     }
 
     try {
-      // Primary: Google Geocoding API
+      // Primary: Google Geocoding API (runtime env to support Vercel)
       const response = await this.rateLimitedApiCall(() =>
         this.withRetry(() =>
           client.geocode({
             params: {
               address: trimmed,
-              key: GOOGLE_GEOCODING_API_KEY
+              key: (env.GOOGLE_GEOCODING_API_KEY as string) || ''
             }
           })
         )
@@ -69,7 +69,7 @@ export class GooglePlacesService {
           client.textSearch({
             params: {
               query: `${zip} USA`,
-              key: GOOGLE_PLACES_API_KEY
+              key: (env.GOOGLE_PLACES_API_KEY as string) || ''
             }
           })
         )
@@ -102,7 +102,7 @@ export class GooglePlacesService {
               location: { lat: latitude, lng: longitude },
               radius: radiusMeters,
               keyword: storeChain,
-              key: GOOGLE_PLACES_API_KEY
+              key: (env.GOOGLE_PLACES_API_KEY as string) || ''
             }
           })
         )
@@ -119,7 +119,7 @@ export class GooglePlacesService {
                 location: { lat: latitude, lng: longitude },
                 rankby: PlacesNearbyRanking.distance,
                 keyword: storeChain,
-                key: GOOGLE_PLACES_API_KEY
+                key: (env.GOOGLE_PLACES_API_KEY as string) || ''
               }
             })
           )
@@ -151,7 +151,7 @@ export class GooglePlacesService {
               query,
               location: { lat: latitude, lng: longitude },
               radius: radiusMeters,
-              key: GOOGLE_PLACES_API_KEY
+              key: (env.GOOGLE_PLACES_API_KEY as string) || ''
             }
           })
         )
@@ -188,7 +188,7 @@ export class GooglePlacesService {
                 location: { lat: latitude, lng: longitude },
                 radius: radiusMeters,
                 type: t as any,
-                key: GOOGLE_PLACES_API_KEY
+                key: (env.GOOGLE_PLACES_API_KEY as string) || ''
               }
             })
           )
@@ -204,7 +204,7 @@ export class GooglePlacesService {
                   location: { lat: latitude, lng: longitude },
                   rankby: PlacesNearbyRanking.distance,
                   type: t as any,
-                  key: GOOGLE_PLACES_API_KEY
+                  key: (env.GOOGLE_PLACES_API_KEY as string) || ''
                 }
               })
             )
@@ -234,7 +234,7 @@ export class GooglePlacesService {
                 location: { lat: latitude, lng: longitude },
                 radius: radiusMeters,
                 keyword: kw,
-                key: GOOGLE_PLACES_API_KEY
+                key: (env.GOOGLE_PLACES_API_KEY as string) || ''
               }
             })
           )
@@ -250,7 +250,7 @@ export class GooglePlacesService {
                   location: { lat: latitude, lng: longitude },
                   rankby: PlacesNearbyRanking.distance,
                   keyword: kw,
-                  key: GOOGLE_PLACES_API_KEY
+                  key: (env.GOOGLE_PLACES_API_KEY as string) || ''
                 }
               })
             )
@@ -291,7 +291,7 @@ export class GooglePlacesService {
                 'geometry',
                 'types'
               ],
-              key: GOOGLE_PLACES_API_KEY
+              key: (env.GOOGLE_PLACES_API_KEY as string) || ''
             }
           })
         )
