@@ -300,6 +300,8 @@
 	}
 </script>
 
+<svelte:window on:keydown={(e) => { if (isOpen && e.key === 'Escape') closeModal(); }} />
+
 {#if isOpen}
 	<div class="modal-overlay" on:click={handleOverlayClick}>
 		<div 
