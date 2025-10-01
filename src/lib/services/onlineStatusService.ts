@@ -160,10 +160,11 @@ export class OnlineStatusService {
 		if (!this.currentUserId) return;
 
 		if (document.hidden) {
-			// Page is hidden, but don't set offline immediately
-			// The heartbeat will stop updating, and the user will be considered offline after timeout
+			// Page hidden: stop heartbeat so user naturally transitions offline after grace period
+			this.stopHeartbeat();
 		} else {
-			// Page is visible, update online status
+			// Page visible: restart heartbeat and set online immediately
+			this.startHeartbeat();
 			await this.setUserOnline(this.currentUserId);
 		}
 	};

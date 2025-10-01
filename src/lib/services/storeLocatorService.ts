@@ -66,8 +66,9 @@ export class StoreLocatorService {
         if (all.length > 0) break; // found some at this radius
       }
 
-      // Apply includeAlcoholOnly preference with graceful fallback to all
-      if (request.includeAlcoholOnly) {
+      // Apply includeAlcoholOnly preference with graceful fallback to all (default true)
+      const preferAlcoholOnly = request.includeAlcoholOnly ?? true;
+      if (preferAlcoholOnly) {
         const alcoholStores = all.filter((s) => s.supportsAlcohol);
         if (alcoholStores.length > 0) {
           return alcoholStores;

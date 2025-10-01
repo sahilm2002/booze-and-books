@@ -113,7 +113,8 @@ export class NotificationService {
 	static async getRecentNotifications(_userId: string, limit = 50, offset = 0): Promise<Notification[]> {
 		const params = new URLSearchParams({
 			limit: String(limit),
-			offset: String(offset)
+			offset: String(offset),
+			unreadOnly: 'true'
 		});
 		const res = await fetch(`/api/notifications?${params.toString()}`, {
 			method: 'GET',
