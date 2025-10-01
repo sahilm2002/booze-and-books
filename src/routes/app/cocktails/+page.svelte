@@ -2,8 +2,9 @@
 	import { onMount } from 'svelte';
 	import { auth } from '$lib/stores/auth';
 	import { CocktailService } from '$lib/services/cocktailService';
-	import type { Cocktail } from '$lib/types/cocktail';
+	import type { Cocktail, UserCocktailPreferences } from '$lib/types/cocktail';
 	import CocktailModal from '../../../components/cocktails/CocktailModal.svelte';
+	import ZipCodeModal from '../../../components/cocktails/ZipCodeModal.svelte';
 	import { StoreLocatorService } from '$lib/services/storeLocatorService';
 
 	let favoriteCocktails: Cocktail[] = [];
@@ -11,6 +12,32 @@
 	let error: string | null = null;
 	let selectedCocktail: Cocktail | null = null;
 	let showCocktailModal = false;
+
+	// UI state for zip code flow and errors
+	let userPreferences: UserCocktailPreferences | null = null;
+	let showZipCodePrompt = false;
+	let uiError: string | null = null;
+	let pendingCocktailForZip: Cocktail | null = null;
+
+	function handleZipSubmit(zip: string) {
+		if (currentUser) {
+			// persist server-side
+			return CocktailService.updateUserPreferences(currentUser.id, { zipCode: zip })
+				.then(() => {
+					// merge with existing prefs while satisfying type
+					userPreferences = userPreferences
+						? { ...userPreferences, zipCode: zip }
+						: { ageVerified: false, zipCode: zip };
+					showZipCodePrompt = false;
+					if (pendingCocktailForZip) {
+						const c = pendingCocktailForZip;
+						pendingCocktailForZip = null;
+						handleOrderIngredients(c);
+					}
+				});
+		}
+		showZipCodePrompt = false;
+	}
 
 	$: currentUser = $auth.user;
 
@@ -30,6 +57,8 @@
 		try {
 			loading = true;
 			error = null;
+			// Preload user preferences for zipcode
+			userPreferences = await CocktailService.getUserPreferences(currentUser.id);
 			favoriteCocktails = await CocktailService.getFavoriteCocktails(currentUser.id);
 		} catch (err) {
 			console.error('Failed to load favorite cocktails:', err);
@@ -62,27 +91,13 @@
 	}
 
 	async function handleOrderIngredients(cocktail: Cocktail) {
-		// Get user preferences for zip code
-		let userPreferences;
-		try {
-			userPreferences = await CocktailService.getUserPreferences(currentUser!.id);
-		} catch (error) {
-			console.error('Failed to get user preferences:', error);
-		}
+		// Use preloaded preferences; if missing zip, prompt via modal
 
 		if (!userPreferences?.zipCode) {
-			// Ask for zip code first
-			const zipCode = prompt('Please enter your zip code to find nearby stores:');
-			if (!zipCode || !StoreLocatorService.validateZipCode(zipCode)) {
-				alert('Please enter a valid US zip code (e.g., 12345 or 12345-6789)');
-				return;
-			}
-
-			// Save zip code
-			if (currentUser) {
-				await CocktailService.updateUserPreferences(currentUser.id, { zipCode });
-				userPreferences = { ...userPreferences!, zipCode };
-			}
+			// Trigger modal to collect zip code, then continue flow
+			pendingCocktailForZip = cocktail;
+			showZipCodePrompt = true;
+			return;
 		}
 
 		try {
@@ -94,7 +109,7 @@
 			});
 
 			if (stores.length === 0) {
-				alert('No stores found within 10 miles of your location. Please try a different zip code.');
+				uiError = 'No stores found within 10 miles of your location. Please try a different zip code.';
 				return;
 			}
 
@@ -111,7 +126,7 @@
 
 		} catch (error) {
 			console.error('Failed to find stores:', error);
-			alert('Failed to find nearby stores. Please try again.');
+			uiError = 'Failed to find nearby stores. Please try again.';
 		}
 	}
 
@@ -134,7 +149,14 @@
 	<div class="page-header">
 		<h1>🍸 My Favorite Cocktails</h1>
 		<p>Your collection of book-inspired cocktail recipes</p>
-	</div>
+		{#if uiError}
+		<div class="error-state">
+			<div class="error-icon">⚠️</div>
+			<p>{uiError}</p>
+			<button class="btn btn-primary" on:click={() => (uiError = null)}>Dismiss</button>
+		</div>
+	{/if}
+</div>
 
 	{#if loading}
 		<div class="loading-state">
@@ -186,6 +208,17 @@
 							<p><strong>Book Connection:</strong> {cocktail.themeExplanation}</p>
 						</div>
 					{/if}
+
+<!-- Zip Code Modal -->
+<ZipCodeModal
+	isOpen={showZipCodePrompt}
+	initialZipCode={userPreferences?.zipCode || null}
+	onSubmit={handleZipSubmit}
+	onCancel={() => {
+		showZipCodePrompt = false;
+		pendingCocktailForZip = null;
+	}}
+/>
 
 					<div class="cocktail-meta">
 						<span class="difficulty">📊 {cocktail.difficulty}</span>

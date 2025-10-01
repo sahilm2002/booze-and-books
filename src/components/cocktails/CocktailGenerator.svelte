@@ -14,6 +14,7 @@
 	import AgeVerificationModal from './AgeVerificationModal.svelte';
 	import CocktailModal from './CocktailModal.svelte';
 	import StoreSelectionModal from './StoreSelectionModal.svelte';
+	import ZipCodeModal from './ZipCodeModal.svelte';
 
 	export let book: Book;
 	export let isOpen: boolean = false;
@@ -36,6 +37,28 @@
 	let ageVerification: AgeVerification | null = null;
 	let userPreferences: UserCocktailPreferences | null = null;
 	let refreshCount = 0;
+
+	// UI state for zip prompt flow
+	let showZipCodePrompt = false;
+	let pendingCocktailForZip: Cocktail | null = null;
+
+	function handleZipSubmit(zip: string) {
+		if (currentUser) {
+			return CocktailService.updateUserPreferences(currentUser.id, { zipCode: zip })
+				.then(() => {
+					userPreferences = userPreferences
+						? { ...userPreferences, zipCode: zip }
+						: { ageVerified: false, zipCode: zip };
+					showZipCodePrompt = false;
+					if (pendingCocktailForZip) {
+						const c = pendingCocktailForZip;
+						pendingCocktailForZip = null;
+						handleOrderIngredients(c);
+					}
+				});
+		}
+		showZipCodePrompt = false;
+	}
 
 	$: currentUser = $auth.user;
 
@@ -168,18 +191,10 @@
 
 	async function handleOrderIngredients(cocktail: Cocktail) {
 		if (!userPreferences?.zipCode) {
-			// Ask for zip code first
-			const zipCode = prompt('Please enter your zip code to find nearby stores:');
-			if (!zipCode || !StoreLocatorService.validateZipCode(zipCode)) {
-				alert('Please enter a valid US zip code (e.g., 12345 or 12345-6789)');
-				return;
-			}
-
-			// Save zip code
-			if (currentUser) {
-				await CocktailService.updateUserPreferences(currentUser.id, { zipCode });
-				userPreferences = { ...userPreferences!, zipCode };
-			}
+			// Use modal instead of prompt to collect zip code
+			pendingCocktailForZip = cocktail;
+			showZipCodePrompt = true;
+			return;
 		}
 
 		try {
@@ -203,7 +218,7 @@
 			}
 
 			if (stores.length === 0) {
-				alert('No stores found near your location. Try a different ZIP or increase the search radius.');
+				state.error = 'No stores found near your location. Try a different ZIP or increase the search radius.';
 				return;
 			}
 
@@ -214,9 +229,9 @@
 			console.error('Failed to find stores:', error);
 			const message = error instanceof Error ? error.message : 'Failed to find nearby stores. Please try again.';
 			if (message.toLowerCase().includes('invalid zip')) {
-				alert('We could not locate that zip code. Please check and try again.');
+				state.error = 'We could not locate that zip code. Please check and try again.';
 			} else {
-				alert(message);
+				state.error = message;
 			}
 		}
 	}
@@ -447,6 +462,17 @@
 		userZipCode={userPreferences?.zipCode}
 	/>
 {/if}
+
+<!-- Zip Code Modal -->
+<ZipCodeModal
+	isOpen={showZipCodePrompt}
+	initialZipCode={userPreferences?.zipCode || null}
+	onSubmit={handleZipSubmit}
+	onCancel={() => {
+		showZipCodePrompt = false;
+		pendingCocktailForZip = null;
+	}}
+/>
 
 <style>
 	.modal-overlay {

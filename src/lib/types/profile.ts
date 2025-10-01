@@ -3,7 +3,7 @@ export interface PublicProfile {
 	username: string;
 	full_name?: string;
 	bio?: string;
-	avatar_url?: string;
+	avatar_url?: string | null;
 	created_at: string;
 	updated_at: string;
 	is_online?: boolean;
@@ -33,7 +33,7 @@ export interface ProfileUpdate {
 	username?: string;
 	full_name?: string;
 	bio?: string;
-	avatar_url?: string;
+	avatar_url?: string | null;
 	email?: string;
 	address_line1?: string;
 	address_line2?: string;
@@ -57,7 +57,7 @@ export interface UserContactInfo {
 	city?: string;
 	state?: string;
 	zip_code?: string;
-	avatar_url?: string;
+	avatar_url?: string | null;
 }
 
 export interface SwapHistoryItem {

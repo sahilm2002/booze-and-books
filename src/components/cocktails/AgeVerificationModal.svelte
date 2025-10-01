@@ -9,6 +9,7 @@
 	const dispatch = createEventDispatcher();
 
 	let isVerifying = false;
+	let error: string | null = null;
 
 	async function handleVerify() {
 		if (isVerifying) return;
@@ -16,10 +17,11 @@
 		isVerifying = true;
 		try {
 			await onVerify();
+			error = null;
 			dispatch('verified');
 		} catch (error) {
 			console.error('Age verification failed:', error);
-			alert('Age verification failed. Please try again.');
+			error = 'Age verification failed. Please try again.';
 		} finally {
 			isVerifying = false;
 		}
@@ -49,6 +51,11 @@
 			</div>
 
 			<div class="modal-body">
+				{#if error}
+					<div class="error-banner" role="alert">
+						<span>⚠️ {error}</span>
+					</div>
+				{/if}
 				<div class="verification-content">
 					<div class="legal-notice">
 						<h3>🇺🇸 United States Legal Drinking Age</h3>
@@ -182,6 +189,16 @@
 
 	.modal-body {
 		padding: 2rem;
+	}
+
+	.error-banner {
+		background: #fef2f2;
+		border: 1px solid #fecaca;
+		color: #b91c1c;
+		padding: .5rem .75rem;
+		border-radius: .5rem;
+		margin: 0 0 .75rem 0;
+		font-size: .9rem;
 	}
 
 	.verification-content {
