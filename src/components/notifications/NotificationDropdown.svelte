@@ -17,13 +17,24 @@
 	let loading = false;
 	let loadingNotifications = false;
 
-	$: if (isOpen && !loadingNotifications) {
+	// Load once when the dropdown component mounts (component is unmounted when closed)
+	onMount(() => {
 		loadNotificationsAndChats();
-	}
+	});
 
 	async function loadNotificationsAndChats() {
 		// Prevent overlapping loads
 		if (loadingNotifications) return;
+
+		// If no valid user, don't attempt to load and clear loading state
+		if (!userId) {
+			notifications = [];
+			conversations = [];
+			loading = false;
+			loadingNotifications = false;
+			return;
+		}
+
 		loadingNotifications = true;
 		loading = true;
 		try {
