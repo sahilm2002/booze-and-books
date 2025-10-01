@@ -8,14 +8,24 @@ export class GooglePlacesService {
    * Convert zip code to coordinates using Google Geocoding API
    */
   static async geocodeZipCode(zipCode: string): Promise<{ latitude: number; longitude: number } | null> {
+    const trimmed = (zipCode ?? '').toString().trim();
+    const ZIP_RE = /^\d{5}(-\d{4})?$/;
+    if (!trimmed || !ZIP_RE.test(trimmed)) {
+      console.warn('[GooglePlacesService] geocodeZipCode: invalid ZIP input, skipping call');
+      return null;
+    }
     try {
       // Primary: Google Geocoding API
-      const response = await client.geocode({
-        params: {
-          address: zipCode,
-          key: GOOGLE_GEOCODING_API_KEY
-        }
-      });
+      const response = await this.rateLimitedApiCall(() =>
+        this.withRetry(() =>
+          client.geocode({
+            params: {
+              address: trimmed,
+              key: GOOGLE_GEOCODING_API_KEY
+            }
+          })
+        )
+      );
 
       if (response.data.results.length > 0) {
         const location = response.data.results[0].geometry.location;
@@ -26,12 +36,16 @@ export class GooglePlacesService {
       }
 
       // Fallback: Google Places Text Search (in case geocoding key is missing or restricted)
-      const textResp = await client.textSearch({
-        params: {
-          query: `${zipCode} USA`,
-          key: GOOGLE_PLACES_API_KEY
-        }
-      });
+      const textResp = await this.rateLimitedApiCall(() =>
+        this.withRetry(() =>
+          client.textSearch({
+            params: {
+              query: `${trimmed} USA`,
+              key: GOOGLE_PLACES_API_KEY
+            }
+          })
+        )
+      );
       if (textResp.data.results?.length > 0) {
         const loc = textResp.data.results[0]?.geometry?.location;
         if (loc) {
@@ -44,12 +58,16 @@ export class GooglePlacesService {
       console.error('Geocoding error:', error);
       // Last-chance fallback via Places Text Search
       try {
-        const textResp = await client.textSearch({
-          params: {
-            query: `${zipCode} USA`,
-            key: GOOGLE_PLACES_API_KEY
-          }
-        });
+        const textResp = await this.rateLimitedApiCall(() =>
+          this.withRetry(() =>
+            client.textSearch({
+              params: {
+                query: `${trimmed} USA`,
+                key: GOOGLE_PLACES_API_KEY
+              }
+            })
+          )
+        );
         if (textResp.data.results?.length > 0) {
           const loc = textResp.data.results[0]?.geometry?.location;
           if (loc) {
@@ -74,27 +92,35 @@ export class GooglePlacesService {
   ): Promise<any[]> {
     try {
       // First pass: use radius with keyword (no type restriction to avoid filtering out supermarkets/department stores)
-      let response = await client.placesNearby({
-        params: {
-          location: { lat: latitude, lng: longitude },
-          radius: radiusMeters,
-          keyword: storeChain,
-          key: GOOGLE_PLACES_API_KEY
-        }
-      });
+      let response = await this.rateLimitedApiCall(() =>
+        this.withRetry(() =>
+          client.placesNearby({
+            params: {
+              location: { lat: latitude, lng: longitude },
+              radius: radiusMeters,
+              keyword: storeChain,
+              key: GOOGLE_PLACES_API_KEY
+            }
+          })
+        )
+      );
 
       let results = response.data.results || [];
 
       // Second pass: if empty, try rankby=distance (omit radius) to broaden search semantics
       if (!results.length) {
-        const resp2 = await client.placesNearby({
-          params: {
-            location: { lat: latitude, lng: longitude },
-            rankby: 'distance' as any,
-            keyword: storeChain,
-            key: GOOGLE_PLACES_API_KEY
-          }
-        });
+        const resp2 = await this.rateLimitedApiCall(() =>
+          this.withRetry(() =>
+            client.placesNearby({
+              params: {
+                location: { lat: latitude, lng: longitude },
+                rankby: 'distance' as any,
+                keyword: storeChain,
+                key: GOOGLE_PLACES_API_KEY
+              }
+            })
+          )
+        );
         results = resp2.data.results || [];
       }
 
@@ -115,14 +141,18 @@ export class GooglePlacesService {
     query: string
   ): Promise<any[]> {
     try {
-      const resp = await client.textSearch({
-        params: {
-          query,
-          location: { lat: latitude, lng: longitude },
-          radius: radiusMeters,
-          key: GOOGLE_PLACES_API_KEY
-        }
-      });
+      const resp = await this.rateLimitedApiCall(() =>
+        this.withRetry(() =>
+          client.textSearch({
+            params: {
+              query,
+              location: { lat: latitude, lng: longitude },
+              radius: radiusMeters,
+              key: GOOGLE_PLACES_API_KEY
+            }
+          })
+        )
+      );
       return resp.data.results || [];
     } catch (err) {
       console.warn(`Places text search failed for "${query}":`, err);
@@ -148,26 +178,34 @@ export class GooglePlacesService {
     for (const t of types) {
       try {
         // First pass: radius + type
-        let resp = await client.placesNearby({
-          params: {
-            location: { lat: latitude, lng: longitude },
-            radius: radiusMeters,
-            type: t as any,
-            key: GOOGLE_PLACES_API_KEY
-          }
-        });
+        let resp = await this.rateLimitedApiCall(() =>
+          this.withRetry(() =>
+            client.placesNearby({
+              params: {
+                location: { lat: latitude, lng: longitude },
+                radius: radiusMeters,
+                type: t as any,
+                key: GOOGLE_PLACES_API_KEY
+              }
+            })
+          )
+        );
         let res = resp.data.results || [];
 
         // Second pass: rankby=distance + type (omit radius)
         if (!res.length) {
-          const resp2 = await client.placesNearby({
-            params: {
-              location: { lat: latitude, lng: longitude },
-              rankby: 'distance' as any,
-              type: t as any,
-              key: GOOGLE_PLACES_API_KEY
-            }
-          });
+          const resp2 = await this.rateLimitedApiCall(() =>
+            this.withRetry(() =>
+              client.placesNearby({
+                params: {
+                  location: { lat: latitude, lng: longitude },
+                  rankby: 'distance' as any,
+                  type: t as any,
+                  key: GOOGLE_PLACES_API_KEY
+                }
+              })
+            )
+          );
           res = resp2.data.results || [];
         }
 
@@ -186,26 +224,34 @@ export class GooglePlacesService {
     for (const kw of keywords) {
       try {
         // First pass: radius + keyword
-        let resp = await client.placesNearby({
-          params: {
-            location: { lat: latitude, lng: longitude },
-            radius: radiusMeters,
-            keyword: kw,
-            key: GOOGLE_PLACES_API_KEY
-          }
-        });
+        let resp = await this.rateLimitedApiCall(() =>
+          this.withRetry(() =>
+            client.placesNearby({
+              params: {
+                location: { lat: latitude, lng: longitude },
+                radius: radiusMeters,
+                keyword: kw,
+                key: GOOGLE_PLACES_API_KEY
+              }
+            })
+          )
+        );
         let res = resp.data.results || [];
 
         // Second pass: rankby=distance + keyword (omit radius)
         if (!res.length) {
-          const resp2 = await client.placesNearby({
-            params: {
-              location: { lat: latitude, lng: longitude },
-              rankby: 'distance' as any,
-              keyword: kw,
-              key: GOOGLE_PLACES_API_KEY
-            }
-          });
+          const resp2 = await this.rateLimitedApiCall(() =>
+            this.withRetry(() =>
+              client.placesNearby({
+                params: {
+                  location: { lat: latitude, lng: longitude },
+                  rankby: 'distance' as any,
+                  keyword: kw,
+                  key: GOOGLE_PLACES_API_KEY
+                }
+              })
+            )
+          );
           res = resp2.data.results || [];
         }
 
@@ -228,13 +274,17 @@ export class GooglePlacesService {
    */
   static async getPlaceDetails(placeId: string): Promise<any | null> {
     try {
-      const response = await client.placeDetails({
-        params: {
-          place_id: placeId,
-          fields: ['name', 'formatted_address', 'formatted_phone_number', 'website', 'opening_hours', 'geometry'],
-          key: GOOGLE_PLACES_API_KEY
-        }
-      });
+      const response = await this.rateLimitedApiCall(() =>
+        this.withRetry(() =>
+          client.placeDetails({
+            params: {
+              place_id: placeId,
+              fields: ['name', 'formatted_address', 'formatted_phone_number', 'website', 'opening_hours', 'geometry'],
+              key: GOOGLE_PLACES_API_KEY
+            }
+          })
+        )
+      );
 
       return response.data.result || null;
     } catch (error) {

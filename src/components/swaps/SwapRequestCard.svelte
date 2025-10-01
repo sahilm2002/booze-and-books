@@ -111,7 +111,7 @@
 		loading = true;
 		try {
 			await swapStore.completeSwapRequest(swapRequest.id, {
-				rating: completionRating,
+				rating: Number(completionRating),
 				feedback: completionFeedback || undefined
 			});
 			showCompletionDialog = false;
