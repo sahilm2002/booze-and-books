@@ -42,6 +42,16 @@ function toAuthorString(authors?: string[] | string | null): string {
   return authors;
 }
 
+// Basic HTML escaper to prevent injection in email templates
+function escapeHtml(input: string): string {
+  return input
+    .replace(/&/g, '&')
+    .replace(/</g, '<')
+    .replace(/>/g, '>')
+    .replace(/"/g, '"')
+    .replace(/'/g, '&#39;');
+}
+
 function appUrl(path: string): string {
   const base = getEnv('APP_BASE_URL', 'http://localhost:5173');
   if (!path.startsWith('/')) path = '/' + path;
@@ -206,24 +216,25 @@ ${this.buildFooter(to)}`;
   // 2) Swap created (offer)
   static async sendSwapCreatedEmail(payload: SwapEmailPayload, to: 'owner' | 'requester' = 'owner'): Promise<void> {
     const target = to === 'owner' ? payload.owner : payload.requester;
-    const name = target.full_name || target.username || 'there';
-    const requesterName = payload.requester.full_name || payload.requester.username || 'A user';
-    const requestedAuthors = toAuthorString(payload.requested_book.authors);
-    const offeredTitle = payload.offered_book?.title || 'a book';
-    const offeredAuthors = payload.offered_book ? toAuthorString(payload.offered_book.authors) : '';
+    const name = escapeHtml(target.full_name || target.username || 'there');
+    const requesterName = escapeHtml(payload.requester.full_name || payload.requester.username || 'A user');
+    const requestedAuthors = escapeHtml(toAuthorString(payload.requested_book.authors));
+    const requestedTitle = escapeHtml(payload.requested_book.title || '');
+    const offeredTitle = escapeHtml(payload.offered_book?.title || 'a book');
+    const offeredAuthors = escapeHtml(payload.offered_book ? toAuthorString(payload.offered_book.authors) : '');
     const subject =
       to === 'owner'
         ? `You received a book swap offer from ${payload.requester.username || 'a user'}`
         : `Your swap offer was sent`;
 
-    const link = loginRedirectUrl(`/app/swaps#swap-${payload.swap_id}`);
+    const link = escapeHtml(loginRedirectUrl(`/app/swaps#swap-${payload.swap_id}`));
 
     const ownerHtml = `
       <div style="font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; color:#111; line-height:1.6;">
         <h2 style="margin:0 0 12px 0;">Hi ${name},</h2>
         <p>You have received a book swap offer from <strong>${requesterName}</strong>.</p>
-        <p>They are offering <strong>"${offeredTitle}"${offeredAuthors ? ` by ${offeredAuthors}` : ''}</strong> in return for <strong>"${payload.requested_book.title}"${requestedAuthors ? ` by ${requestedAuthors}` : ''}</strong>.</p>
-        ${payload.message ? `<p><em>Message:</em> ${payload.message}</p>` : ''}
+        <p>They are offering <strong>"${offeredTitle}"${offeredAuthors ? ' by ' + offeredAuthors : ''}</strong> in return for <strong>"${requestedTitle}"${requestedAuthors ? ' by ' + requestedAuthors : ''}</strong>.</p>
+        ${payload.message ? `<p><em>Message:</em> ${escapeHtml(payload.message)}</p>` : ''}
         <p>
           <a href="${link}" style="display:inline-block; padding:10px 14px; border-radius:8px; background:#1f2937; color:#fff; text-decoration:none;">
             View swap request and reply
@@ -237,8 +248,8 @@ ${this.buildFooter(to)}`;
       <div style="font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; color:#111; line-height:1.6;">
         <h2 style="margin:0 0 12px 0;">Hi ${name},</h2>
         <p>Your book swap offer has been sent.</p>
-        <p>You offered <strong>"${offeredTitle}"${offeredAuthors ? ` by ${offeredAuthors}` : ''}</strong> in return for <strong>"${payload.requested_book.title}"${requestedAuthors ? ` by ${requestedAuthors}` : ''}</strong>.</p>
-        ${payload.message ? `<p><em>Your message:</em> ${payload.message}</p>` : ''}
+        <p>You offered <strong>"${offeredTitle}"${offeredAuthors ? ' by ' + offeredAuthors : ''}</strong> in return for <strong>"${requestedTitle}"${requestedAuthors ? ' by ' + requestedAuthors : ''}</strong>.</p>
+        ${payload.message ? `<p><em>Your message:</em> ${escapeHtml(payload.message)}</p>` : ''}
         <p>
           <a href="${link}" style="display:inline-block; padding:10px 14px; border-radius:8px; background:#1f2937; color:#fff; text-decoration:none;">
             View swap request
@@ -256,15 +267,16 @@ ${this.buildFooter(to)}`;
   static async sendSwapCancelledEmail(payload: SwapEmailPayload, cancelledBy: 'owner' | 'requester'): Promise<void> {
     // Notify the non-cancelling party
     const target = cancelledBy === 'requester' ? payload.owner : payload.requester;
-    const name = target.full_name || target.username || 'there';
-    const requestedAuthors = toAuthorString(payload.requested_book.authors);
-    const link = loginRedirectUrl(`/app/swaps#swap-${payload.swap_id}`);
+    const name = escapeHtml(target.full_name || target.username || 'there');
+    const requestedAuthors = escapeHtml(toAuthorString(payload.requested_book.authors));
+    const requestedTitle = escapeHtml(payload.requested_book.title || '');
+    const link = escapeHtml(loginRedirectUrl(`/app/swaps#swap-${payload.swap_id}`));
     const subject = `A book swap offer was cancelled`;
 
     const html = `
       <div style="font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; color:#111; line-height:1.6;">
         <h2 style="margin:0 0 12px 0;">Hi ${name},</h2>
-        <p>Your book swap offer for <strong>"${payload.requested_book.title}"${requestedAuthors ? ` by ${requestedAuthors}` : ''}</strong> was cancelled by the ${cancelledBy === 'owner' ? 'book owner' : 'requester'}.</p>
+        <p>Your book swap offer for <strong>"${requestedTitle}"${requestedAuthors ? ' by ' + requestedAuthors : ''}</strong> was cancelled by the ${cancelledBy === 'owner' ? 'book owner' : 'requester'}.</p>
         <p>
           <a href="${link}" style="display:inline-block; padding:10px 14px; border-radius:8px; background:#1f2937; color:#fff; text-decoration:none;">
             View swap details
@@ -278,18 +290,19 @@ ${this.buildFooter(to)}`;
   // 4) Counter-offer made (notify original requester)
   static async sendCounterOfferEmail(payload: SwapEmailPayload): Promise<void> {
     const target = payload.requester;
-    const name = target.full_name || target.username || 'there';
-    const requestedAuthors = toAuthorString(payload.requested_book.authors);
-    const counterTitle = payload.counter_offered_book?.title || 'a different book';
-    const counterAuthors = payload.counter_offered_book ? toAuthorString(payload.counter_offered_book.authors) : '';
-    const link = loginRedirectUrl(`/app/swaps#swap-${payload.swap_id}`);
+    const name = escapeHtml(target.full_name || target.username || 'there');
+    const requestedAuthors = escapeHtml(toAuthorString(payload.requested_book.authors));
+    const requestedTitle = escapeHtml(payload.requested_book.title || '');
+    const counterTitle = escapeHtml(payload.counter_offered_book?.title || 'a different book');
+    const counterAuthors = escapeHtml(payload.counter_offered_book ? toAuthorString(payload.counter_offered_book.authors) : '');
+    const link = escapeHtml(loginRedirectUrl(`/app/swaps#swap-${payload.swap_id}`));
     const subject = `You received a counter-offer`;
 
     const html = `
       <div style="font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; color:#111; line-height:1.6;">
         <h2 style="margin:0 0 12px 0;">Hi ${name},</h2>
-        <p>The owner counter-offered your request for <strong>"${payload.requested_book.title}"${requestedAuthors ? ` by ${requestedAuthors}` : ''}</strong>.</p>
-        <p>They are proposing <strong>"${counterTitle}"${counterAuthors ? ` by ${counterAuthors}` : ''}</strong> instead.</p>
+        <p>The owner counter-offered your request for <strong>"${requestedTitle}"${requestedAuthors ? ' by ' + requestedAuthors : ''}</strong>.</p>
+        <p>They are proposing <strong>"${counterTitle}"${counterAuthors ? ' by ' + counterAuthors : ''}</strong> instead.</p>
         <p>
           <a href="${link}" style="display:inline-block; padding:10px 14px; border-radius:8px; background:#1f2937; color:#fff; text-decoration:none;">
             Review and respond to counter-offer
@@ -306,7 +319,7 @@ ${this.buildFooter(to)}`;
     const sendTo = [payload.requester, payload.owner];
 
     for (const target of sendTo) {
-      const name = target.full_name || target.username || 'there';
+      const name = escapeHtml(target.full_name || target.username || 'there');
       const subject = `Swap approved – coordinate next steps`;
       const html = `
         <div style="font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; color:#111; line-height:1.6;">
@@ -319,7 +332,7 @@ ${this.buildFooter(to)}`;
           </ul>
           <p>Once you receive your book, mark the swap as completed.</p>
           <p>
-            <a href="${link}" style="display:inline-block; padding:10px 14px; border-radius:8px; background:#1f2937; color:#fff; text-decoration:none;">
+            <a href="${escapeHtml(link)}" style="display:inline-block; padding:10px 14px; border-radius:8px; background:#1f2937; color:#fff; text-decoration:none;">
               View swap and chat
             </a>
           </p>
@@ -331,8 +344,8 @@ ${this.buildFooter(to)}`;
 
   // 6) Partial completion – one party marked as completed (notify the other)
   static async sendPartialCompletionEmail(payload: SwapEmailPayload, otherUser: EmailRecipient): Promise<void> {
-    const name = otherUser.full_name || otherUser.username || 'there';
-    const link = loginRedirectUrl(`/app/swaps#swap-${payload.swap_id}`);
+    const name = escapeHtml(otherUser.full_name || otherUser.username || 'there');
+    const link = escapeHtml(loginRedirectUrl(`/app/swaps#swap-${payload.swap_id}`));
     const subject = `The other user marked the swap as completed – did you receive your book?`;
 
     const html = `
@@ -356,14 +369,14 @@ ${this.buildFooter(to)}`;
     const link = loginRedirectUrl(`/app/swaps#swap-${payload.swap_id}`);
 
     for (const target of sendTo) {
-      const name = target.full_name || target.username || 'there';
+      const name = escapeHtml(target.full_name || target.username || 'there');
       const subject = `Swap completed – enjoy your book!`;
       const html = `
         <div style="font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; color:#111; line-height:1.6;">
           <h2 style="margin:0 0 12px 0;">Hi ${name},</h2>
           <p>Both users have marked the swap as completed. Enjoy your new book!</p>
           <p>
-            <a href="${link}" style="display:inline-block; padding:10px 14px; border-radius:8px; background:#1f2937; color:#fff; text-decoration:none;">
+            <a href="${escapeHtml(link)}" style="display:inline-block; padding:10px 14px; border-radius:8px; background:#1f2937; color:#fff; text-decoration:none;">
               View swap
             </a>
           </p>
@@ -375,8 +388,8 @@ ${this.buildFooter(to)}`;
 
   // 8) Completion reminder – every 4 days
   static async sendCompletionReminderEmail(payload: SwapEmailPayload, to: EmailRecipient): Promise<void> {
-    const name = to.full_name || to.username || 'there';
-    const link = loginRedirectUrl(`/app/swaps#swap-${payload.swap_id}`);
+    const name = escapeHtml(to.full_name || to.username || 'there');
+    const link = escapeHtml(loginRedirectUrl(`/app/swaps#swap-${payload.swap_id}`));
     const subject = `Reminder: Please complete your book swap`;
 
     const html = `

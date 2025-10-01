@@ -290,6 +290,26 @@ export class ChatService {
 		conversationId: string,
 		file: File
 	): Promise<ChatAttachment> {
+		// Verify user is a participant
+		const auth = await supabase.auth.getUser();
+		if (!auth.data.user) {
+			throw new Error('Unauthenticated');
+		}
+		const userId = auth.data.user.id;
+
+		// Check if user is participant in this conversation
+		const { data: authCheck } = await supabase
+			.from('notifications')
+			.select('sender_id, recipient_id')
+			.eq('conversation_id', conversationId)
+			.eq('message_type', MessageType.CHAT_MESSAGE)
+			.or(`sender_id.eq.${userId},recipient_id.eq.${userId}`)
+			.limit(1);
+
+		if (!authCheck || authCheck.length === 0) {
+			throw new Error('Unauthorized: You are not a participant in this conversation');
+		}
+
 		// Validate file size (e.g., 10MB limit)
 		const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 		if (file.size > MAX_FILE_SIZE) {
