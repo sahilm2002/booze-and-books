@@ -12,10 +12,16 @@ export const GET: RequestHandler = async ({ locals }) => {
 		let profile = await ProfileServiceServer.getProfile(locals.supabase, locals.user.id);
 		
 		if (!profile) {
-			const sanitizedUsername = ProfileServiceServer.sanitizeUsername(locals.user.email);
+			const sanitizedUsername = ProfileServiceServer.sanitizeUsername(locals.user?.email || '');
 			profile = await ProfileServiceServer.createProfile(locals.supabase, locals.user.id, {
 				username: sanitizedUsername,
-				full_name: locals.user.email
+				full_name: locals.user.email,
+				email: locals.user.email
+			});
+		} else if (!profile.email && locals.user.email) {
+			// Backfill email if missing (for existing users)
+			profile = await ProfileServiceServer.updateProfile(locals.supabase, locals.user.id, {
+				email: locals.user.email
 			});
 		}
 

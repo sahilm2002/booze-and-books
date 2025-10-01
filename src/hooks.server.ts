@@ -1,10 +1,22 @@
 import { createServerClient } from '@supabase/ssr';
 import { type Handle, redirect } from '@sveltejs/kit';
 import { PUBLIC_SUPABASE_URL, PUBLIC_SUPABASE_ANON_KEY } from '$env/static/public';
+import { env } from '$env/dynamic/private';
+
+const requiredEnvVars = ['GOOGLE_PLACES_API_KEY', 'GOOGLE_GEOCODING_API_KEY'] as const;
+
+for (const key of requiredEnvVars) {
+  const value = env[key];
+  if (!value || value.trim() === '') {
+    const message =
+      `Missing required environment variable ${key}. Configure GOOGLE_PLACES_API_KEY and GOOGLE_GEOCODING_API_KEY for Google APIs. ` +
+      'Set them in your environment (.env for dev, CI/CD secrets for deploy). See PRODUCTION_DEPLOYMENT_GUIDE.md and DEPLOYMENT_CHECKLIST.md.';
+    console.error(message);
+    throw new Error(message);
+  }
+}
 
 export const handle: Handle = async ({ event, resolve }) => {
-	console.log('hooks.server.ts - handle called for:', event.url.pathname);
-
 	// Create Supabase client
 	event.locals.supabase = createServerClient(PUBLIC_SUPABASE_URL, PUBLIC_SUPABASE_ANON_KEY, {
 		cookies: {
@@ -21,8 +33,6 @@ export const handle: Handle = async ({ event, resolve }) => {
 	// Implement working authentication with proper error handling
 	event.locals.safeGetSession = async () => {
 		try {
-			console.log('Getting session with improved error handling...');
-			
 			// Try to get session with a more aggressive timeout and better error handling
 			const controller = new AbortController();
 			const timeoutId = setTimeout(() => controller.abort(), 3000); // 3 second timeout
@@ -36,7 +46,6 @@ export const handle: Handle = async ({ event, resolve }) => {
 					return { session: null, user: null };
 				}
 				
-				console.log('Session retrieved successfully:', !!session);
 				return { session, user: session?.user || null };
 			} catch (authError) {
 				clearTimeout(timeoutId);
@@ -72,19 +81,16 @@ export const handle: Handle = async ({ event, resolve }) => {
 
 		// Redirect unauthenticated users away from protected routes
 		if (isProtectedRoute && !session) {
-			console.log('Redirecting unauthenticated user to login');
 			const returnTo = encodeURIComponent(url.pathname + url.search);
 			throw redirect(303, `/auth/login?redirectTo=${returnTo}`);
 		}
 
 		// Redirect authenticated users away from auth pages to dashboard
 		if (isAuthRoute && session) {
-			console.log('Redirecting authenticated user to app');
 			throw redirect(303, '/app');
 		}
 	}
 
-	console.log('hooks.server.ts - returning resolve');
 	return resolve(event, {
 		filterSerializedResponseHeaders(name) {
 			return name === 'content-range' || name === 'x-supabase-api-version';

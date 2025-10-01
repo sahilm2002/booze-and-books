@@ -49,12 +49,13 @@
 	async function processFile(file: File) {
 		// Basic client-side validation
 		if (!file.type.startsWith('image/')) {
-			alert('Please select an image file');
+			console.warn('Invalid avatar file type, expected image/*');
+			// Non-blocking: consider exposing a local error UI if desired
 			return;
 		}
 
 		if (file.size > MAX_AVATAR_UPLOAD_SIZE) {
-			alert(`File size must be less than ${getMaxUploadSizeDisplay()}`);
+			console.warn(`Avatar too large. Max ${getMaxUploadSizeDisplay()}`);
 			return;
 		}
 
@@ -109,8 +110,7 @@
 				}
 			}
 		} catch (error) {
-			alert('Failed to upload avatar. Please try again.');
-			console.error(error);
+			console.error('Failed to upload avatar', error);
 		} finally {
 			uploading = false;
 			// Reset progress after a short delay so UI can show 100%

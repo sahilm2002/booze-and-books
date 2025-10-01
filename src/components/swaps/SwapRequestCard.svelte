@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { createEventDispatcher } from 'svelte';
+	import { goto } from '$app/navigation';
 	import { auth } from '$lib/stores/auth';
 	import { profile } from '$lib/stores/profile';
 	import { swapStore } from '$lib/stores/swaps';
@@ -36,6 +37,7 @@
 	let userBooks: any[] = [];
 	let loadingUserBooks = false;
 	let completionFeedback = '';
+	let completionRating = 5; // Default to 5 stars
 
 	$: currentUser = $auth.user;
 	$: canAccept = currentUser && canUserAcceptSwap(swapRequest, currentUser.id);
@@ -109,10 +111,12 @@
 		loading = true;
 		try {
 			await swapStore.completeSwapRequest(swapRequest.id, {
+				rating: Number(completionRating),
 				feedback: completionFeedback || undefined
 			});
 			showCompletionDialog = false;
 			completionFeedback = '';
+			completionRating = 5; // Reset to default
 			dispatch('updated', swapRequest);
 		} catch (error) {
 			dispatch('error', error instanceof Error ? error.message : 'Failed to complete swap');
@@ -218,7 +222,7 @@
 	}
 </script>
 
-<div class="swap-card">
+<div id={"swap-" + swapRequest.id} class="swap-card">
 	<div class="swap-header">
 		<div class="status-badge" style="background-color: {statusColor}">
 			{statusDisplay}
@@ -244,7 +248,15 @@
 				</div>
 			{/if}
 			<div class="user-details">
-				<h4>{otherUser.username || 'Unknown User'}</h4>
+				<h4>
+					<button 
+						class="username-link"
+						on:click={() => goto(`/app/profile/${otherUser.username}`)}
+						disabled={!otherUser.username}
+					>
+						{otherUser.username || 'Unknown User'}
+					</button>
+				</h4>
 				<div class="user-role">
 					{isIncoming ? 'Requesting your book' : 'Book owner'}
 				</div>
@@ -406,41 +418,33 @@
 				<h5>Contact Information</h5>
 				<div class="contact-details">
 					<div class="contact-user">
-						<h6>{isIncoming ? 'Requester' : 'Book Owner'}: {otherUser.username}</h6>
-						{#if otherUser.full_name && otherUser.full_name !== otherUser.username}
-							<p><strong>Name:</strong> {otherUser.full_name}</p>
-						{/if}
-						{#if otherUser.location}
-							<p><strong>Location:</strong> {otherUser.location}</p>
-						{/if}
-						{#if otherUser.email}
-							<p><strong>Email:</strong> {otherUser.email}</p>
-						{:else}
-							<p class="contact-note-small">
-								<strong>Email:</strong> Contact {otherUser.username} directly to exchange email addresses
-							</p>
+						<h6>{isIncoming ? 'Requester' : 'Book Owner'}</h6>
+						<p><strong>Name:</strong> {otherUser.full_name || otherUser.username}</p>
+						<p><strong>Email:</strong> 
+							<button 
+								class="contact-chat-link"
+								on:click={() => window.open(`/app/profile/${otherUser.username}?openChat=1`, '_blank')}
+							>
+								Contact {otherUser.username}
+							</button>
+						</p>
+						{#if otherUser.city && otherUser.state}
+							<p><strong>Location:</strong> {otherUser.city}, {otherUser.state}</p>
 						{/if}
 					</div>
 					
 					<div class="contact-user">
 						<h6>Your Information</h6>
-						{#if $profile?.email || $auth.user?.email}
-							<p><strong>Email:</strong> {$profile?.email || $auth.user?.email}</p>
-						{/if}
-						{#if $profile?.full_name}
-							<p><strong>Name:</strong> {$profile.full_name}</p>
-						{:else if $auth.user?.user_metadata?.full_name}
-							<p><strong>Name:</strong> {$auth.user.user_metadata.full_name}</p>
-						{/if}
-						{#if $profile?.location}
-							<p><strong>Location:</strong> {$profile.location}</p>
+						<p><strong>Name:</strong> {$profile?.full_name || $profile?.username || $auth.user?.email}</p>
+						<p><strong>Email:</strong> {$profile?.email || $auth.user?.email}</p>
+						{#if $profile?.city && $profile?.state}
+							<p><strong>Location:</strong> {$profile.city}, {$profile.state}</p>
 						{/if}
 					</div>
 				</div>
 				<div class="contact-instructions">
 					<p class="contact-note">
-						<strong>Next Steps:</strong> Contact {otherUser.username} via email to coordinate the physical book exchange. 
-						Exchange phone numbers or arrange a meetup location and time.
+						<strong>Next Steps:</strong> Use the chat link above to coordinate logistics, exchange contact details, and arrange the physical book exchange.
 					</p>
 					<p class="safety-note">
 						<strong>Safety Tip:</strong> Meet in a public place for the book exchange.
@@ -723,6 +727,17 @@
 			
 			<form on:submit|preventDefault={handleComplete}>
 				<div class="form-group">
+					<label for="rating">Rate your experience (1-5 stars):</label>
+					<select bind:value={completionRating} required>
+						<option value={5}>⭐⭐⭐⭐⭐ Excellent (5 stars)</option>
+						<option value={4}>⭐⭐⭐⭐ Good (4 stars)</option>
+						<option value={3}>⭐⭐⭐ Average (3 stars)</option>
+						<option value={2}>⭐⭐ Poor (2 stars)</option>
+						<option value={1}>⭐ Terrible (1 star)</option>
+					</select>
+				</div>
+
+				<div class="form-group">
 					<label for="feedback">Message for {otherUser.username} (optional):</label>
 					<textarea 
 						bind:value={completionFeedback}
@@ -811,6 +826,28 @@
 		margin: 0 0 0.25rem 0;
 		font-size: 1.125rem;
 		font-weight: 600;
+	}
+
+	.username-link {
+		background: none;
+		border: none;
+		color: #3b82f6;
+		font-size: inherit;
+		font-weight: inherit;
+		cursor: pointer;
+		padding: 0;
+		text-decoration: none;
+		transition: color 0.2s ease;
+	}
+
+	.username-link:hover:not(:disabled) {
+		color: #2563eb;
+		text-decoration: underline;
+	}
+
+	.username-link:disabled {
+		color: inherit;
+		cursor: default;
 	}
 
 	.user-role {
@@ -947,6 +984,21 @@
 		margin: 0.25rem 0;
 		font-size: 0.75rem;
 		color: #6b7280;
+	}
+
+	.contact-chat-link {
+		background: none;
+		border: none;
+		color: #3b82f6;
+		text-decoration: underline;
+		cursor: pointer;
+		font-size: inherit;
+		padding: 0;
+		transition: color 0.2s ease;
+	}
+
+	.contact-chat-link:hover {
+		color: #2563eb;
 	}
 
 	.contact-instructions {

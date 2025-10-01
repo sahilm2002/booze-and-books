@@ -1,9 +1,9 @@
 import { writable, derived, get } from 'svelte/store';
 import { auth } from '$lib/stores/auth';
 import { ProfileService } from '$lib/services/profileService';
-import type { Profile, ProfileUpdate } from '$lib/types/profile';
+import type { PrivateProfile, ProfileUpdate } from '$lib/types/profile';
 
-export const profile = writable<Profile | null>(null);
+export const profile = writable<PrivateProfile | null>(null);
 export const profileLoading = writable<boolean>(false);
 export const profileError = writable<string | null>(null);
 

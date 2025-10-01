@@ -1,3 +1,8 @@
+export enum MessageType {
+	NOTIFICATION = 'notification',
+	CHAT_MESSAGE = 'chat_message'
+}
+
 export enum NotificationType {
 	SWAP_REQUEST = 'SWAP_REQUEST',
 	SWAP_ACCEPTED = 'SWAP_ACCEPTED',
@@ -8,7 +13,9 @@ export enum NotificationType {
 	COUNTER_OFFER_RECEIVED = 'counter_offer_received',
 	DAILY_REMINDER_PENDING_SWAPS = 'daily_reminder_pending_swaps',
 	DAILY_REMINDER_COUNTER_OFFERS = 'daily_reminder_counter_offers',
-	DAILY_REMINDER_ACCEPTED_SWAPS = 'daily_reminder_accepted_swaps'
+	DAILY_REMINDER_ACCEPTED_SWAPS = 'daily_reminder_accepted_swaps',
+	CHAT_MESSAGE = 'CHAT_MESSAGE',
+	CHAT_MESSAGE_RECEIVED = 'CHAT_MESSAGE_RECEIVED'
 }
 
 export interface Notification {
@@ -20,6 +27,13 @@ export interface Notification {
 	data: NotificationData;
 	is_read: boolean;
 	created_at: string;
+	message_type: MessageType;
+	conversation_id?: string;
+	attachment_url?: string;
+	attachment_type?: string;
+	attachment_size?: number;
+	sender_id?: string;
+	recipient_id?: string;
 }
 
 export interface NotificationInput {
@@ -38,7 +52,9 @@ export type NotificationData =
 	| SwapCompletedNotificationData
 	| SwapApprovedNotificationData
 	| CounterOfferReceivedNotificationData
-	| DailyReminderNotificationData;
+	| DailyReminderNotificationData
+	| ChatMessageNotificationData
+	| ChatMessageReceivedNotificationData;
 
 export interface SwapRequestNotificationData {
 	swap_request_id: string;
@@ -85,3 +101,87 @@ export interface DailyReminderNotificationData {
 	swap_request_ids: string[];
 	reminder_type: 'pending_swaps' | 'counter_offers' | 'accepted_swaps';
 }
+
+// Chat-specific interfaces
+export interface ChatMessage extends Notification {
+	message_type: MessageType.CHAT_MESSAGE;
+	conversation_id: string;
+	sender_id: string;
+	recipient_id: string;
+	sender_profile?: {
+		id: string;
+		username: string;
+		full_name: string;
+		avatar_url: string;
+	};
+	recipient_profile?: {
+		id: string;
+		username: string;
+		full_name: string;
+		avatar_url: string;
+	};
+}
+
+export interface ChatMessageInput {
+	recipient_id: string;
+	message: string;
+	attachment_url?: string;
+	attachment_type?: string;
+	attachment_size?: number;
+}
+
+export interface ChatParticipant {
+	id: string;
+	username?: string;
+	full_name?: string;
+	email?: string;
+	avatar_url?: string | null;
+	role?: string;
+}
+
+export interface Conversation {
+	id: string;
+	participants: string[];
+	last_message?: ChatMessage;
+	unread_count: number;
+	updated_at: string;
+	other_participant?: ChatParticipant; // Profile info of the other participant
+}
+
+export interface ChatAttachment {
+	url: string;
+	type: string;
+	size: number;
+	name: string;
+	path?: string; // storage path to enable deletion by path
+}
+
+export interface ChatMessageNotificationData {
+	sender_id: string;
+	conversation_id: string;
+	has_attachment: boolean;
+}
+
+export interface ChatMessageReceivedNotificationData {
+	sender_id: string;
+	conversation_id: string;
+	has_attachment: boolean;
+}
+
+// Utility types
+export type ConversationParticipants = [string, string];
+
+export interface AttachmentValidation {
+	maxSize: number;
+	allowedTypes: string[];
+}
+
+export type ChatMessageFilter = {
+	conversation_id?: string;
+	sender_id?: string;
+	recipient_id?: string;
+	has_attachment?: boolean;
+	before?: string;
+	after?: string;
+	limit?: number;
+};

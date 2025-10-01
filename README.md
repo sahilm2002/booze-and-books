@@ -45,6 +45,9 @@ Imagine having access to a vast library of books owned by fellow readers in your
 - **Real-Time Updates**: Instant notifications for all swap status changes
 
 #### **Seamless Communication**
+- **Real-Time Chat System**: Direct messaging between users for swap discussions
+- **Chat Notifications**: Instant notifications for new messages with conversation previews
+- **Secure File Sharing**: Share images and documents (up to 10MB) in chat conversations
 - **Contact Information Sharing**: When both parties agree to a swap, contact details are automatically shared
 - **Email Notifications**: Stay updated on swap requests, approvals, and counter-offers
 - **In-App Notifications**: Real-time updates with book covers and detailed information
@@ -97,13 +100,38 @@ Never miss an opportunity with rich, visual notifications featuring book covers,
 
 ## 🚀 Getting Started
 
+### **📱 Mobile-First Experience**
+Booze & Books is designed for mobile users - 90% of our community uses their phones! Every feature works seamlessly on your smartphone.
+
+### **🏠 Discover the Platform**
+1. **Visit the Homepage**: Learn how the platform works with our interactive 3-step guide
+2. **Explore Literary History**: Discover stories about famous literary societies like the Kit-Cat Club and Bloomsbury Group
+3. **Generate New Stories**: Click "Discover More Stories" to learn about different historical book communities
+4. **Research Further**: Use Wikipedia links to dive deeper into literary society history
+
+### **👤 Join the Community**
 1. **Sign Up**: Create your free account to join the community
-2. **Add Books**: Start by adding a few books from your collection
-3. **Explore**: Browse what other readers have available
-4. **Make Requests**: Find books you'd like to read and propose swaps
-5. **Connect**: When swaps are approved, connect with other readers
-6. **Exchange**: Meet up or arrange shipping to complete your swaps
-7. **Rate**: Share your experience to build community trust
+2. **Complete Your Profile**: Add your username, bio, and reading preferences
+3. **Upload an Avatar**: Personalize your profile with a photo
+
+### **📚 Build Your Library**
+1. **Add Books**: Start by adding books from your collection using our Google Books integration
+2. **Set Availability**: Mark which books you're willing to lend or trade
+3. **Add Details**: Include condition notes and personal reviews
+
+### **🔍 Start Swapping**
+1. **Explore**: Browse what other readers have available
+2. **Make Requests**: Find books you'd like to read and propose swaps
+3. **Chat**: Use our real-time messaging system to discuss exchanges
+4. **Connect**: When swaps are approved, contact details are automatically shared
+5. **Exchange**: Meet up or arrange shipping to complete your swaps
+6. **Rate**: Share your experience to build community trust
+
+### **💬 Stay Connected**
+- **Real-Time Chat**: Message other users directly about book swaps
+- **Online Status**: See when other users are available to chat
+- **Notifications**: Get instant updates about swap requests and messages
+- **Profile Navigation**: Click usernames/avatars to view other users' profiles
 
 ## 🌈 Success Stories
 

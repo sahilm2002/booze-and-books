@@ -16,6 +16,10 @@ PUBLIC_SUPABASE_URL=[Your Supabase project URL from .env]
 PUBLIC_SUPABASE_ANON_KEY=[Your sb_publishable_ key from .env]
 SUPABASE_SERVICE_ROLE_KEY=[Your sb_secret_ key from .env]
 
+# Google Maps/Places API Keys (Required; app fails fast on startup if missing)
+GOOGLE_PLACES_API_KEY=[Your Google Places API key]
+GOOGLE_GEOCODING_API_KEY=[Your Google Geocoding API key]
+
 # Optional
 DAILY_REMINDER_TOKEN=[Use value from your .env file]
 ```
@@ -41,6 +45,8 @@ vercel env add JWT_ISSUER
 vercel env add PUBLIC_SUPABASE_URL
 vercel env add PUBLIC_SUPABASE_ANON_KEY
 vercel env add SUPABASE_SERVICE_ROLE_KEY
+vercel env add GOOGLE_PLACES_API_KEY
+vercel env add GOOGLE_GEOCODING_API_KEY
 vercel env add DAILY_REMINDER_TOKEN
 
 # Deploy
@@ -64,6 +70,8 @@ railway variables set JWT_ISSUER="booze-and-books-app"
 railway variables set PUBLIC_SUPABASE_URL="your-supabase-url-from-env"
 railway variables set PUBLIC_SUPABASE_ANON_KEY="your-publishable-key-from-env"
 railway variables set SUPABASE_SERVICE_ROLE_KEY="your-secret-key-from-env"
+railway variables set GOOGLE_PLACES_API_KEY="your-google-places-api-key"
+railway variables set GOOGLE_GEOCODING_API_KEY="your-google-geocoding-api-key"
 railway variables set DAILY_REMINDER_TOKEN="your-daily-reminder-token-from-env"
 
 # Deploy
@@ -101,6 +109,7 @@ npm run preview
 - **Never commit your .env file** - it contains secrets
 - **JWT_SECRET is critical** - keep it secure
 - **HTTPS is required** - most platforms enable automatically
+- Google API keys are required for store locator features — the app fails fast on startup if either GOOGLE_PLACES_API_KEY or GOOGLE_GEOCODING_API_KEY is missing.
 - **Test thoroughly** before going live
 
 ## 📞 Need Help?
