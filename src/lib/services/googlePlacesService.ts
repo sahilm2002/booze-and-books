@@ -1,19 +1,37 @@
-import { Client } from '@googlemaps/google-maps-services-js';
+import { Client, PlacesNearbyRanking } from '@googlemaps/google-maps-services-js';
 import { GOOGLE_PLACES_API_KEY, GOOGLE_GEOCODING_API_KEY } from '$env/static/private';
 
 const client = new Client({});
+
+export interface PlaceDetailsResult {
+  name?: string;
+  formatted_address?: string;
+  formatted_phone_number?: string;
+  website?: string;
+  opening_hours?: {
+    open_now?: boolean;
+    weekday_text?: string[];
+  };
+  geometry?: {
+    location: { lat: number; lng: number };
+  };
+  types?: string[];
+}
 
 export class GooglePlacesService {
   /**
    * Convert zip code to coordinates using Google Geocoding API
    */
-  static async geocodeZipCode(zipCode: string): Promise<{ latitude: number; longitude: number } | null> {
+  static async geocodeZipCode(
+    zipCode: string
+  ): Promise<{ latitude: number; longitude: number } | null> {
     const trimmed = (zipCode ?? '').toString().trim();
     const ZIP_RE = /^\d{5}(-\d{4})?$/;
     if (!trimmed || !ZIP_RE.test(trimmed)) {
       console.warn('[GooglePlacesService] geocodeZipCode: invalid ZIP input, skipping call');
       return null;
     }
+
     try {
       // Primary: Google Geocoding API
       const response = await this.rateLimitedApiCall(() =>
@@ -29,56 +47,41 @@ export class GooglePlacesService {
 
       if (response.data.results.length > 0) {
         const location = response.data.results[0].geometry.location;
-        return {
-          latitude: location.lat,
-          longitude: location.lng
-        };
+        return { latitude: location.lat, longitude: location.lng };
       }
 
       // Fallback: Google Places Text Search (in case geocoding key is missing or restricted)
+      return await this.fallbackTextSearch(trimmed);
+    } catch (error) {
+      console.error('Geocoding error:', error);
+      // Last-chance fallback via Places Text Search
+      return await this.fallbackTextSearch(trimmed);
+    }
+  }
+
+  // Fallback text search helper for ZIP -> coordinates
+  private static async fallbackTextSearch(
+    zip: string
+  ): Promise<{ latitude: number; longitude: number } | null> {
+    try {
       const textResp = await this.rateLimitedApiCall(() =>
         this.withRetry(() =>
           client.textSearch({
             params: {
-              query: `${trimmed} USA`,
+              query: `${zip} USA`,
               key: GOOGLE_PLACES_API_KEY
             }
           })
         )
       );
-      if (textResp.data.results?.length > 0) {
-        const loc = textResp.data.results[0]?.geometry?.location;
-        if (loc) {
-          return { latitude: loc.lat, longitude: loc.lng };
-        }
+      const loc = textResp.data.results?.[0]?.geometry?.location;
+      if (loc) {
+        return { latitude: loc.lat, longitude: loc.lng };
       }
-
-      return null;
-    } catch (error) {
-      console.error('Geocoding error:', error);
-      // Last-chance fallback via Places Text Search
-      try {
-        const textResp = await this.rateLimitedApiCall(() =>
-          this.withRetry(() =>
-            client.textSearch({
-              params: {
-                query: `${trimmed} USA`,
-                key: GOOGLE_PLACES_API_KEY
-              }
-            })
-          )
-        );
-        if (textResp.data.results?.length > 0) {
-          const loc = textResp.data.results[0]?.geometry?.location;
-          if (loc) {
-            return { latitude: loc.lat, longitude: loc.lng };
-          }
-        }
-      } catch (err2) {
-        console.warn('Places text search fallback failed:', err2);
-      }
-      return null;
+    } catch (err2) {
+      console.warn('Places text search fallback failed:', err2);
     }
+    return null;
   }
 
   /**
@@ -114,7 +117,7 @@ export class GooglePlacesService {
             client.placesNearby({
               params: {
                 location: { lat: latitude, lng: longitude },
-                rankby: 'distance' as any,
+                rankby: PlacesNearbyRanking.distance,
                 keyword: storeChain,
                 key: GOOGLE_PLACES_API_KEY
               }
@@ -199,7 +202,7 @@ export class GooglePlacesService {
               client.placesNearby({
                 params: {
                   location: { lat: latitude, lng: longitude },
-                  rankby: 'distance' as any,
+                  rankby: PlacesNearbyRanking.distance,
                   type: t as any,
                   key: GOOGLE_PLACES_API_KEY
                 }
@@ -245,7 +248,7 @@ export class GooglePlacesService {
               client.placesNearby({
                 params: {
                   location: { lat: latitude, lng: longitude },
-                  rankby: 'distance' as any,
+                  rankby: PlacesNearbyRanking.distance,
                   keyword: kw,
                   key: GOOGLE_PLACES_API_KEY
                 }
@@ -272,21 +275,29 @@ export class GooglePlacesService {
   /**
    * Get detailed place information
    */
-  static async getPlaceDetails(placeId: string): Promise<any | null> {
+  static async getPlaceDetails(placeId: string): Promise<PlaceDetailsResult | null> {
     try {
       const response = await this.rateLimitedApiCall(() =>
         this.withRetry(() =>
           client.placeDetails({
             params: {
               place_id: placeId,
-              fields: ['name', 'formatted_address', 'formatted_phone_number', 'website', 'opening_hours', 'geometry'],
+              fields: [
+                'name',
+                'formatted_address',
+                'formatted_phone_number',
+                'website',
+                'opening_hours',
+                'geometry',
+                'types'
+              ],
               key: GOOGLE_PLACES_API_KEY
             }
           })
         )
       );
 
-      return response.data.result || null;
+      return (response.data.result as PlaceDetailsResult) || null;
     } catch (error) {
       console.error('Place details error:', error);
       return null;
