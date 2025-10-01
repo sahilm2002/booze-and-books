@@ -13,9 +13,9 @@
 	let chatOtherUser: PublicProfileType | null = null;
 	let currentUserId = '';
 
-	// Get current user ID from page data or session
-	$: if ($page.data.session?.user?.id) {
-		currentUserId = $page.data.session.user.id;
+	// Get current user ID from page data's safe user
+	$: if ($page.data.user?.id) {
+		currentUserId = $page.data.user.id;
 	}
 
 	function handleOpenChat(event: CustomEvent) {

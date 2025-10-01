@@ -130,13 +130,22 @@ export interface ChatMessageInput {
 	attachment_size?: number;
 }
 
+export interface ChatParticipant {
+	id: string;
+	username?: string;
+	full_name?: string;
+	email?: string;
+	avatar_url?: string | null;
+	role?: string;
+}
+
 export interface Conversation {
 	id: string;
 	participants: string[];
 	last_message?: ChatMessage;
 	unread_count: number;
 	updated_at: string;
-	other_participant?: any; // Profile info of the other participant
+	other_participant?: ChatParticipant; // Profile info of the other participant
 }
 
 export interface ChatAttachment {
