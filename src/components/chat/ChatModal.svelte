@@ -453,7 +453,7 @@
 						type="file"
 						bind:this={fileInput}
 						on:change={handleFileSelect}
-						accept="image/*,.pdf,.doc,.docx"
+						accept="image/*,.pdf"
 						style="display: none;"
 					/>
 					<button 
