@@ -7,7 +7,7 @@ import type { USStore, SupportedStoreChain } from '$lib/types/cocktail';
 import { calculateDistance } from '$lib/types/cocktail';
 
 // Feature flag: Text Search fallback is DISABLED to avoid 403s and ensure only vetted data
-const ALLOW_TEXT_SEARCH = false;
+const ALLOW_TEXT_SEARCH = true;
 
 // Hard timeout helper to prevent hanging requests
 function withTimeout<T>(p: Promise<T>, ms: number): Promise<T> {
@@ -226,7 +226,7 @@ async function findStoresUsingGooglePlaces(
 		const types = ['liquor_store', 'supermarket', 'grocery_or_supermarket', 'drugstore'];
 		const keywords = ['liquor', 'spirits', 'wine', 'beer', 'safeway', 'target', 'total wine', 'bevmo', 'walgreens', 'cvs', 'whole foods', 'trader joe'];
 		// Try the requested radius, then widen to 15 and 25 miles
-		const radiiMiles = Array.from(new Set([radiusMiles, 15, 25]));
+		const radiiMiles = Array.from(new Set([radiusMiles, 15, 25, 35]));
 		for (const miles of radiiMiles) {
 			const meters = miles * 1609.34;
 			try {
@@ -528,15 +528,13 @@ async function convertGooglePlaceToStore(
 		}
 
 		const chainSlug = detectKnownChain();
-		// If we cannot confidently map to a supported chain, drop this result (no fabricated mapping)
-		if (!chainSlug) {
-			return null;
-		}
+		// If chain cannot be confidently detected, treat as independent (still real store data)
+		const resolvedChain = chainSlug ?? ('independent' as SupportedStoreChain);
 
 		const store: USStore = {
 			id: place.place_id,
 			name: details.name || place.name,
-			chain: chainSlug,
+			chain: resolvedChain,
 			address: addressLine,
 			city: locality,
 			state: admin1,
