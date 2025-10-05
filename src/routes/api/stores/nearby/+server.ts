@@ -1,28 +1,66 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { GooglePlacesService } from '$lib/services/googlePlacesService';
+import { env } from '$env/dynamic/private';
 import { cache, CacheKeys } from '$lib/services/cacheService';
 import type { USStore, SupportedStoreChain } from '$lib/types/cocktail';
 import { calculateDistance } from '$lib/types/cocktail';
+
+// Feature flag: Text Search fallback is DISABLED to avoid 403s and ensure only vetted data
+const ALLOW_TEXT_SEARCH = false;
+
+// Hard timeout helper to prevent hanging requests
+function withTimeout<T>(p: Promise<T>, ms: number): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const to = setTimeout(() => reject(new Error(`timeout after ${ms}ms`)), ms);
+    p.then((v) => { clearTimeout(to); resolve(v); })
+     .catch((e) => { clearTimeout(to); reject(e); });
+  });
+}
+
+// Abort-compatible fetch with timeout (Node 18+ or fallback)
+async function fetchWithTimeout(input: RequestInfo | URL, init: RequestInit = {}, ms: number = 5000): Promise<Response> {
+  try {
+    const anyAbort = AbortSignal as any;
+    if (anyAbort && typeof anyAbort.timeout === 'function') {
+      return await fetch(input, { ...init, signal: anyAbort.timeout(ms) });
+    }
+  } catch {
+    // fall through to manual controller
+  }
+  const controller = new AbortController();
+  const id = setTimeout(() => controller.abort(), ms);
+  try {
+    return await fetch(input, { ...init, signal: controller.signal });
+  } finally {
+    clearTimeout(id);
+  }
+}
 
 export const POST: RequestHandler = async ({ request }) => {
 	try {
 		const { zipCode, radiusMiles = 10 } = await request.json();
 
 		if (!zipCode || typeof zipCode !== 'string' || zipCode.trim() === '') {
-			return json({ 
-				error: 'Please set your zip code in your profile settings to find nearby stores.',
-				errorType: 'MISSING_ZIP_CODE'
-			}, { status: 400 });
+			return json(
+				{
+					error: 'Please set your zip code in your profile settings to find nearby stores.',
+					errorType: 'MISSING_ZIP_CODE'
+				},
+				{ status: 400 }
+			);
 		}
 
 		// Validate zip code format
 		const cleanZip = zipCode.trim();
 		if (!/^\d{5}(-\d{4})?$/.test(cleanZip)) {
-			return json({ 
-				error: 'Please enter a valid US zip code (e.g., 90210 or 90210-1234).',
-				errorType: 'INVALID_ZIP_CODE'
-			}, { status: 400 });
+			return json(
+				{
+					error: 'Please enter a valid US zip code (e.g., 90210 or 90210-1234).',
+					errorType: 'INVALID_ZIP_CODE'
+				},
+				{ status: 400 }
+			);
 		}
 
 		// Check cache first
@@ -32,12 +70,29 @@ export const POST: RequestHandler = async ({ request }) => {
 			return json({ success: true, data: cached });
 		}
 
-		// Get coordinates from zip code
-		let userCoords = await GooglePlacesService.withRetry(
-			() => GooglePlacesService.rateLimitedApiCall(
-				() => GooglePlacesService.geocodeZipCode(zipCode)
-			)
-		);
+		// Ensure Google keys exist; if missing, return empty with reason (no fabrications)
+		const hasPlacesKey = !!(env.GOOGLE_PLACES_API_KEY as string);
+		const hasGeocodeKey = !!(env.GOOGLE_GEOCODING_API_KEY as string);
+		if (!hasPlacesKey || !hasGeocodeKey) {
+			console.warn('Nearby stores disabled: missing Google API keys', {
+				hasPlacesKey,
+				hasGeocodeKey
+			});
+			return json({ success: true, data: [], meta: { reason: 'MISSING_GOOGLE_KEYS' } });
+		}
+
+		// Get coordinates from zip code (fast; tolerate failures and fallback)
+		let userCoords: { latitude: number; longitude: number } | null = null;
+		try {
+			userCoords = await withTimeout(
+				GooglePlacesService.withRetry(() =>
+					GooglePlacesService.rateLimitedApiCall(() => GooglePlacesService.geocodeZipCode(zipCode))
+				),
+				5000
+			);
+		} catch (e) {
+			console.warn('Geocoding timed out or failed, falling back to ZIP prefix coords:', e);
+		}
 
 		// Fallback coordinates for development or when geocoding fails
 		if (!userCoords) {
@@ -49,48 +104,37 @@ export const POST: RequestHandler = async ({ request }) => {
 		}
 
 		// Find nearby stores
-		const stores = await findStoresUsingGooglePlaces(userCoords, radiusMiles);
+		const stores: USStore[] = [];
 
-		// Fallback to OpenStreetMap Overpass if Google returns no results
-		if (stores.length === 0) {
-			try {
-				const osm = await findStoresUsingOpenStreetMap(userCoords, radiusMiles);
-				if (Array.isArray(osm) && osm.length > 0) {
-					stores.push(...osm);
-				}
-			} catch (e) {
-				console.warn('OSM fallback failed:', e);
+		// Primary: Google Places
+		try {
+			const gstores = await withTimeout(findStoresUsingGooglePlaces(userCoords, radiusMiles), 5000);
+			if (Array.isArray(gstores) && gstores.length) {
+				stores.push(...gstores);
 			}
+		} catch (e) {
+			console.warn('Google Places search failed:', e);
 		}
 
-		// Final fallback: OpenStreetMap Nominatim text search near lat/lon for common queries
-		if (stores.length === 0) {
-			try {
-				const nom = await findStoresUsingNominatim(userCoords, radiusMiles);
-				if (Array.isArray(nom) && nom.length > 0) {
-					stores.push(...nom);
-				}
-			} catch (e) {
-				console.warn('Nominatim fallback failed:', e);
-			}
-		}
+		// OSM fallback disabled per "no fabricated/approximate stores" policy
+		// if (stores.length === 0) { ... }
 
-		// Sort by distance (return up to 12; UI controls how many to show)
-		let nearbyStores = stores
-			.sort((a, b) => (a.distance || 0) - (b.distance || 0))
-			.slice(0, 12);
+		// Nominatim fallback disabled per "no fabricated/approximate stores" policy
+		// if (stores.length === 0) { ... }
 
+		// Sort by distance, limit to 12
+		const nearbyStores = stores.sort((a, b) => (a.distance || 0) - (b.distance || 0)).slice(0, 12);
 
-		// Cache for 30 minutes (only cache non-empty results)
+		// Cache non-empty results for 30 minutes
 		if (nearbyStores.length > 0) {
 			cache.set(cacheKey, nearbyStores, 1800);
 		}
 
 		return json({ success: true, data: nearbyStores });
-
 	} catch (error) {
 		console.error('Store locator API error:', error);
-		return json({ error: 'Failed to find nearby stores' }, { status: 500 });
+		// Fail soft: return empty result so client shows a friendly "No stores found" banner
+		return json({ success: true, data: [] });
 	}
 };
 
@@ -157,7 +201,7 @@ async function findStoresUsingGooglePlaces(
 
 	// Search for each supported chain with progressive widening
 	const seenIds = new Set<string>();
-	const chainRadii = Array.from(new Set([radiusMiles, 15, 25]));
+	const chainRadii = Array.from(new Set([radiusMiles, 15, 25, 35]));
 	for (const miles of chainRadii) {
 		const meters = miles * 1609.34;
 		for (const chain of SUPPORTED_CHAINS) {
@@ -250,8 +294,8 @@ async function findStoresUsingGooglePlaces(
 			}
 		}
 
-		// Final fallback: Google Text Search queries with progressive widening
-		if (stores.length === 0) {
+		// Final fallback: Google Text Search queries with progressive widening (disabled)
+		if (ALLOW_TEXT_SEARCH && stores.length === 0) {
 			const queries = ['Safeway', 'Target', 'liquor store', 'Total Wine', 'BevMo', 'Walgreens', 'CVS', 'Whole Foods', "Trader Joe's"];
 			for (const miles of radiiMiles) {
 				const meters = miles * 1609.34;
@@ -417,20 +461,86 @@ async function convertGooglePlaceToStore(
 			location.lng
 		);
 
-		// Parse address components
-		const addressParts = details.formatted_address?.split(', ') || [];
-		const zipMatch = details.formatted_address?.match(/\b\d{5}(-\d{4})?\b/);
-		const stateMatch = details.formatted_address?.match(/\b[A-Z]{2}\b/);
+		// Parse address strictly from address_components; drop if incomplete
+		const comps = (details as any).address_components || [];
+		const pick = (type: string) =>
+			comps.find((c: any) => (c.types || []).includes(type))?.long_name || '';
+		const streetNumber = pick('street_number');
+		const route = pick('route');
+		const locality = pick('locality') || pick('sublocality') || pick('postal_town');
+		const admin1 = pick('administrative_area_level_1');
+		const postal = pick('postal_code');
+		const addressLine = [streetNumber, route].filter(Boolean).join(' ').trim();
+		if (!addressLine || !locality || !admin1 || !postal) {
+			return null;
+		}
 		const types = details.types || place.types || [];
+
+		// Detect known chains strictly (no defaults). Prefer website domain; fallback to name.
+		const nameLower = (details.name || place.name || '').toLowerCase();
+		const website = (details.website || '') as string;
+		const host = (() => {
+			try {
+				return website ? new URL(website).hostname.toLowerCase() : '';
+			} catch {
+				return '';
+			}
+		})();
+
+		const domainMap: Record<SupportedStoreChain, string[]> = {
+			target: ['target.com'],
+			walmart: ['walmart.com'],
+			kroger: ['kroger.com'],
+			total_wine: ['totalwine.com'],
+			bevmo: ['bevmo.com'],
+			safeway: ['safeway.com'],
+			publix: ['publix.com'],
+			heb: ['heb.com'],
+			meijer: ['meijer.com'],
+			costco: ['costco.com'],
+			sams_club: ['samsclub.com'],
+			whole_foods: ['wholefoodsmarket.com'],
+			trader_joes: ['traderjoes.com'],
+			cvs: ['cvs.com'],
+			walgreens: ['walgreens.com']
+		};
+
+		function detectKnownChain(): SupportedStoreChain | null {
+			for (const [slug, domains] of Object.entries(domainMap) as [SupportedStoreChain, string[]][]) {
+				if (domains.some((d) => host.includes(d))) return slug;
+			}
+			if (nameLower.includes('target')) return 'target';
+			if (nameLower.includes('walmart')) return 'walmart';
+			if (nameLower.includes('kroger')) return 'kroger';
+			if (nameLower.includes('total wine')) return 'total_wine';
+			if (nameLower.includes('bevmo')) return 'bevmo';
+			if (nameLower.includes('safeway')) return 'safeway';
+			if (nameLower.includes('publix')) return 'publix';
+			if (nameLower.includes('h-e-b') || nameLower.includes('heb')) return 'heb';
+			if (nameLower.includes('meijer')) return 'meijer';
+			if (nameLower.includes('costco')) return 'costco';
+			if (nameLower.includes('sam\'s club') || nameLower.includes('sams club') || nameLower.includes('sam s club')) return 'sams_club';
+			if (nameLower.includes('whole foods')) return 'whole_foods';
+			if (nameLower.includes('trader joe')) return 'trader_joes';
+			if (nameLower.includes('cvs')) return 'cvs';
+			if (nameLower.includes('walgreens')) return 'walgreens';
+			return null;
+		}
+
+		const chainSlug = detectKnownChain();
+		// If we cannot confidently map to a supported chain, drop this result (no fabricated mapping)
+		if (!chainSlug) {
+			return null;
+		}
 
 		const store: USStore = {
 			id: place.place_id,
 			name: details.name || place.name,
-			chain: detectChainFromName(details.name || place.name),
-			address: addressParts[0] || details.formatted_address,
-			city: addressParts[addressParts.length - 3] || 'Unknown',
-			state: stateMatch?.[0] || 'CA',
-			zipCode: zipMatch?.[0] || '00000',
+			chain: chainSlug,
+			address: addressLine,
+			city: locality,
+			state: admin1,
+			zipCode: postal,
 			latitude: location.lat,
 			longitude: location.lng,
 			phone: details.formatted_phone_number,
@@ -456,49 +566,11 @@ async function convertGooglePlaceToStore(
  * Ensures we still return valid stores if Place Details is unavailable.
  */
 function convertNearbyPlaceToMinimalStore(
-	place: any,
-	userCoords: { latitude: number; longitude: number }
+	_place: any,
+	_userCoords: { latitude: number; longitude: number }
 ): USStore | null {
-	try {
-		const loc = place.geometry?.location;
-		if (!loc) return null;
-
-		const distance = calculateDistance(
-			userCoords.latitude,
-			userCoords.longitude,
-			loc.lat,
-			loc.lng
-		);
-
-		const name: string = place.name || 'Unknown Store';
-		const vicinity: string = place.vicinity || place.formatted_address || 'Unknown address';
-
-		const store: USStore = {
-			id: place.place_id,
-			name,
-			chain: detectChainFromName(name),
-			address: vicinity,
-			city: 'Unknown',
-			state: 'CA',
-			zipCode: '00000',
-			latitude: loc.lat,
-			longitude: loc.lng,
-			phone: undefined,
-			websiteUrl: '',
-			supportsAlcohol: (Array.isArray(place.types) && (place.types.includes('liquor_store') || place.types.includes('supermarket') || place.types.includes('grocery_or_supermarket'))) ? true : chainSupportsAlcohol(name),
-			supportsDelivery: chainSupportsDelivery(name),
-			supportsPickup: true,
-			apiIntegration: false,
-			cartBaseUrl: undefined,
-			hours: undefined,
-			distance: Math.round(distance * 10) / 10
-		};
-
-		return store;
-	} catch (e) {
-		console.warn('Minimal store conversion failed:', e);
-		return null;
-	}
+	// Disabled to prevent introducing approximate or incomplete store data
+	return null;
 }
 
 /**
@@ -518,11 +590,11 @@ async function findStoresUsingOpenStreetMap(
 );
 out center;`;
 		const body = new URLSearchParams({ data: q }).toString();
-		const resp = await fetch('https://overpass-api.de/api/interpreter', {
+		const resp = await fetchWithTimeout('https://overpass-api.de/api/interpreter', {
 			method: 'POST',
 			headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
 			body
-		});
+		}, 5000);
 		if (!resp.ok) {
 			console.warn('Overpass API returned non-OK:', resp.status, resp.statusText);
 			return [];
@@ -636,11 +708,11 @@ async function findStoresUsingNominatim(
 			url.searchParams.set('limit', '15');
 			url.searchParams.set('q', `${q} near ${userCoords.latitude}, ${userCoords.longitude}`);
 
-			const resp = await fetch(url.toString(), {
+			const resp = await fetchWithTimeout(url.toString(), {
 				headers: {
 					'Accept': 'application/json'
 				}
-			});
+			}, 5000);
 			if (!resp.ok) {
 				console.warn('Nominatim non-OK:', resp.status, resp.statusText);
 				continue;
