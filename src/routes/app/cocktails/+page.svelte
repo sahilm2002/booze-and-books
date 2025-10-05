@@ -2,9 +2,10 @@
 	import { onMount } from 'svelte';
 	import { auth } from '$lib/stores/auth';
 	import { CocktailService } from '$lib/services/cocktailService';
-	import type { Cocktail, UserCocktailPreferences } from '$lib/types/cocktail';
+	import type { Cocktail, UserCocktailPreferences, USStore } from '$lib/types/cocktail';
 	import CocktailModal from '../../../components/cocktails/CocktailModal.svelte';
 	import ZipCodeModal from '../../../components/cocktails/ZipCodeModal.svelte';
+	import StoreSelectionModal from '../../../components/cocktails/StoreSelectionModal.svelte';
 	import { StoreLocatorService } from '$lib/services/storeLocatorService';
 
 	let favoriteCocktails: Cocktail[] = [];
@@ -18,6 +19,12 @@
 	let showZipCodePrompt = false;
 	let uiError: string | null = null;
 	let pendingCocktailForZip: Cocktail | null = null;
+
+	// Store selection modal flow
+	let showStoreSelector: boolean = false;
+	let availableStores: USStore[] = [];
+	// UX: indicate when a store search is in progress
+	let isFindingStores: boolean = false;
 
 	function handleZipSubmit(zip: string) {
 		if (currentUser) {
@@ -91,42 +98,35 @@
 	}
 
 	async function handleOrderIngredients(cocktail: Cocktail) {
-		// Use preloaded preferences; if missing zip, prompt via modal
-
+		// If no ZIP, prompt and resume after submit
 		if (!userPreferences?.zipCode) {
-			// Trigger modal to collect zip code, then continue flow
 			pendingCocktailForZip = cocktail;
 			showZipCodePrompt = true;
 			return;
 		}
 
+		isFindingStores = true;
 		try {
-			// Find nearby stores
 			const stores = await StoreLocatorService.findNearbyStores({
 				zipCode: userPreferences!.zipCode!,
 				radiusMiles: 10,
 				includeAlcoholOnly: true
 			});
 
-			if (stores.length === 0) {
+			if (!stores || stores.length === 0) {
 				uiError = 'No stores found within 10 miles of your location. Please try a different zip code.';
 				return;
 			}
 
-			// For simplicity, just open the first store
-			const store = stores[0];
-			const cartItems = cocktail.ingredients.map(ingredient => ({
-				ingredientName: ingredient.name,
-				quantity: 1,
-				estimatedPrice: 0
-			}));
-
-			const cartUrl = StoreLocatorService.buildShoppingCartUrl(store, cartItems);
-			window.open(cartUrl, '_blank', 'noopener,noreferrer');
-
+			// Modal-first UX: show the selector and let the user pick
+			availableStores = stores;
+			selectedCocktail = cocktail;
+			showStoreSelector = true;
 		} catch (error) {
 			console.error('Failed to find stores:', error);
 			uiError = 'Failed to find nearby stores. Please try again.';
+		} finally {
+			isFindingStores = false;
 		}
 	}
 
@@ -138,6 +138,43 @@
 	function closeCocktailModal() {
 		selectedCocktail = null;
 		showCocktailModal = false;
+	}
+
+	function handleStoreSelect(store: USStore, cocktail: Cocktail) {
+		// Build shopping items (informational)
+		const cartItems = cocktail.ingredients.map((ingredient) => ({
+			ingredientName: ingredient.name,
+			quantity: 1,
+			estimatedPrice: 0
+		}));
+
+		// Build deep link; prefer chain URL with ZIP when supported
+		const cartUrl = StoreLocatorService.buildShoppingCartUrl(
+			store,
+			cartItems,
+			userPreferences?.zipCode
+		);
+
+		let url = (cartUrl && cartUrl.trim()) ? cartUrl : '';
+
+		// Fallbacks for independent stores or missing website
+		if (!url) {
+			if (store.websiteUrl && /^https?:\/\//i.test(store.websiteUrl)) {
+				url = store.websiteUrl;
+			} else {
+				const query = [`${store.name}`, userPreferences?.zipCode || ''].filter(Boolean).join(' near ');
+				url = `https://www.google.com/search?q=${encodeURIComponent(query)}`;
+			}
+		}
+
+		// Open in new tab and close modal
+		window.open(url, '_blank', 'noopener,noreferrer');
+		showStoreSelector = false;
+
+		// Optional: track selection (no-op server for now)
+		if (currentUser) {
+			StoreLocatorService.trackStoreSelection(currentUser.id, store.id, cocktail.id);
+		}
 	}
 </script>
 
@@ -220,6 +257,17 @@
 	}}
 />
 
+{#if selectedCocktail && showStoreSelector}
+	<StoreSelectionModal
+		isOpen={showStoreSelector}
+		stores={availableStores}
+		cocktail={selectedCocktail}
+		onStoreSelect={handleStoreSelect}
+		onClose={() => { showStoreSelector = false; }}
+		userZipCode={userPreferences?.zipCode}
+	/>
+{/if}
+
 					<div class="cocktail-meta">
 						<span class="difficulty">📊 {cocktail.difficulty}</span>
 						<span class="prep-time">⏱️ {cocktail.prepTimeMinutes} min</span>
@@ -235,8 +283,13 @@
 						<button 
 							class="btn btn-primary" 
 							on:click={() => handleOrderIngredients(cocktail)}
+							disabled={isFindingStores}
 						>
-							🛒 Order Ingredients
+							{#if isFindingStores}
+								⏳ Finding stores...
+							{:else}
+								🛒 Order Ingredients
+							{/if}
 						</button>
 					</div>
 				</div>

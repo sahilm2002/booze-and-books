@@ -285,6 +285,7 @@ export class GooglePlacesService {
               fields: [
                 'name',
                 'formatted_address',
+                'address_components',
                 'formatted_phone_number',
                 'website',
                 'opening_hours',
@@ -310,7 +311,11 @@ export class GooglePlacesService {
   private static lastApiCall = 0;
   private static readonly MIN_API_INTERVAL = 100; // 100ms between calls
 
-  static async rateLimitedApiCall<T>(apiCall: () => Promise<T>): Promise<T> {
+  /**
+   * Rate limit + hard timeout wrapper to prevent hangs from external APIs.
+   * Default timeout: 5000ms.
+   */
+  static async rateLimitedApiCall<T>(apiCall: () => Promise<T>, timeoutMs: number = 5000): Promise<T> {
     const now = Date.now();
     const timeSinceLastCall = now - this.lastApiCall;
 
@@ -319,7 +324,24 @@ export class GooglePlacesService {
     }
 
     this.lastApiCall = Date.now();
-    return apiCall();
+
+    const requestPromise = apiCall();
+    let timeoutId: ReturnType<typeof setTimeout> | null = null;
+
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      timeoutId = setTimeout(() => {
+        reject(new Error(`Google API timeout after ${timeoutMs}ms`));
+      }, timeoutMs);
+    });
+
+    try {
+      const result = await Promise.race([requestPromise, timeoutPromise]);
+      if (timeoutId) clearTimeout(timeoutId);
+      return result as T;
+    } finally {
+      // Prevent unhandled rejection if the API promise resolves/rejects after timeout
+      requestPromise.catch(() => {});
+    }
   }
 
   /**
