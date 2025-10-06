@@ -37,31 +37,37 @@ function createAuthStore() {
 		 */
 		ensureValidSession: async (): Promise<boolean> => {
 			try {
-				// Get session from client-side only (no server calls)
-				const { data: { session }, error } = await supabase.auth.getSession();
-				
-				if (error) {
-					console.error('Error getting session:', error);
-					return false;
-				}
-				
-				if (!session || !session.user) {
-					console.log('No authenticated session found');
+				// Validate against Supabase Auth server to avoid stale client cache
+				const { data: userData, error: userError } = await supabase.auth.getUser();
+				if (userError) {
+					console.error('Error validating user via getUser:', userError);
 					await auth.signOut();
 					return false;
 				}
-				
-				// Update store with current session
+				if (!userData?.user) {
+					console.log('No authenticated user found (server-validated)');
+					await auth.signOut();
+					return false;
+				}
+
+				// Fetch session after validating user to sync tokens/expiry
+				const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+				if (sessionError || !session) {
+					console.warn('Validated user but no session available, signing out');
+					await auth.signOut();
+					return false;
+				}
+
+				// Update store with current, validated session
 				update(state => ({
 					...state,
 					session,
-					user: session.user,
+					user: userData.user,
 					loading: false
 				}));
-				
 				return true;
 			} catch (error) {
-				console.error('Error ensuring valid session:', error);
+				console.error('Error ensuring valid session (server-validation):', error);
 				await auth.signOut();
 				return false;
 			}
@@ -74,21 +80,31 @@ function createAuthStore() {
 			// Start with provided session or try to get current session
 			if (browser) {
 				// Get current session on initialization
-				supabase.auth.getSession().then(({ data: { session: currentSession } }) => {
+				supabase.auth.getSession().then(async ({ data: { session: currentSession } }) => {
 					const finalSession = session || currentSession;
+
+					// Server-validate the session to avoid stale client state
+					const { data: userData, error: userError } = await supabase.auth.getUser().catch((e) => ({ data: null, error: e as any }));
+					if (userError || !userData?.user) {
+						console.warn('Initial session present but user validation failed; enforcing logout');
+						set({ session: null, user: null, loading: false });
+						await auth.signOutToHomepage();
+						return;
+					}
+
 					set({
-						session: finalSession,
-						user: finalSession?.user ?? null,
+						session: finalSession ?? null,
+						user: userData.user,
 						loading: false
 					});
 
-					// If we have a session, start activity tracking and online status tracking
-					if (finalSession) {
-						console.log('Initializing services for user:', finalSession.user.email);
+					// If we have a validated user, start activity + online status tracking
+					if (userData.user) {
+						console.log('Initializing services for user:', userData.user.email);
 						initializeActivityService();
-						onlineStatusService.startTracking(finalSession.user.id);
+						onlineStatusService.startTracking(userData.user.id);
 					} else {
-						console.log('No session found, services not initialized');
+						console.log('No validated user found, services not initialized');
 					}
 				}).catch(error => {
 					console.error('Error getting initial session:', error);
