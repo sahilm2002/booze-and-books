@@ -33,20 +33,31 @@ export const handle: Handle = async ({ event, resolve }) => {
 	// Implement working authentication with proper error handling
 	event.locals.safeGetSession = async () => {
 		try {
-			// Try to get session with a more aggressive timeout and better error handling
+			// Validate user against Supabase Auth server to avoid trusting stale cookies
 			const controller = new AbortController();
 			const timeoutId = setTimeout(() => controller.abort(), 3000); // 3 second timeout
-			
+
 			try {
-				const { data: { session }, error } = await event.locals.supabase.auth.getSession();
-				clearTimeout(timeoutId);
-				
-				if (error) {
-					console.error('Session error:', error);
+				const { data: userData, error: userError } = await event.locals.supabase.auth.getUser();
+				if (userError || !userData?.user) {
+					clearTimeout(timeoutId);
+					if (userError) {
+						console.error('getUser error:', userError);
+					}
 					return { session: null, user: null };
 				}
-				
-				return { session, user: session?.user || null };
+
+				const { data: { session }, error: sessionError } = await event.locals.supabase.auth.getSession();
+				clearTimeout(timeoutId);
+
+				if (sessionError || !session) {
+					if (sessionError) {
+						console.warn('getSession error after valid user:', sessionError);
+					}
+					return { session: null, user: null };
+				}
+
+				return { session, user: userData.user };
 			} catch (authError) {
 				clearTimeout(timeoutId);
 				console.error('Auth call failed:', authError);
@@ -79,14 +90,14 @@ export const handle: Handle = async ({ event, resolve }) => {
 		const authRoutes = ['/auth/login', '/auth/signup'];
 		const isAuthRoute = authRoutes.includes(pathname);
 
-		// Redirect unauthenticated users away from protected routes
-		if (isProtectedRoute && !session) {
+		// Redirect unauthenticated users away from protected routes (use server-validated user)
+		if (isProtectedRoute && !user) {
 			const returnTo = encodeURIComponent(url.pathname + url.search);
 			throw redirect(303, `/auth/login?redirectTo=${returnTo}`);
 		}
 
 		// Redirect authenticated users away from auth pages to dashboard
-		if (isAuthRoute && session) {
+		if (isAuthRoute && user) {
 			throw redirect(303, '/app');
 		}
 	}
