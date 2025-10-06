@@ -21,7 +21,7 @@
 
 	const dispatch = createEventDispatcher();
 
-	let state: CocktailUIState = {
+	let state: CocktailUIState & { isFindingStores: boolean } = {
 		isLoading: false,
 		isGenerating: false,
 		isRefreshing: false,
@@ -31,7 +31,8 @@
 		currentCocktails: [],
 		availableStores: [],
 		selectedCocktail: undefined,
-		error: undefined
+		error: undefined,
+		isFindingStores: false
 	};
 
 	let ageVerification: AgeVerification | null = null;
@@ -197,6 +198,7 @@
 			return;
 		}
 
+		state.isFindingStores = true;
 		try {
 			// Find nearby stores (service widens radius progressively; start at 10)
 			let stores = await StoreLocatorService.findNearbyStores({
@@ -233,6 +235,8 @@
 			} else {
 				state.error = message;
 			}
+		} finally {
+			state.isFindingStores = false;
 		}
 	}
 
@@ -417,8 +421,13 @@
 										<button 
 											class="btn btn-primary" 
 											on:click={() => handleOrderIngredients(cocktail)}
+											disabled={state.isFindingStores}
 										>
-											🛒 Order Ingredients
+											{#if state.isFindingStores}
+												⏳ Finding stores...
+											{:else}
+												🛒 Order Ingredients
+											{/if}
 										</button>
 									</div>
 								</div>
