@@ -13,12 +13,16 @@
     error = '';
 
     try {
-      // Build an absolute redirect URL if a relative path was provided
+      // Build a server-side callback URL so SSR can exchange the auth code for a session cookie
+      // and keep SvelteKit hooks/server validation in sync.
       const redirect =
         typeof window !== 'undefined'
-          ? (redirectTo
-              ? new URL(redirectTo, window.location.origin).toString()
-              : window.location.origin)
+          ? (() => {
+              const nextTarget = redirectTo ?? '/app';
+              const cb = new URL('/auth/callback', window.location.origin);
+              cb.searchParams.set('next', nextTarget);
+              return cb.toString();
+            })()
           : undefined;
 
       const { error: authError } = await supabase.auth.signInWithOAuth({
