@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { supabase } from '$lib/supabase';
+	import GoogleAuthButton from './GoogleAuthButton.svelte';
 
 	export let redirectTo: string = '/app';
 
@@ -19,7 +20,7 @@
 		error = '';
 
 		try {
-			console.log('Attempting client-side login...');
+			if (import.meta.env.DEV) console.log('Attempting client-side login...');
 			
 			// Use direct client-side Supabase authentication instead of API endpoint
 			const { data, error: authError } = await supabase.auth.signInWithPassword({
@@ -28,16 +29,16 @@
 			});
 
 			if (authError) {
-				console.error('Login error:', authError);
+				if (import.meta.env.DEV) console.error('Login error:', authError);
 				error = authError.message || 'Login failed';
 			} else if (data.user) {
-				console.log('Login successful:', data.user.email);
+				if (import.meta.env.DEV) console.log('Login successful:', data.user.email);
 				// Use SvelteKit navigation with small delay to ensure auth state updates
 				setTimeout(async () => {
 					try {
 						await goto('/app', { replaceState: true });
 					} catch (navError) {
-						console.error('Navigation error:', navError);
+						if (import.meta.env.DEV) console.error('Navigation error:', navError);
 						// Fallback to hard redirect if SvelteKit navigation fails
 						window.location.href = '/app';
 					}
@@ -47,7 +48,7 @@
 				error = 'Login failed - no user returned';
 			}
 		} catch (err) {
-			console.error('Login exception:', err);
+			if (import.meta.env.DEV) console.error('Login exception:', err);
 			error = 'An unexpected error occurred';
 		} finally {
 			loading = false;
@@ -64,6 +65,11 @@
 <form on:submit|preventDefault={handleLogin} class="auth-form">
 	<h2>Welcome Back</h2>
 	<p class="subtitle">Sign in to your account</p>
+
+	<div class="oauth-section">
+		<GoogleAuthButton {redirectTo} />
+		<div class="divider"><span>or</span></div>
+	</div>
 
 	{#if error}
 		<div class="error" role="alert">
@@ -209,4 +215,30 @@
 	.auth-link a:hover {
 		text-decoration: underline;
 	}
+	/* OAuth section */
+	.oauth-section {
+		margin: 1rem 0 1.25rem 0;
+	}
+
+	.divider {
+		display: flex;
+		align-items: center;
+		gap: 0.75rem;
+		color: #a0aec0;
+		font-size: 0.9rem;
+		margin-top: 0.75rem;
+	}
+
+	.divider::before,
+	.divider::after {
+		content: '';
+		flex: 1;
+		height: 1px;
+		background: #e2e8f0;
+	}
+
+	.divider span {
+		color: #a0aec0;
+	}
+
 </style>

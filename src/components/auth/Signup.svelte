@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
+	import GoogleAuthButton from './GoogleAuthButton.svelte';
 
 	let email = '';
 	let password = '';
@@ -96,6 +97,11 @@
 <form on:submit|preventDefault={handleSignup} class="auth-form">
 	<h2>Join Our Community</h2>
 	<p class="subtitle">Create your account to start swapping books</p>
+
+	<div class="oauth-section">
+		<GoogleAuthButton redirectTo="/app" />
+		<div class="divider"><span>or</span></div>
+	</div>
 
 	{#if error}
 		<div class="error" role="alert">
@@ -304,4 +310,30 @@
 	.auth-link a:hover {
 		text-decoration: underline;
 	}
+	/* OAuth section */
+	.oauth-section {
+		margin: 1rem 0 1.25rem 0;
+	}
+
+	.divider {
+		display: flex;
+		align-items: center;
+		gap: 0.75rem;
+		color: #a0aec0;
+		font-size: 0.9rem;
+		margin-top: 0.75rem;
+	}
+
+	.divider::before,
+	.divider::after {
+		content: '';
+		flex: 1;
+		height: 1px;
+		background: #e2e8f0;
+	}
+
+	.divider span {
+		color: #a0aec0;
+	}
+
 </style>
