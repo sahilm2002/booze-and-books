@@ -11,6 +11,28 @@
 			}
 		</style>
 		%sveltekit.head%
+		<script>
+			// Reduce console noise in production while keeping errors/warnings visible
+			(function () {
+				try {
+					var host = (typeof location !== 'undefined' && location.hostname) || '';
+					var isLocal =
+						host === 'localhost' ||
+						host === '127.0.0.1' ||
+						host.endsWith('.local') ||
+						host.startsWith('192.168.') ||
+						host.startsWith('10.') ||
+						host.startsWith('172.');
+					if (!isLocal) {
+						var noop = function () {};
+						try { console.log = noop; } catch {}
+						try { console.info = noop; } catch {}
+						try { console.debug = noop; } catch {}
+						// Keep console.warn and console.error intact for important diagnostics
+					}
+				} catch {}
+			})();
+		</script>
 	</head>
 	<body data-sveltekit-preload-data="hover">
 		<div style="display: contents">%sveltekit.body%</div>

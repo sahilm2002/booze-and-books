@@ -193,6 +193,63 @@ We take your privacy seriously:
 - **Optimized Queries**: Efficient data fetching with proper indexing
 - **Data Integrity**: Foreign key constraints and validation functions
 
+## 🔐 Google Sign-In (Supabase OAuth)
+
+Add “Continue with Google” using Supabase Auth.
+
+1) Supabase configuration
+- In Supabase Dashboard → Authentication → Providers → Google:
+  - Enable provider
+  - Add your Google OAuth Client ID/Secret
+  - Add Redirect URLs (all that apply):
+    - http://localhost:5173
+    - https://boozeandbooks.me
+    - Your Vercel preview URLs (example): https://boozeand-books-<branch>-<hash>.vercel.app
+- Save changes
+
+2) App behavior
+- The Login and Signup pages now include a Continue with Google button
+- On first login, a profile row is auto-created (username from email local part); subsequent logins reuse the profile
+- Post-redirect, the session is available to the app via Supabase SSR hooks
+
+3) Local testing
+- Start dev server (npm run dev) and open http://localhost:5173
+- Use Continue with Google
+- Verify you land in /app and your profile is visible
+
+4) Production testing (Vercel)
+- Ensure “https://boozeandbooks.me” is included in provider redirects
+- Add preview domains as needed (no wildcards; add each preview URL if required)
+
+## 🧰 Cline MCP: Supabase server configuration
+
+Use the Supabase MCP server to read/update auth provider settings directly from Cline.
+
+1) Configure MCP server (example JSON)
+{
+  "servers": {
+    "supabase": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/supabase-mcp@latest"],
+      "env": {
+        "SUPABASE_ACCESS_TOKEN": "YOUR_SUPABASE_PAT",
+        "SUPABASE_PROJECT_ID": "YOUR_PROJECT_REF"
+      }
+    }
+  }
+}
+
+- SUPABASE_ACCESS_TOKEN: Create a Personal Access Token in Supabase (Account → Access Tokens)
+- SUPABASE_PROJECT_ID: The project ref from Supabase (visible in project settings or URL)
+- Restart Cline so the “supabase” server loads
+- From there, tools like list_providers/get_provider/update_provider can be used to verify enablement and set redirect URLs
+
+## 🧹 Production readiness: logging and migrations
+
+- Client logging trimmed in production: console.log/info/debug are suppressed in browser for non-local hosts (errors/warnings remain visible). This keeps production logs clean while preserving critical diagnostics.
+- Server-side logs remain unchanged (errors/warnings preserved). If additional trimming is desired, gate logs in server code under import.meta.env.DEV.
+- Database migrations: keep full history for reproducibility. Do not delete past migrations; if a migration is obsolete, document it rather than removing it.
+
 ## 📞 Support & Feedback
 
 Having issues or suggestions? We'd love to hear from you:
