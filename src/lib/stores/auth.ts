@@ -147,9 +147,7 @@ function createAuthStore() {
 					
 					// Handle token refresh
 					if (event === 'TOKEN_REFRESHED' && session) {
-						console.log('Token refreshed, reinitializing services');
-						initializeActivityService();
-						onlineStatusService.startTracking(session.user.id);
+						console.log('Token refreshed; not resetting inactivity timer');
 						await invalidateAll();
 					}
 				});

@@ -13,8 +13,7 @@ export class ActivityService {
 		'scroll',
 		'touchstart',
 		'click',
-		'focus',
-		'blur'
+		'focus'
 	] as const;
 
 	/**
