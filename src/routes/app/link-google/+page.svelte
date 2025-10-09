@@ -26,8 +26,21 @@
     loading = true;
     error = null;
     try {
+      const redirect =
+        typeof window !== 'undefined'
+          ? (() => {
+              const nextTarget = '/app';
+              const cb = new URL('/auth/callback', window.location.origin);
+              cb.searchParams.set('next', nextTarget);
+              return cb.toString();
+            })()
+          : undefined;
+
       const { data, error: linkError } = await supabase.auth.linkIdentity({
-        provider: 'google'
+        provider: 'google',
+        options: {
+          redirectTo: redirect
+        }
       });
       if (linkError) {
         error = linkError.message || 'Failed to start Google linking flow';
