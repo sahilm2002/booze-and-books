@@ -80,6 +80,7 @@
 			</div>
 			
 			<div class="nav-auth">
+				<a href="/docs" class="nav-link">Documentation</a>
 				<a href="/auth/login" class="nav-link">Sign In</a>
 				<a href="/auth/signup" class="nav-link primary">Sign Up</a>
 			</div>

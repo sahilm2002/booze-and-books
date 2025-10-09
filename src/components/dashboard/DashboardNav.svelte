@@ -40,6 +40,11 @@
 			href: '/app/swaps',
 			icon: 'exchange',
 			badgeCount: $pendingSwapCounts.incoming
+		},
+		{
+			name: 'Documentation',
+			href: '/docs',
+			icon: 'book'
 		}
 	];
 
