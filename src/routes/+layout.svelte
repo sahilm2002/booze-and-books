@@ -10,6 +10,16 @@
 	import type { PageData } from './$types';
 	export let data: PageData;
 
+	// SEO defaults
+	const siteName = 'Booze & Books';
+	const baseUrl = 'https://boozeandbooks.me';
+	const defaultTitle = 'Booze & Books — Swap books, discover cocktails';
+	const defaultDescription = 'Swap books with locals, discover cocktails, and connect with readers.';
+	const defaultImagePath = '/images/historical-society.jpg';
+	const defaultImageAlt = 'Booze & Books social share image';
+	const image = `${baseUrl}${defaultImagePath}`;
+	$: url = $page?.url ? $page.url.href : baseUrl;
+
 	// initialize store on client
 	onMount(() => {
 		auth.initialize(data.session);
@@ -65,6 +75,30 @@
 	// Check if we're on an /app route (which has its own layout with navigation)
 	$: isAppRoute = $page.url.pathname.startsWith('/app');
 </script>
+
+<svelte:head>
+	<title>{defaultTitle}</title>
+	<meta name="description" content={defaultDescription} />
+	<link rel="canonical" href={url} />
+
+	<meta property="og:locale" content="en_US" />
+	<meta property="og:title" content={defaultTitle} />
+	<meta property="og:description" content={defaultDescription} />
+	<meta property="og:type" content="website" />
+	<meta property="og:url" content={url} />
+	<meta property="og:site_name" content={siteName} />
+	<meta property="og:image" content={image} />
+	<meta property="og:image:secure_url" content={image} />
+	<meta property="og:image:type" content="image/jpeg" />
+	<meta property="og:image:width" content="1200" />
+	<meta property="og:image:height" content="630" />
+	<meta property="og:image:alt" content={defaultImageAlt} />
+
+	<meta name="twitter:card" content="summary_large_image" />
+	<meta name="twitter:title" content={defaultTitle} />
+	<meta name="twitter:description" content={defaultDescription} />
+	<meta name="twitter:image" content={image} />
+</svelte:head>
 
 <div id="app">
 	{#if user && !isAppRoute}
