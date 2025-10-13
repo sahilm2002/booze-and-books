@@ -15,7 +15,7 @@
 	const baseUrl = 'https://boozeandbooks.me';
 	const defaultTitle = 'Booze & Books — Swap books, discover cocktails';
 	const defaultDescription = 'Swap books with locals, discover cocktails, and connect with readers.';
-	const defaultImagePath = '/images/historical-society.jpg';
+	const defaultImagePath = '/images/default-avatar.png';
 	const defaultImageAlt = 'Booze & Books social share image';
 	const image = `${baseUrl}${defaultImagePath}`;
 	$: url = $page?.url ? $page.url.href : baseUrl;
@@ -89,7 +89,7 @@
 	<meta property="og:site_name" content={siteName} />
 	<meta property="og:image" content={image} />
 	<meta property="og:image:secure_url" content={image} />
-	<meta property="og:image:type" content="image/jpeg" />
+	<meta property="og:image:type" content="image/png" />
 	<meta property="og:image:width" content="1200" />
 	<meta property="og:image:height" content="630" />
 	<meta property="og:image:alt" content={defaultImageAlt} />
