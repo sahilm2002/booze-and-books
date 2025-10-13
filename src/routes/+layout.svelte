@@ -15,7 +15,7 @@
 	const baseUrl = 'https://boozeandbooks.me';
 	const defaultTitle = 'Booze & Books — Swap books, discover cocktails';
 	const defaultDescription = 'Swap books with locals, discover cocktails, and connect with readers.';
-	const defaultImagePath = '/images/historical-society.jpg';
+	const defaultImagePath = '/images/social-share.jpeg';
 	const defaultImageAlt = 'Booze & Books social share image';
 	const image = `${baseUrl}${defaultImagePath}`;
 	$: url = $page?.url ? $page.url.href : baseUrl;
